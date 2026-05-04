@@ -1,0 +1,6 @@
+backend/data/state.json
+backend/data/*.log
+node_modules/
+.env
+npm-debug.log*
+insumos/

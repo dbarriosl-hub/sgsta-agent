@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agente SGSTA ISO 21101</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">SG</div>
+        <div>
+          <strong>SGSTA Agent</strong>
+          <span>NTC-ISO 21101</span>
+        </div>
+      </div>
+      <nav>
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Inicio</button>
+          <div class="nav-items">
+            <button class="nav-item active" data-view="dashboard"><span>Panel</span><em>SG</em></button>
+            <button class="nav-item" data-view="implementacion"><span>Implementacion</span><em>PHVA</em></button>
+            <button class="nav-item" data-view="phva"><span>PHVA</span><em>4-10</em></button>
+            <button class="nav-item" data-view="diagnostico"><span>Diagnostico</span><em>4-10</em></button>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Planear</button>
+          <div class="nav-items">
+            <button class="nav-item" data-view="empresa"><span>Empresa</span><em>4.1-4.3</em></button>
+            <button class="nav-item" data-view="riesgos"><span>Riesgos</span><em>6.1.2</em></button>
+            <button class="nav-item" data-view="seguros"><span>Seguros</span><em>6.1.3</em></button>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Hacer</button>
+          <div class="nav-items">
+            <button class="nav-item" data-view="personal"><span>Personal</span><em>5.3/7.2</em></button>
+            <button class="nav-item" data-view="capacitacion"><span>Capacitacion</span><em>7.2-7.3</em></button>
+            <button class="nav-item" data-view="equipos"><span>Equipos</span><em>7.1/8.1</em></button>
+            <button class="nav-item" data-view="actividades"><span>Actividades</span><em>8.1</em></button>
+            <button class="nav-item" data-view="participantes"><span>Participantes</span><em>7.4.3</em></button>
+            <button class="nav-item" data-view="documentos"><span>Documentos</span><em>7.5</em></button>
+            <button class="nav-item" data-view="incidentes"><span>Incidentes</span><em>8.3</em></button>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Verificar</button>
+          <div class="nav-items">
+            <button class="nav-item" data-view="auditorias"><span>Auditorias</span><em>9.2</em></button>
+            <button class="nav-item" data-view="revision"><span>Revision direccion</span><em>9.3</em></button>
+            <button class="nav-item" data-view="reportes"><span>Reportes</span><em>DIR</em></button>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Actuar</button>
+          <div class="nav-items">
+            <button class="nav-item" data-view="acciones"><span>Acciones</span><em>10.1</em></button>
+            <button class="nav-item" data-view="evidencias"><span>Evidencias</span><em>7.5/10</em></button>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-label" type="button" aria-expanded="true">Agente SaaS</button>
+          <div class="nav-items">
+            <button class="nav-item" data-view="agente"><span>Agente</span><em>IA</em></button>
+            <button class="nav-item" data-view="monitor"><span>Monitor</span><em>PHVA</em></button>
+            <button class="nav-item" data-view="revision_humana"><span>Revision humana</span><em>APR</em></button>
+            <button class="nav-item" data-view="alertas"><span>Alertas</span><em>VIG</em></button>
+            <button class="nav-item" data-view="agenda"><span>Agenda</span><em>SEG</em></button>
+            <button class="nav-item" data-view="formularios"><span>Formularios</span><em>REG</em></button>
+            <button class="nav-item" data-view="suscripcion"><span>Suscripcion</span><em>SaaS</em></button>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Sistema de gestion</p>
+          <h1>Turismo de aventura</h1>
+          <div id="backendStatus" class="backend-status offline">Modo local</div>
+        </div>
+        <form id="orgForm" class="org-form">
+          <label>
+            Organizacion
+            <input id="orgName" type="text" value="Mi empresa de turismo" autocomplete="off">
+          </label>
+          <label>
+            Responsable
+            <input id="ownerName" type="text" value="Responsable SGSTA" autocomplete="off">
+          </label>
+          <label>
+            Rol actual
+            <select id="currentUserRole">
+              <option value="direccion">Direccion</option>
+              <option value="admin">Admin</option>
+              <option value="responsable_sgsta">Responsable SGSTA</option>
+              <option value="consultor">Consultor</option>
+              <option value="guia">Guia</option>
+            </select>
+          </label>
+          <label>
+            Sistema
+            <select id="activeSystem">
+              <option value="iso21101">ISO 21101 Turismo aventura</option>
+              <option value="iso9001">ISO 9001 Calidad</option>
+              <option value="sst">SG-SST</option>
+              <option value="sostenibilidad">Sostenibilidad turistica</option>
+            </select>
+          </label>
+        </form>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="metrics">
+          <article><span>Cumplimiento</span><strong id="metricCompliance">0%</strong></article>
+          <article><span>Requisitos evaluados</span><strong id="metricEvaluated">0</strong></article>
+          <article><span>Acciones abiertas</span><strong id="metricActions">0</strong></article>
+          <article><span>Evidencias</span><strong id="metricEvidence">0</strong></article>
+          <article><span>Riesgos altos</span><strong id="metricHighRisks">0</strong></article>
+          <article><span>Personal pendiente</span><strong id="metricPeoplePending">0</strong></article>
+          <article><span>Capacitaciones</span><strong id="metricTraining">0</strong></article>
+          <article><span>Polizas por vencer</span><strong id="metricPoliciesDue">0</strong></article>
+        </div>
+        <div class="panel-grid">
+          <section class="panel">
+            <div class="panel-heading"><h2>Avance por capitulo</h2></div>
+            <div id="chapterProgress" class="chapter-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading"><h2>Proximas acciones</h2></div>
+            <div id="nextActions" class="action-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="implementacion" class="view">
+        <div class="implementation-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Asistente paso a paso</p>
+                <h2>Implementacion PHVA</h2>
+              </div>
+              <button id="runImplementationReview" type="button">Revisar avance</button>
+            </div>
+            <div id="implementationSteps" class="steps-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Siguiente mejor accion</p>
+                <h2>Guia del agente</h2>
+              </div>
+            </div>
+            <div id="implementationGuide" class="guide-box"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="phva" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Ciclo de gestion</p>
+              <h2>PHVA</h2>
+            </div>
+          </div>
+          <div id="phvaBoard" class="phva-grid"></div>
+        </div>
+      </section>
+
+      <section id="personal" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Competencia y conciencia</p>
+              <h2>Personal</h2>
+            </div>
+            <button id="addPerson" type="button">Nueva persona</button>
+          </div>
+          <div id="peopleTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="capacitacion" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Competencia y conciencia</p>
+              <h2>Capacitacion</h2>
+            </div>
+            <button id="addTrainingNeed" type="button">Nueva necesidad</button>
+          </div>
+          <div id="trainingTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="equipos" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Recursos y control operacional</p>
+              <h2>Equipos</h2>
+            </div>
+            <button id="addEquipment" type="button">Nuevo equipo</button>
+          </div>
+          <div id="equipmentTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="seguros" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Cobertura por actividad</p>
+              <h2>Seguros</h2>
+            </div>
+            <button id="addPolicy" type="button">Nueva poliza</button>
+          </div>
+          <div id="policiesTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="participantes" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Datos externos enlazados</p>
+              <h2>Participantes</h2>
+            </div>
+            <button id="addParticipantEvidence" type="button">Nueva evidencia</button>
+          </div>
+          <div id="participantsTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="empresa" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Datos base</p>
+              <h2>Empresa y alcance</h2>
+            </div>
+          </div>
+          <form id="companyForm" class="form-grid">
+            <label>Nombre legal<input id="companyLegalName" type="text"></label>
+            <label>NIT o identificacion<input id="companyNit" type="text"></label>
+            <label>Ciudad<input id="companyCity" type="text"></label>
+            <label>Telefono<input id="companyPhone" type="text"></label>
+            <label class="wide">Alcance del SGSTA<textarea id="companyScope"></textarea></label>
+            <label class="wide">Partes interesadas principales<textarea id="companyStakeholders"></textarea></label>
+          </form>
+        </div>
+      </section>
+
+      <section id="actividades" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <h2>Actividades de turismo</h2>
+            <button id="addActivity" type="button">Nueva actividad</button>
+          </div>
+          <div id="activitiesTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="riesgos" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <h2>Mapa de riesgos</h2>
+            <button id="addRisk" type="button">Nuevo riesgo</button>
+          </div>
+          <div id="risksTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="documentos" class="view">
+        <div class="documents-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Informacion documentada</p>
+                <h2>Documentos controlados</h2>
+              </div>
+              <div class="button-row">
+                <button id="generateDocumentDraft" class="secondary-button" type="button">Generar borrador IA</button>
+                <button id="addDocument" type="button">Nuevo documento</button>
+              </div>
+            </div>
+            <div id="documentsTable" class="simple-table"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Borrador generado</p>
+                <h2>Vista previa</h2>
+              </div>
+              <button id="documentToEvidence" class="secondary-button" type="button">Convertir en evidencia</button>
+            </div>
+            <article id="documentPreview" class="document-preview"></article>
+          </section>
+        </div>
+      </section>
+
+      <section id="incidentes" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <h2>Incidentes</h2>
+            <button id="addIncident" type="button">Registrar incidente</button>
+          </div>
+          <div id="incidentsTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="auditorias" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <h2>Auditorias</h2>
+            <button id="addAudit" type="button">Programar auditoria</button>
+          </div>
+          <div id="auditsTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="revision" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Numeral 9.3</p>
+              <h2>Revision por la direccion</h2>
+            </div>
+            <button id="addManagementReview" type="button">Preparar revision</button>
+          </div>
+          <div id="managementReviewTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="reportes" class="view">
+        <div class="documents-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Direccion y auditoria</p>
+                <h2>Reportes del sistema</h2>
+              </div>
+              <div class="button-row">
+                <button id="generateAuditReport" class="secondary-button" type="button">Actualizar auditoria</button>
+                <button id="generateReport" type="button">Actualizar reporte</button>
+                <button id="reportToEvidence" class="secondary-button" type="button">Enviar a evidencias</button>
+                <button id="printReport" class="secondary-button" type="button">Imprimir</button>
+                <button id="downloadReport" class="secondary-button" type="button">Descargar TXT</button>
+              </div>
+            </div>
+            <div id="reportSummary" class="report-summary"></div>
+            <div id="reportFindings" class="simple-table"></div>
+            <div class="panel-heading report-subheading">
+              <div>
+                <p class="eyebrow">Auditoria por requisito</p>
+                <h2>Matriz de auditoria</h2>
+              </div>
+            </div>
+            <div id="auditReportSummary" class="report-summary"></div>
+            <div id="auditReportTable" class="simple-table audit-report-table"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Borrador generado</p>
+                <h2>Informe</h2>
+              </div>
+            </div>
+            <article id="reportPreview" class="document-preview"></article>
+          </section>
+        </div>
+      </section>
+
+      <section id="formularios" class="view">
+        <div class="forms-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Desde Excel: Tablas + Campos</p>
+                <h2>Catalogo de formularios</h2>
+              </div>
+              <button id="addFormResponse" type="button">Diligenciar con agente</button>
+            </div>
+            <div id="formCatalogSummary" class="catalog-summary"></div>
+            <div class="form-filters">
+              <input id="formSearch" type="search" placeholder="Buscar formulario, tabla o requisito">
+              <select id="formPhvaFilter">
+                <option value="todos">Todo PHVA</option>
+                <option value="planear">Planear</option>
+                <option value="hacer">Hacer</option>
+                <option value="verificar">Verificar</option>
+                <option value="actuar">Actuar</option>
+              </select>
+              <select id="formStatusFilter">
+                <option value="todos">Todos los estados</option>
+                <option value="sin llenar">Sin llenar</option>
+                <option value="borrador">Borrador</option>
+                <option value="revision">Revision</option>
+                <option value="aprobado">Aprobado</option>
+              </select>
+            </div>
+            <div id="formRequirementCoverage" class="coverage-list"></div>
+            <div id="formsTable" class="simple-table"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Campos del formulario</p>
+                <h2>Vista del formulario</h2>
+              </div>
+            </div>
+            <div id="formPreview" class="form-preview"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="diagnostico" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Matriz de evidencias</p>
+              <h2>Requisitos NTC-ISO 21101</h2>
+            </div>
+            <div class="button-row">
+              <button id="closeCriticalGaps" type="button">Cerrar brechas criticas</button>
+              <button id="resetData" class="secondary-button" type="button">Reiniciar</button>
+            </div>
+          </div>
+          <div id="evidenceMatrixSummary" class="report-summary"></div>
+          <div id="closurePackagesPanel" class="closure-packages"></div>
+          <div id="requirementsTable" class="requirements-table"></div>
+        </div>
+      </section>
+
+      <section id="agente" class="view">
+        <div class="agent-layout">
+          <section class="panel agent-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Asistente</p>
+                <h2>Agente SGSTA</h2>
+              </div>
+            </div>
+            <div id="chatLog" class="chat-log"></div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" type="text" placeholder="Ej: Que me falta para el numeral 5.2?">
+              <button type="submit">Enviar</button>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="panel-heading"><h2>Acciones rapidas</h2></div>
+            <div class="quick-actions">
+              <button data-agent-action="diagnostico">Diagnostico inicial</button>
+              <button data-agent-action="politica">Crear tarea de politica</button>
+              <button data-agent-action="riesgos">Crear tarea de riesgos</button>
+              <button data-agent-action="personal">Revisar personal</button>
+              <button data-agent-action="capacitacion">Detectar capacitacion</button>
+              <button data-agent-action="equipos">Revisar equipos</button>
+              <button data-agent-action="seguros">Revisar seguros</button>
+              <button data-agent-action="participantes">Evidencia participantes</button>
+              <button data-agent-action="documentos">Revisar documentos</button>
+              <button data-agent-action="auditoria">Preparar auditoria</button>
+              <button data-agent-action="revision">Preparar revision direccion</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="acciones" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Actuar</p>
+              <h2>Acciones de gestion</h2>
+            </div>
+            <button id="addAction" type="button">Nueva accion</button>
+          </div>
+          <div id="actionsSummary" class="report-summary"></div>
+          <div id="actionsTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="alertas" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Vigilancia del sistema</p>
+              <h2>Alertas y vencimientos</h2>
+            </div>
+            <div class="button-row">
+              <button id="createCriticalAlertActions" class="secondary-button" type="button">Acciones criticas</button>
+              <button id="refreshAlerts" type="button">Actualizar alertas</button>
+            </div>
+          </div>
+          <div id="alertsSummary" class="report-summary"></div>
+          <div id="alertsTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="agenda" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Seguimiento operativo</p>
+              <h2>Agenda del sistema</h2>
+            </div>
+            <button id="refreshAgenda" type="button">Actualizar agenda</button>
+          </div>
+          <div id="agendaSummary" class="report-summary"></div>
+          <div id="agendaTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="revision_humana" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Control humano</p>
+              <h2>Bandeja de revision</h2>
+            </div>
+            <button id="refreshReviewInbox" type="button">Actualizar bandeja</button>
+          </div>
+          <div id="reviewInboxSummary" class="report-summary"></div>
+          <div id="reviewInbox" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="monitor" class="view">
+        <div class="panel-grid">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Herramientas auditables</p>
+              <h2>Monitor del agente</h2>
+            </div>
+            <button id="runAgentMonitor" type="button">Ejecutar monitor</button>
+          </div>
+          <div id="agentFindings" class="simple-table"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Trazabilidad</p>
+              <h2>Bitacora auditable</h2>
+            </div>
+          </div>
+          <div id="auditLog" class="audit-log"></div>
+        </div>
+        </div>
+      </section>
+
+      <section id="suscripcion" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Modelo SaaS</p>
+              <h2>Planes de suscripcion</h2>
+            </div>
+            <label class="compact-select">
+              Plan actual
+              <select id="currentPlan">
+                <option value="basico">Basico</option>
+                <option value="profesional">Profesional</option>
+                <option value="consultor">Consultor</option>
+                <option value="empresarial">Empresarial</option>
+              </select>
+            </label>
+          </div>
+          <div id="planUsage" class="plan-usage"></div>
+          <div id="systemsMatrix" class="systems-matrix"></div>
+          <div id="subscriptionPlans" class="plans-grid"></div>
+        </div>
+      </section>
+
+      <section id="evidencias" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Trazabilidad</p>
+              <h2>Evidencias</h2>
+            </div>
+            <div class="button-row">
+              <button id="suggestEvidence" class="secondary-button" type="button">Sugerir evidencia</button>
+              <button id="addEvidence" type="button">Registrar evidencia</button>
+            </div>
+          </div>
+          <div id="evidenceTable" class="simple-table"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="form_catalog.js"></script>
+    <script src="form_matrix.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

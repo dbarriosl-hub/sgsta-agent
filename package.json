@@ -1,0 +1,13 @@
+{
+  "name": "sgsta-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP agente-asistido para sistemas de gestion ISO 21101.",
+  "scripts": {
+    "start": "node backend/server.js",
+    "check": "node --check backend/server.js && node --check app/app.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

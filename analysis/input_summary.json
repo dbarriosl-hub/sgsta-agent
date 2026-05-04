@@ -1,0 +1,2409 @@
+{
+  "sql": {
+    "table_count": 44,
+    "tables": [
+      {
+        "name": "acciones_sugeridas",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_incidente",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "sugerencia",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_sugerencia",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "organizaciones",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "nombre",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "nit",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "direccion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "correo_contacto",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "usuarios",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "nombre",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "correo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contrasena_hash",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "rol",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "actividades",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "nombre",
+            "definition": "VARCHAR(255) NOT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "lider_usuario_id",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_inicio",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_fin",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`lider_usuario_id`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "personas",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "nombre_completo",
+            "definition": "VARCHAR(255) NOT NULL"
+          },
+          {
+            "name": "numero_identificacion",
+            "definition": "VARCHAR(50) NOT NULL"
+          },
+          {
+            "name": "tipo_identificacion",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "telefono",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "correo_electronico",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "perfil_general",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "bitacora_actividades",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_persona_guia",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "nombre_actividad",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "lugar_actividad",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_hora_inicio",
+            "definition": "DATETIME NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_clima",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "evaluacion_entorno",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "verificacion_equipos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "instrucciones_seguridad",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "horas_clave",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones_recorrido",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "comportamiento_grupo",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "eventos_inusuales",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "acciones_tomadas",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones_guia",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "firma_guia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion_registro",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_persona_guia`)",
+          "REFERENCES `sgs_iso21101`.`personas` (`id`)"
+        ]
+      },
+      {
+        "name": "capitulos_iso",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "codigo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "cargos",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "nombre",
+            "definition": "VARCHAR(255) NOT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "competencias_minimas",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_cargo",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "competencia",
+            "definition": "TEXT NOT NULL"
+          },
+          {
+            "name": "fuente_normativa",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_cargo`)",
+          "REFERENCES `sgs_iso21101`.`cargos` (`id`)"
+        ]
+      },
+      {
+        "name": "cargos_competencias",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_cargo",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_competencia_minima",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_verificacion",
+            "definition": "ENUM('Cumple', 'No cumple', 'Parcial') NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_verificacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)",
+          "FOREIGN KEY (`id_cargo`)",
+          "REFERENCES `sgs_iso21101`.`cargos` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`actividades` (`id`)",
+          "FOREIGN KEY (`id_competencia_minima`)",
+          "REFERENCES `sgs_iso21101`.`competencias_minimas` (`id`)"
+        ]
+      },
+      {
+        "name": "compromiso_personal",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_persona",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "cargo_funcion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_firma",
+            "definition": "DATE NOT NULL"
+          },
+          {
+            "name": "archivo_firma",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_persona`)",
+          "REFERENCES `sgs_iso21101`.`personas` (`id`)",
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "contexto_actividades",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "nombre_actividad",
+            "definition": "VARCHAR(255) NOT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_inicio",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_fin",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "riesgo_asociado",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "ENUM('activa', 'inactiva') NULL DEFAULT 'activa'"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "contexto_interno_externo",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "alcance",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contexto_social_cultural",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contexto_politico_legal",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contexto_economico",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contexto_geografico_ambiental",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tendencias",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "partes_interesadas",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "vision",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "mision",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "valores",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "organigrama",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "objetivos",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "politica",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "cultura",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "capacidades_personal",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "equipos_utilizados",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "procesos",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "sistemas_informacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "relaciones_contratuales",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "objetivos_gestion_riesgo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "relacion_sgsst",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "metodologias_riesgo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_adjunto",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "documentacion_minima",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "numeral_iso",
+            "definition": "VARCHAR(20) NOT NULL"
+          },
+          {
+            "name": "tipo",
+            "definition": "ENUM('Procedimiento', 'Registro', 'Política', 'Manual', 'Otro') NOT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NOT NULL"
+          },
+          {
+            "name": "obligatorio",
+            "definition": "TINYINT(1) NULL DEFAULT '1'"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "documentos_controlados",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_documentacion_minima",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "codigo",
+            "definition": "VARCHAR(50) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tipo_documento",
+            "definition": "ENUM('Procedimiento', 'Registro', 'Política', 'Manual', 'Externo', 'Otro') NULL DEFAULT NULL"
+          },
+          {
+            "name": "version",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_emision",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "autor",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "formato",
+            "definition": "VARCHAR(50) NULL DEFAULT NULL"
+          },
+          {
+            "name": "medio",
+            "definition": "ENUM('Electrónico', 'Físico') NULL DEFAULT NULL"
+          },
+          {
+            "name": "ubicacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "ENUM('Vigente', 'Obsoleto', 'En revisión') NULL DEFAULT NULL"
+          },
+          {
+            "name": "control_cambios",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "origen",
+            "definition": "ENUM('Interno', 'Externo') NULL DEFAULT NULL"
+          },
+          {
+            "name": "acceso",
+            "definition": "ENUM('Solo lectura', 'Lectura y escritura') NULL DEFAULT NULL"
+          },
+          {
+            "name": "restricciones_acceso",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_aprobacion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_aprobacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "retencion_minima",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "disposicion_final",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion_registro",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_documentacion_minima`)",
+          "REFERENCES `sgs_iso21101`.`documentacion_minima` (`id`)"
+        ]
+      },
+      {
+        "name": "equipos",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "codigo_equipo",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "nombre_equipo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "marca_referencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tipo_equipo",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_adquisicion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_inicial",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_ultima_inspeccion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_actual",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "mantenimiento_realizado",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proximo_mantenimiento",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_mantenimiento",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "numero_serie",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "certificaciones_sellos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "impacto_riesgo",
+        "columns": [
+          {
+            "name": "valor",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "categoria",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "programa_auditorias",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "periodo",
+            "definition": "VARCHAR(50) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proceso_auditar",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "criterios_auditoria",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "auditor_responsable",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "alcance",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "frecuencia",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_planeada",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "plan_auditoria",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_programa_auditoria",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "fecha_auditoria",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "dia",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "hora_inicio",
+            "definition": "TIME NULL DEFAULT NULL"
+          },
+          {
+            "name": "hora_fin",
+            "definition": "TIME NULL DEFAULT NULL"
+          },
+          {
+            "name": "actividad",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "lugar",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_actividad",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_programa_auditoria`)",
+          "REFERENCES `sgs_iso21101`.`programa_auditorias` (`id`)"
+        ]
+      },
+      {
+        "name": "informe_auditoria",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_plan_auditoria",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "auditor",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_informe",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "conclusiones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "recomendaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_soporte",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_plan_auditoria`)",
+          "REFERENCES `sgs_iso21101`.`plan_auditoria` (`id`)"
+        ]
+      },
+      {
+        "name": "informe_auditoria_detalle",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_informe_auditoria",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "numeral_norma",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "requisito",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "conforme",
+            "definition": "TINYINT(1) NULL DEFAULT NULL"
+          },
+          {
+            "name": "evidencia",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_informe_auditoria`)",
+          "REFERENCES `sgs_iso21101`.`informe_auditoria` (`id`)"
+        ]
+      },
+      {
+        "name": "mapa_riesgos",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "actividad",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "peligro",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "riesgo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "consecuencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "impacto_inicial",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "probabilidad_inicial",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "nivel_riesgo_inicial",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "control_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "impacto_residual",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "probabilidad_residual",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "nivel_riesgo_residual",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_control",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_control",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "normograma",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "tipo_norma",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "numero_norma",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "entidad_emisora",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_emision",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_vigencia",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "aplicabilidad",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_cumplimiento",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "medio_verificacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado_cumplimiento",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "enlace_norma",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "politica_sgs",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "contenido",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_firma",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_adjunto",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "objetivos_sgs",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_politica",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "objetivo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "indicador",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "meta",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_politica`)",
+          "REFERENCES `sgs_iso21101`.`politica_sgs` (`id`)"
+        ]
+      },
+      {
+        "name": "plan_comunicaciones",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "tipo_comunicacion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tema",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "frecuencia",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "audiencia",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "medio",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "plan_emergencia",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "ubicacion_operacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "riesgos_emergencias",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "consecuencias",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "procedimientos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "roles_personal",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "evacuacion_heridos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "personal_capacitado",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "equipos_disponibles",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "entidades_contacto",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "gestion_datos_participantes",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "proteccion_datos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "frecuencia_simulacros",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "registro_simulacros",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "comunicacion_participantes",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "revision_mejora",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "plan_objetivos_sgs",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_objetivo",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "que_se_hara",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "recursos",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "cuando",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "como_se_evaluara",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_objetivo`)",
+          "REFERENCES `sgs_iso21101`.`objetivos_sgs` (`id`)"
+        ]
+      },
+      {
+        "name": "plantillas_documentos",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "codigo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tipo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contenido",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "aplicacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "politica_datos_personales",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "version",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contenido",
+            "definition": "LONGTEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_emision",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "canal_publicacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "url_documento",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "politica_seguridad",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "contenido",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_firma",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "firma_imagen_url",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_adjunto",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "probabilidad_riesgo",
+        "columns": [
+          {
+            "name": "valor",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "categoria",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "procedimientos_sgs",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "codigo",
+            "definition": "VARCHAR(50) NULL DEFAULT NULL"
+          },
+          {
+            "name": "numeral_iso",
+            "definition": "VARCHAR(10) NULL DEFAULT NULL"
+          },
+          {
+            "name": "contenido",
+            "definition": "LONGTEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_adj",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "version",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_aprobacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "estado",
+            "definition": "ENUM('Vigente', 'En revisión', 'Obsoleto') NULL DEFAULT 'Vigente'"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "procedimientos_obligatorios",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "codigo",
+            "definition": "VARCHAR(10) NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "numeral_iso",
+            "definition": "VARCHAR(10) NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "obligatorio",
+            "definition": "TINYINT(1) NULL DEFAULT '1'"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "procedimientos_implementados",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_procedimiento_sgs",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_procedimiento_obligatorio",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "fecha_vinculacion",
+            "definition": "DATE NOT NULL"
+          },
+          {
+            "name": "cumple_requisitos",
+            "definition": "TINYINT(1) NULL DEFAULT '1'"
+          },
+          {
+            "name": "comentarios",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_procedimiento_sgs`)",
+          "REFERENCES `sgs_iso21101`.`procedimientos_sgs` (`id`)",
+          "FOREIGN KEY (`id_procedimiento_obligatorio`)",
+          "REFERENCES `sgs_iso21101`.`procedimientos_obligatorios` (`id`)"
+        ]
+      },
+      {
+        "name": "procedimientos_servicio",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "version",
+            "definition": "VARCHAR(20) NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_1_inicio",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_2_registro_instrucciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_3_verificacion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_4_desarrollo",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_5_incidentes",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_6_revision",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_7_conclusion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_8_equipos_requeridos",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_9_medidas_preventivas",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "paso_10_requisitos_infraestructura",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable_aprobacion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_aprobacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_original",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "referencia_norma_iso21101",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "capitulo",
+            "definition": "VARCHAR(10) NULL DEFAULT NULL"
+          },
+          {
+            "name": "numeral",
+            "definition": "VARCHAR(10) NULL DEFAULT NULL"
+          },
+          {
+            "name": "titulo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "requisito",
+            "definition": "TEXT NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": []
+      },
+      {
+        "name": "registro_comunicaciones_seguridad",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "tipo_comunicacion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "tema",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "lugar",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "medio",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "participantes",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsable",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "conclusiones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_acta",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)"
+        ]
+      },
+      {
+        "name": "registro_incidentes",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "fecha_hora_incidente",
+            "definition": "DATETIME NULL DEFAULT NULL"
+          },
+          {
+            "name": "ubicacion",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "personas_involucradas",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "condiciones_ambientales",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "equipo_asociado",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion_incidente",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "causas_probables",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "respuesta_emergencia",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "consecuencias",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "medidas_correctivas",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fuente_informacion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_evidencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "incorporado_mapa_riesgos",
+            "definition": "TINYINT(1) NULL DEFAULT '0'"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_registro",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "registro_participantes_evidencia",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_bitacora",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "tipo_evidencia",
+            "definition": "ENUM('formulario externo', 'archivo escaneado', 'otro') NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "url_evidencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_bitacora`)",
+          "REFERENCES `sgs_iso21101`.`bitacora_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "roles_responsabilidades",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "id_usuario",
+            "definition": "INT NULL DEFAULT NULL"
+          },
+          {
+            "name": "nombre_rol",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "responsabilidades",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "autoridad",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_actualizacion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_usuario`)",
+          "REFERENCES `sgs_iso21101`.`usuarios` (`id`)"
+        ]
+      },
+      {
+        "name": "seguimiento_medicion",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "fecha_registro",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "tipo_seguimiento",
+            "definition": "ENUM('Seguridad', 'SOP', 'Equipo', 'Emergencias', 'Satisfacción', 'Desempeño') NULL DEFAULT NULL"
+          },
+          {
+            "name": "indicador",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "medicion",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "observaciones",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "acciones_a_tomar",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_evidencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)"
+        ]
+      },
+      {
+        "name": "simulacros",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_organizacion",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_actividad",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "id_plan_emergencia",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "tipo_simulacro",
+            "definition": "VARCHAR(100) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_simulacro",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "participantes",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "resultados",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "proxima_accion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_proxima_accion",
+            "definition": "DATE NULL DEFAULT NULL"
+          },
+          {
+            "name": "archivo_evidencia",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_creacion",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_organizacion`)",
+          "REFERENCES `sgs_iso21101`.`organizaciones` (`id`)",
+          "FOREIGN KEY (`id_actividad`)",
+          "REFERENCES `sgs_iso21101`.`contexto_actividades` (`id`)",
+          "FOREIGN KEY (`id_plan_emergencia`)",
+          "REFERENCES `sgs_iso21101`.`plan_emergencia` (`id`)"
+        ]
+      },
+      {
+        "name": "simulacro_evidencias",
+        "columns": [
+          {
+            "name": "id",
+            "definition": "INT NOT NULL AUTO_INCREMENT"
+          },
+          {
+            "name": "id_simulacro",
+            "definition": "INT NOT NULL"
+          },
+          {
+            "name": "tipo_archivo",
+            "definition": "ENUM('foto', 'video', 'otro') NULL DEFAULT NULL"
+          },
+          {
+            "name": "descripcion",
+            "definition": "TEXT NULL DEFAULT NULL"
+          },
+          {
+            "name": "url_archivo",
+            "definition": "VARCHAR(255) NULL DEFAULT NULL"
+          },
+          {
+            "name": "fecha_subida",
+            "definition": "DATETIME NULL DEFAULT CURRENT_TIMESTAMP"
+          }
+        ],
+        "foreign_keys": [
+          "FOREIGN KEY (`id_simulacro`)",
+          "REFERENCES `sgs_iso21101`.`simulacros` (`id`)"
+        ]
+      }
+    ],
+    "insert_count": 0
+  },
+  "xlsx": {
+    "sheet_count": 2,
+    "sheets": [
+      {
+        "name": "Tablas",
+        "preview_rows": [
+          [
+            "Tabla",
+            "Descripción",
+            "",
+            ""
+          ],
+          [
+            "organizaciones",
+            "Información básica de cada organización registrada en el sistema.",
+            "Creacióny gestión  por Auth.",
+            "Tabla de registro en el sistema para los usuarios. Tiene todo que ver con la autenticación del usuario cliente. Esta tabla también relaciona todas las demás como llave."
+          ],
+          [
+            "usuarios",
+            "Tabla de usuarios con su rol y vinculación a una organización.",
+            "",
+            ""
+          ],
+          [
+            "capitulos_iso",
+            "Capítulos de la norma ISO 21101 con su código y título.",
+            "Tabla de referencia",
+            "Llenar con los capítulos de la ISO 21101"
+          ],
+          [
+            "compromiso_liderazgo",
+            "Formulario R1 donde se registra el compromiso formal de la alta dirección.",
+            "Creación de registros, edición, consulta, reporte",
+            "Un texto y su firma (la firma podría ser digital)"
+          ],
+          [
+            "contexto_interno_externo",
+            "Formulario R23 con información sobre contexto interno y externo de la organización.",
+            "Creación de registros, edición, consulta, reporte",
+            ""
+          ],
+          [
+            "contexto_actividades",
+            "Lista de actividades ofrecidas por una organización en turismo de aventura",
+            "Creación de registros, edición, consulta, reporte",
+            "Debe crearse antes de contexto o con currente (por ejemplo si van a "
+          ],
+          [
+            "impacto_riesgo",
+            "Tabla referencial que define categorías y descripciones del impacto del riesgo.",
+            "Tabla de referencia",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "Campos",
+        "preview_rows": [
+          [
+            "Tabla",
+            "Campo",
+            "Descripción"
+          ],
+          [
+            "capitulos_iso",
+            "id",
+            "Identificador del capítulo (clave primaria)."
+          ],
+          [
+            "capitulos_iso",
+            "codigo",
+            "Código del capítulo de la norma (ej: 4.1, 5.2)."
+          ],
+          [
+            "capitulos_iso",
+            "titulo",
+            "Título o nombre del capítulo."
+          ],
+          [
+            "compromiso_liderazgo",
+            "id",
+            "Identificador del registro."
+          ],
+          [
+            "compromiso_liderazgo",
+            "id_organizacion",
+            "Organización que emite el compromiso."
+          ],
+          [
+            "compromiso_liderazgo",
+            "id_usuario",
+            "Usuario que registra el compromiso."
+          ],
+          [
+            "compromiso_liderazgo",
+            "nombre_empresa",
+            "Nombre legal de la empresa."
+          ]
+        ]
+      }
+    ]
+  },
+  "pdf": {
+    "path": "C:\\Users\\Diego\\Documents\\New project\\insumos\\NTC-ISO-21101-2020-TURISMO-DE-AVENTURA-SISTEMAS-DE-GESTION-DE-SEGURIDAD-REQUISITOS.pdf",
+    "text_available": true,
+    "page_count": 35,
+    "sample": " \nNORMA TÉCNICA COLOMBIANA \nNTC-ISO 21101 \n2020-11-25 \n \n \nTurismo de aventura. \nSistemas de gestión de seguridad. Requisitos \n \n \nE: Adventure tourism. Safety management systems. Requirements \n \n \n \n \n \n \n \n \n \nCORRESPONDENCIA: Esta norma Técnica Colombiana es una adopción idéntica y por \ntraducción (IDT) de la norma ISO 21101:2014 (revisado y confirmado 2019) \n \nDESCRIPTORES: sistemas de gestión; turismo de aventura; turismo; seguridad. \n \nI.C.S.: 03.200;03.080.30 \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n® ICONTEC 2020 \nReservados todos los derechos. Ninguna parte de esta  publicación puede ser reproducida o utilizada en \ncualquier forma o por cualquier medio, electrónico o me cánico incluyendo fotocopiado y microfilmación, sin \npermiso por escrito del editor. \n \nEditada por ICONTEC. Apartado 14237 Bogotá, D.C. - Tel. (571) 6078888\n \n \nProhibida su reproducción | Editada 2020-11-25 \n \n\n \n \n \n \n \n \nPRÓLOGO \n \n \n \nEl Instituto Colombiano de Normas Técnicas y Certificación, ICONTEC, es el organismo nacional de \nnormalización, según el Decreto 1595 de 2015. \n \nICONTEC es una entidad de carácter privado, sin ánimo de lucro, cuya Misión es fundamental para \nbrindar soporte y desarrollo al productor y protección al consu midor. Colabora con el sector \ngubernamental y apoya al sector privado del país, para lograr ventajas competitivas en los mercados \ninterno y externo. \n \nLa representación de todos los sectores involucrados en el proc eso de Normalización Técnica está \ngarantizada por los Comités Técnicos y el período de Consulta P ública, este último caracterizado \npor la participación del público en general. \n \nSe llama la atención sobre la posibilidad de que algunos elementos de este documento pueden ser \nobjeto de derechos de patente. ICONTEC no asume la responsabilidad por la identificación de dichas \npatentes, o por la documentación que se haya aportado que goza de esta protección legal. \n \nEl proceso de elaboración de la norma NTC-ISO 21101 fue liderad o por el Ministerio de Comercio, \nIndustria y Turismo, con el Fondo de Turismo - FONTUR como contratante del proceso. \n \nLa norma NTC-ISO 21101 fue elaborada por el CTN 258 Turismo de Aventura y Buceo y ratificada \npor el Consejo Directivo de 2020-11-25. \n \nEste documento está sujeto a ser revisado en cualquier momento con el objeto de que responda a \nlas necesidades y exigencias actuales. Se invita a los usuarios  de este documento a presentar sus \nsolicitudes de revisión a ICONTEC; sus comentarios serán puesto s a"
+  }
+}

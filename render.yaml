@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: sgsta-agent
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: STORAGE_DRIVER
+        value: postgres
+      - key: STATE_KEY
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sgsta-agent-db
+          property: connectionString
+
+databases:
+  - name: sgsta-agent-db
+    plan: starter
