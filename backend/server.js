@@ -65,6 +65,28 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function serializeError(error) {
+  if (!error) return null;
+  const details = {
+    name: error.name || "Error",
+    message: error.message || String(error)
+  };
+  if (error.code) details.code = error.code;
+  if (error.errno) details.errno = error.errno;
+  if (error.address) details.address = error.address;
+  if (error.port) details.port = error.port;
+  if (Array.isArray(error.errors)) {
+    details.errors = error.errors.map((item) => ({
+      name: item.name || "Error",
+      message: item.message || String(item),
+      code: item.code,
+      address: item.address,
+      port: item.port
+    }));
+  }
+  return details;
+}
+
 function saveState() {
   if (!storageReady) {
     console.warn("Estado aun no persistido: almacenamiento no esta listo.");
@@ -902,7 +924,7 @@ async function handle(req, res) {
       service: "sgsta-agent-api",
       storage: storage ? storage.name : "starting",
       ready: storageReady,
-      storageError: storageError ? storageError.message : null
+      storageError: serializeError(storageError)
     });
   }
   if (req.method === "GET" && url.pathname === "/api/organizations") return send(res, 200, state.organizations);
@@ -1075,7 +1097,7 @@ async function start() {
   } catch (error) {
     storageReady = false;
     storageError = error;
-    console.error(`SGSTA Agent storage failed: ${error.message}`);
+    console.error("SGSTA Agent storage failed:", serializeError(error));
   }
 }
 
