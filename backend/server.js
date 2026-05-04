@@ -66,6 +66,10 @@ function clone(value) {
 }
 
 function saveState() {
+  if (!storageReady) {
+    console.warn("Estado aun no persistido: almacenamiento no esta listo.");
+    return;
+  }
   storage.save(state).catch((error) => {
     console.error(`No se pudo guardar estado en ${storage.name}:`, error.message);
   });
@@ -86,6 +90,8 @@ function normalizeState(savedState) {
 
 let storage;
 let state = clone(defaultState);
+let storageReady = false;
+let storageError = null;
 
 function readWindowPayload(file, globalName) {
   const text = fs.readFileSync(path.join(ROOT, "app", file), "utf8").trim();
@@ -890,7 +896,15 @@ function updateFormWorkflow(input) {
 async function handle(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (req.method === "OPTIONS") return send(res, 200, {});
-  if (req.method === "GET" && url.pathname === "/health") return send(res, 200, { ok: true, service: "sgsta-agent-api", storage: storage.name });
+  if (req.method === "GET" && url.pathname === "/health") {
+    return send(res, 200, {
+      ok: true,
+      service: "sgsta-agent-api",
+      storage: storage ? storage.name : "starting",
+      ready: storageReady,
+      storageError: storageError ? storageError.message : null
+    });
+  }
   if (req.method === "GET" && url.pathname === "/api/organizations") return send(res, 200, state.organizations);
   if (req.method === "GET" && url.pathname === "/api/requirements") return send(res, 200, requirements);
   if (req.method === "GET" && url.pathname === "/api/forms/catalog") return send(res, 200, visibleFormCatalog());
@@ -1050,10 +1064,19 @@ const server = http.createServer((req, res) => {
 
 async function start() {
   storage = createStorage({ defaultState, mergeState: normalizeState, dataFile: DATA_FILE });
-  state = await storage.load();
   server.listen(PORT, HOST, () => {
     console.log(`SGSTA Agent API listening on http://${HOST}:${PORT} using ${storage.name} storage`);
   });
+  try {
+    state = await storage.load();
+    storageReady = true;
+    storageError = null;
+    console.log(`SGSTA Agent storage ready: ${storage.name}`);
+  } catch (error) {
+    storageReady = false;
+    storageError = error;
+    console.error(`SGSTA Agent storage failed: ${error.message}`);
+  }
 }
 
 start().catch((error) => {

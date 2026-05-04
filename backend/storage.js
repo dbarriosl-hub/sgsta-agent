@@ -37,7 +37,11 @@ function createPostgresStorage({ databaseUrl, defaultState, mergeState, stateKey
     throw new Error("STORAGE_DRIVER=postgres requiere instalar la dependencia 'pg'. Ejecuta npm install.");
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000
+  });
 
   async function ensureTable() {
     await pool.query(`
