@@ -1140,6 +1140,15 @@ textarea {
   grid-template-columns: minmax(220px, 1fr) 150px 110px;
 }
 
+.simple-row.selected-row {
+  background: #eef8f6;
+  border-left: 4px solid var(--accent);
+}
+
+.activity-profile {
+  margin-top: 14px;
+}
+
 .finding-row {
   grid-template-columns: minmax(0, 1fr) 120px minmax(130px, auto);
 }

@@ -233,6 +233,7 @@ const defaultState = {
   executiveReport: null,
   agentFindings: [],
   closurePackages: [],
+  selectedActivityName: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
   formFilters: { search: "", phva: "todos", status: "todos" },
   formResponses: [
@@ -813,7 +814,7 @@ function fillCompanyForm() {
 }
 
 function primaryActivityName() {
-  return state.activities[0]?.name || "Actividad por definir";
+  return state.selectedActivityName || state.activities[0]?.name || "Actividad por definir";
 }
 
 function itemActivityName(item) {
@@ -832,13 +833,74 @@ function activityRelatedItems(activityName) {
   };
 }
 
+function activityControlStatus(activityName) {
+  const related = activityRelatedItems(activityName);
+  return {
+    guide: related.people.some((person) => person.competence === "cumple"),
+    risks: related.risks.length > 0,
+    equipment: related.equipment.length > 0 && related.equipment.every((item) => item.status === "operativo"),
+    participants: related.participants.length > 0,
+    insurance: related.policies.some((item) => item.status === "vigente"),
+    training: related.training.length > 0
+  };
+}
+
+function controlBadge(ok, label) {
+  return `<span class="badge ${ok ? "cumple" : "no_cumple"}">${label}</span>`;
+}
+
+function addRiskForActivity(activityName) {
+  state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
+  state.compliance["6.1.2"] = "en_proceso";
+  createAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", "actividad");
+}
+
+function addEquipmentForActivity(activityName) {
+  const count = state.equipment.length + 1;
+  state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar" });
+  state.compliance["7.1"] = "en_proceso";
+  state.compliance["8.1"] = "en_proceso";
+  createAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", "actividad");
+}
+
+function addGuideForActivity(activityName) {
+  const count = state.people.length + 1;
+  state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar" });
+  state.compliance["7.2"] = "en_proceso";
+  createAction(`Verificar guia competente para ${activityName}`, "7.2", "preventiva", "actividad");
+}
+
+function addParticipantConditionForActivity(activityName) {
+  state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente" });
+  state.compliance["7.4.3"] = "en_proceso";
+  createAction(`Definir condiciones de participacion para ${activityName}`, "7.4.3", "tarea", "actividad");
+}
+
+function addPolicyForActivity(activityName) {
+  const count = state.policies.length + 1;
+  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente" });
+  state.compliance["6.1.3"] = "en_proceso";
+  createAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", "actividad");
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
-  container.innerHTML = state.activities.length
-    ? state.activities.map((item, index) => {
+  if (!state.activities.length) {
+    container.innerHTML = `<div class="muted">No hay actividades registradas.</div>`;
+    return;
+  }
+  if (!state.activities.some((item) => item.name === state.selectedActivityName)) {
+    state.selectedActivityName = state.activities[0].name;
+  }
+  const selectedActivity = state.activities.find((item) => item.name === state.selectedActivityName) || state.activities[0];
+  const selectedRelated = activityRelatedItems(selectedActivity.name);
+  container.innerHTML = `
+    <div class="simple-table">
+      ${state.activities.map((item, index) => {
       const related = activityRelatedItems(item.name);
+      const controls = activityControlStatus(item.name);
       return `
-      <div class="simple-row module-row">
+      <div class="simple-row module-row ${state.selectedActivityName === item.name ? "selected-row" : ""}">
         <div>
           <strong>${item.name}</strong>
           <div class="muted">${item.place} - Lider: ${item.leader}</div>
@@ -849,13 +911,63 @@ function renderActivities() {
             <span>Guias ${related.people.length}</span>
             <span>Participantes ${related.participants.length}</span>
           </div>
+          <div class="matrix-metrics">
+            ${controlBadge(controls.guide, "guia")}
+            ${controlBadge(controls.risks, "riesgos")}
+            ${controlBadge(controls.equipment, "equipos")}
+            ${controlBadge(controls.participants, "participantes")}
+            ${controlBadge(controls.insurance, "seguro")}
+          </div>
         </div>
         <span class="badge cumple">${item.status}</span>
+        <button class="secondary-button" data-select-activity="${item.name}" type="button">Ver ficha</button>
         <button class="secondary-button" data-remove="activities:${index}" type="button">Quitar</button>
       </div>`;
-    }).join("")
-    : `<div class="muted">No hay actividades registradas.</div>`;
+    }).join("")}
+    </div>
+    <div class="panel activity-profile">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Ficha de actividad</p>
+          <h2>${selectedActivity.name}</h2>
+        </div>
+        <span class="badge phva">8.1</span>
+      </div>
+      <div class="report-summary">
+        <div class="report-card"><span>Riesgos</span><strong>${selectedRelated.risks.length}</strong></div>
+        <div class="report-card"><span>Equipos</span><strong>${selectedRelated.equipment.length}</strong></div>
+        <div class="report-card"><span>Guias</span><strong>${selectedRelated.people.length}</strong></div>
+        <div class="report-card"><span>Seguro</span><strong>${selectedRelated.policies.length}</strong></div>
+      </div>
+      <div class="simple-table">
+        <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
+        <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
+        <div class="simple-row"><strong>Riesgos</strong><span>${selectedRelated.risks.map((item) => item.title).join(", ") || "Sin riesgos especificos"}</span></div>
+        <div class="simple-row"><strong>Equipos</strong><span>${selectedRelated.equipment.map((item) => `${item.name} (${item.status})`).join(", ") || "Sin equipos especificos"}</span></div>
+        <div class="simple-row"><strong>Guias</strong><span>${selectedRelated.people.map((item) => `${item.name} (${item.competence})`).join(", ") || "Sin guia asignado"}</span></div>
+        <div class="simple-row"><strong>Seguro</strong><span>${selectedRelated.policies.map((item) => `${item.number} (${item.status})`).join(", ") || "Sin poliza por actividad"}</span></div>
+      </div>
+      <div class="button-row">
+        <button class="secondary-button" data-add-risk-activity="${selectedActivity.name}" type="button">Riesgo</button>
+        <button class="secondary-button" data-add-equipment-activity="${selectedActivity.name}" type="button">Equipo</button>
+        <button class="secondary-button" data-add-guide-activity="${selectedActivity.name}" type="button">Guia</button>
+        <button class="secondary-button" data-add-participant-activity="${selectedActivity.name}" type="button">Participacion</button>
+        <button class="secondary-button" data-add-policy-activity="${selectedActivity.name}" type="button">Seguro</button>
+      </div>
+    </div>`;
   bindRemoveButtons(container);
+  container.querySelectorAll("[data-select-activity]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedActivityName = button.dataset.selectActivity;
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelector("[data-add-risk-activity]")?.addEventListener("click", (event) => addRiskForActivity(event.currentTarget.dataset.addRiskActivity));
+  container.querySelector("[data-add-equipment-activity]")?.addEventListener("click", (event) => addEquipmentForActivity(event.currentTarget.dataset.addEquipmentActivity));
+  container.querySelector("[data-add-guide-activity]")?.addEventListener("click", (event) => addGuideForActivity(event.currentTarget.dataset.addGuideActivity));
+  container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
+  container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
 }
 
 function renderPeople() {
