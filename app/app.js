@@ -183,8 +183,13 @@ const defaultState = {
   company: {
     legalName: "Mi empresa de turismo",
     nit: "",
+    country: "Colombia",
+    region: "",
     city: "",
     phone: "",
+    operatingArea: "",
+    activityDescription: "Caminatas ecologicas y actividades guiadas de turismo de aventura.",
+    localContext: "",
     scope: "Actividades de turismo de aventura ofrecidas por la organizacion.",
     stakeholders: "Clientes, guias, proveedores, autoridades, comunidad local."
   },
@@ -785,8 +790,13 @@ function fillCompanyForm() {
   const fields = {
     companyLegalName: "legalName",
     companyNit: "nit",
+    companyCountry: "country",
+    companyRegion: "region",
     companyCity: "city",
     companyPhone: "phone",
+    companyOperatingArea: "operatingArea",
+    companyActivityDescription: "activityDescription",
+    companyLocalContext: "localContext",
     companyScope: "scope",
     companyStakeholders: "stakeholders"
   };
@@ -3760,8 +3770,13 @@ document.querySelector("#currentPlan").addEventListener("change", () => {
 document.querySelector("#companyForm").addEventListener("input", () => {
   state.company.legalName = document.querySelector("#companyLegalName").value;
   state.company.nit = document.querySelector("#companyNit").value;
+  state.company.country = document.querySelector("#companyCountry").value;
+  state.company.region = document.querySelector("#companyRegion").value;
   state.company.city = document.querySelector("#companyCity").value;
   state.company.phone = document.querySelector("#companyPhone").value;
+  state.company.operatingArea = document.querySelector("#companyOperatingArea").value;
+  state.company.activityDescription = document.querySelector("#companyActivityDescription").value;
+  state.company.localContext = document.querySelector("#companyLocalContext").value;
   state.company.scope = document.querySelector("#companyScope").value;
   state.company.stakeholders = document.querySelector("#companyStakeholders").value;
   state.compliance["4.3"] = state.company.scope ? "en_proceso" : "pendiente";

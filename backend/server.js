@@ -635,9 +635,31 @@ function extractJsonObject(text) {
 }
 
 function compactSystemContext() {
+  const company = state.company || {};
+  const registeredActivities = list(state.activities).slice(0, 8);
   return {
-    organization: state.company || {},
-    activities: list(state.activities).slice(0, 5),
+    organizationProfile: {
+      legalName: company.legalName || state.orgName || state.organizations?.[0]?.name || "",
+      nit: company.nit || "",
+      country: company.country || "",
+      region: company.region || "",
+      city: company.city || "",
+      phone: company.phone || "",
+      operatingArea: company.operatingArea || "",
+      activityDescription: company.activityDescription || "",
+      localContext: company.localContext || "",
+      scope: company.scope || "",
+      stakeholders: company.stakeholders || ""
+    },
+    activities: registeredActivities,
+    activityNames: registeredActivities.map((activity) => activity.name || activity.activity).filter(Boolean),
+    locations: [
+      company.country,
+      company.region,
+      company.city,
+      company.operatingArea,
+      ...registeredActivities.map((activity) => activity.place)
+    ].filter(Boolean),
     risks: list(state.risks).slice(0, 5),
     people: list(state.people).slice(0, 5),
     equipment: list(state.equipment).slice(0, 5),
@@ -688,6 +710,8 @@ async function generateAiFormValues(form, currentValues = {}) {
           content: [
             "Eres un agente experto en sistemas de gestion NTC ISO 21101 para turismo de aventura.",
             "Tu tarea es diligenciar borradores auditables de formularios, no aprobar cumplimiento.",
+            "Antes de redactar, considera siempre el perfil empresarial: ubicacion, zona de operacion, actividades principales, entorno local, alcance y partes interesadas.",
+            "Adapta los campos al tipo de actividad de turismo de aventura, al territorio donde opera la empresa y a los riesgos/recursos registrados.",
             "Usa solo datos del contexto. Si falta informacion, escribe un valor profesional con 'Por definir' o 'Pendiente de evidencia'.",
             "Devuelve unicamente JSON valido con esta forma: {\"values\": {\"campo\": \"valor\"}, \"notes\": \"resumen breve\"}."
           ].join(" ")
