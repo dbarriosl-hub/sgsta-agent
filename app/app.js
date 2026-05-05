@@ -849,6 +849,44 @@ function controlBadge(ok, label) {
   return `<span class="badge ${ok ? "cumple" : "no_cumple"}">${label}</span>`;
 }
 
+const activityPackageTables = [
+  "contexto_actividades",
+  "mapa_riesgos",
+  "procedimientos_servicio",
+  "equipos",
+  "plan_emergencia",
+  "registro_participantes_evidencia"
+];
+
+function formResponseForActivity(table, activityName) {
+  return state.formResponses.find((item) => item.table === table && (item.activity === activityName || item.values?.actividad === activityName || item.values?.nombre_actividad === activityName || item.values?.id_actividad === activityName));
+}
+
+function activityFormStats(activityName) {
+  const responses = activityPackageTables.map((table) => formResponseForActivity(table, activityName)).filter(Boolean);
+  return {
+    total: activityPackageTables.length,
+    responses,
+    draft: responses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length,
+    approved: responses.filter((item) => normalizedFormStatus(item.status) === "aprobado").length,
+    pending: activityPackageTables.length - responses.length,
+    evidence: state.evidence.filter((item) => item.activity === activityName || item.linkedActivity === activityName)
+  };
+}
+
+function activityContext(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName) || {};
+  const related = activityRelatedItems(activityName);
+  return {
+    activity,
+    related,
+    risk: related.risks[0] || {},
+    person: related.people[0] || {},
+    equipment: related.equipment[0] || {},
+    policy: related.policies[0] || {}
+  };
+}
+
 function addRiskForActivity(activityName) {
   state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
   state.compliance["6.1.2"] = "en_proceso";
@@ -883,6 +921,93 @@ function addPolicyForActivity(activityName) {
   createAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", "actividad");
 }
 
+function generateFormDraftValuesForActivity(form, activityName) {
+  const relation = getFormMatrixItem(form.table);
+  const requirement = getFormRequirement(form);
+  const context = activityContext(activityName);
+  const values = {};
+  form.fields.forEach((field) => {
+    const name = field.name.toLowerCase();
+    values[field.name] = suggestedValueForField(name, {
+      form,
+      relation,
+      requirement,
+      activity: context.activity,
+      person: context.person,
+      equipment: context.equipment,
+      policy: context.policy,
+      risk: context.risk
+    });
+  });
+  return values;
+}
+
+function upsertActivityFormDraft(table, activityName) {
+  const form = visibleCatalogForms(window.formCatalog || []).find((item) => item.table === table);
+  if (!form) return null;
+  const relation = getFormMatrixItem(form.table);
+  const requirement = getFormRequirement(form);
+  const existing = formResponseForActivity(table, activityName);
+  const values = generateFormDraftValuesForActivity(form, activityName);
+  if (existing) {
+    existing.status = existing.status === "aprobado" ? "revision" : "borrador";
+    existing.values = { ...(existing.values || {}), ...values };
+    existing.activity = activityName;
+    existing.source = existing.source || "agente_actividad";
+    existing.requiresApproval = true;
+    existing.updatedAt = today();
+    return existing;
+  }
+  const response = {
+    table: form.table,
+    form: `${form.title} - ${activityName}`,
+    module: relation?.module || form.table,
+    activity: activityName,
+    status: "borrador",
+    code: requirement.code,
+    fields: form.fields.map((field) => field.name),
+    values,
+    source: "agente_actividad",
+    requiresApproval: true,
+    approvedBy: "",
+    approvedAt: "",
+    updatedAt: today()
+  };
+  state.formResponses.unshift(response);
+  return response;
+}
+
+function suggestActivityEvidence(activityName) {
+  activityPackageTables.forEach((table) => {
+    const response = formResponseForActivity(table, activityName);
+    if (!response) return;
+    const existing = state.evidence.find((item) => item.linkedDocument === `${table}:${activityName}` && item.source === "paquete actividad");
+    const evidence = {
+      title: `Evidencia sugerida: ${response.form}`,
+      code: response.code,
+      activity: activityName,
+      linkedActivity: activityName,
+      linkedDocument: `${table}:${activityName}`,
+      source: "paquete actividad",
+      status: normalizedFormStatus(response.status) === "aprobado" ? "registrada" : "sugerida",
+      date: today()
+    };
+    if (existing) Object.assign(existing, evidence);
+    else state.evidence.unshift(evidence);
+  });
+}
+
+function prepareActivityPackage(activityName) {
+  const created = activityPackageTables.map((table) => upsertActivityFormDraft(table, activityName)).filter(Boolean);
+  suggestActivityEvidence(activityName);
+  createAction(`Revisar paquete operativo de ${activityName}`, "8.1", "tarea", "actividad");
+  state.selectedActivityName = activityName;
+  state.formFilters.search = activityName;
+  saveState();
+  addMessage("agent", `Prepare ${created.length} formulario(s) y evidencias sugeridas para ${activityName}. Quedan pendientes de revision humana.`);
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -894,6 +1019,7 @@ function renderActivities() {
   }
   const selectedActivity = state.activities.find((item) => item.name === state.selectedActivityName) || state.activities[0];
   const selectedRelated = activityRelatedItems(selectedActivity.name);
+  const selectedStats = activityFormStats(selectedActivity.name);
   container.innerHTML = `
     <div class="simple-table">
       ${state.activities.map((item, index) => {
@@ -938,6 +1064,8 @@ function renderActivities() {
         <div class="report-card"><span>Equipos</span><strong>${selectedRelated.equipment.length}</strong></div>
         <div class="report-card"><span>Guias</span><strong>${selectedRelated.people.length}</strong></div>
         <div class="report-card"><span>Seguro</span><strong>${selectedRelated.policies.length}</strong></div>
+        <div class="report-card"><span>Formularios</span><strong>${selectedStats.approved}/${selectedStats.total}</strong></div>
+        <div class="report-card"><span>Evidencias</span><strong>${selectedStats.evidence.length}</strong></div>
       </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
@@ -946,8 +1074,10 @@ function renderActivities() {
         <div class="simple-row"><strong>Equipos</strong><span>${selectedRelated.equipment.map((item) => `${item.name} (${item.status})`).join(", ") || "Sin equipos especificos"}</span></div>
         <div class="simple-row"><strong>Guias</strong><span>${selectedRelated.people.map((item) => `${item.name} (${item.competence})`).join(", ") || "Sin guia asignado"}</span></div>
         <div class="simple-row"><strong>Seguro</strong><span>${selectedRelated.policies.map((item) => `${item.number} (${item.status})`).join(", ") || "Sin poliza por actividad"}</span></div>
+        <div class="simple-row"><strong>Formularios actividad</strong><span>${selectedStats.approved} aprobados, ${selectedStats.draft} borrador/revision, ${selectedStats.pending} pendientes</span></div>
       </div>
       <div class="button-row">
+        <button data-prepare-activity="${selectedActivity.name}" type="button">Preparar actividad con agente</button>
         <button class="secondary-button" data-add-risk-activity="${selectedActivity.name}" type="button">Riesgo</button>
         <button class="secondary-button" data-add-equipment-activity="${selectedActivity.name}" type="button">Equipo</button>
         <button class="secondary-button" data-add-guide-activity="${selectedActivity.name}" type="button">Guia</button>
@@ -968,6 +1098,7 @@ function renderActivities() {
   container.querySelector("[data-add-guide-activity]")?.addEventListener("click", (event) => addGuideForActivity(event.currentTarget.dataset.addGuideActivity));
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
+  container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
 }
 
 function renderPeople() {
