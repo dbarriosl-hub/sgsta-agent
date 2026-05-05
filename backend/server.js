@@ -514,6 +514,24 @@ function buildRequirementGap(code) {
 
 function buildAgentFindings() {
   const findings = [];
+  list(state.activities).forEach((activity) => {
+    const name = activity.name || activity.activity;
+    if (!name) return;
+    const hasRisk = list(state.risks).some((item) => item.activity === name);
+    const hasEquipment = list(state.equipment).some((item) => item.activity === name);
+    const hasGuide = list(state.people).some((item) => item.activity === name || String(item.role || "").toLowerCase().includes(String(name).toLowerCase()));
+    const hasParticipants = list(state.participantEvidence).some((item) => item.activity === name);
+    if (!hasRisk || !hasEquipment || !hasGuide || !hasParticipants) {
+      const missing = [
+        !hasRisk ? "riesgos" : "",
+        !hasEquipment ? "equipos" : "",
+        !hasGuide ? "guias/personal competente" : "",
+        !hasParticipants ? "condiciones/evidencias de participantes" : ""
+      ].filter(Boolean).join(", ");
+      findings.push({ title: `Actividad sin controles completos: ${name}`, detail: `Faltan registros especificos de ${missing}.`, priority: "alta", code: "8.1", actionType: "preventiva", origin: "actividad", actionTitle: `Completar controles operacionales de ${name}` });
+    }
+  });
+
   const highRisks = list(state.risks).filter((risk) => riskLevel(risk) >= 12);
   if (highRisks.length) {
     findings.push({ title: "Riesgos altos sin cierre preventivo", detail: `${highRisks.length} riesgo(s) alto(s) requieren tratamiento y verificacion.`, priority: "alta", code: "6.1.2", actionType: "preventiva", origin: "riesgo", actionTitle: "Definir tratamiento para riesgos altos" });
@@ -637,6 +655,19 @@ function extractJsonObject(text) {
 function compactSystemContext() {
   const company = state.company || {};
   const registeredActivities = list(state.activities).slice(0, 8);
+  const activityProfiles = registeredActivities.map((activity) => {
+    const name = activity.name || activity.activity || "Actividad por definir";
+    const belongs = (item) => item.activity === name || item.activityName === name || item.actividad === name;
+    return {
+      ...activity,
+      risks: list(state.risks).filter(belongs),
+      equipment: list(state.equipment).filter(belongs),
+      guides: list(state.people).filter((item) => belongs(item) || String(item.role || "").toLowerCase().includes(String(name).toLowerCase())),
+      trainingNeeds: list(state.trainingNeeds).filter(belongs),
+      policies: list(state.policies).filter(belongs),
+      participantConditions: list(state.participantEvidence).filter(belongs)
+    };
+  });
   return {
     organizationProfile: {
       legalName: company.legalName || state.orgName || state.organizations?.[0]?.name || "",
@@ -652,6 +683,7 @@ function compactSystemContext() {
       stakeholders: company.stakeholders || ""
     },
     activities: registeredActivities,
+    activityProfiles,
     activityNames: registeredActivities.map((activity) => activity.name || activity.activity).filter(Boolean),
     locations: [
       company.country,

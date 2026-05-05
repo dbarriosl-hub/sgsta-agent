@@ -195,26 +195,32 @@ const defaultState = {
   },
   compliance: {},
   activities: [
-    { name: "Caminata ecologica", place: "Sendero local", leader: "Guia principal", status: "activa" }
+    { name: "Senderismo", place: "Sendero local", leader: "Guia principal", status: "activa", conditions: "Recorrido terrestre con cambios de clima y terreno.", participantRequirements: "Condicion fisica basica, calzado adecuado y aceptacion de instrucciones de seguridad." },
+    { name: "Rafting", place: "Rio por definir", leader: "Guia rafting", status: "activa", conditions: "Actividad acuatica sujeta a caudal, clima y nivel tecnico.", participantRequirements: "Saber nadar o aceptar chaleco, edad minima definida y consentimiento informado." },
+    { name: "Paseo en cuatrimotos", place: "Ruta por definir", leader: "Guia cuatrimotos", status: "activa", conditions: "Ruta motorizada con control de velocidad, casco y briefing obligatorio.", participantRequirements: "Edad/licencia cuando aplique, casco, briefing y aceptacion de normas de conduccion." }
   ],
   people: [
-    { name: "Guia principal", role: "Guia", competence: "pendiente", training: "Primeros auxilios pendiente" }
+    { name: "Guia principal", role: "Guia senderismo", activity: "Senderismo", competence: "pendiente", training: "Primeros auxilios y manejo de grupos pendiente" }
   ],
   trainingNeeds: [
-    { topic: "Primeros auxilios y respuesta a emergencias", origin: "competencia", priority: "alta", status: "pendiente", code: "7.2" }
+    { topic: "Primeros auxilios y respuesta a emergencias", activity: "Senderismo", origin: "competencia", priority: "alta", status: "pendiente", code: "7.2" }
   ],
   equipment: [
-    { name: "Botiquin principal", type: "Emergencia", status: "operativo", nextCheck: "Por programar" },
-    { name: "Radios de comunicacion", type: "Comunicacion", status: "revision", nextCheck: "Por programar" }
+    { name: "Botiquin principal", type: "Emergencia", activity: "Senderismo", status: "operativo", nextCheck: "Por programar" },
+    { name: "Radios de comunicacion", type: "Comunicacion", activity: "Senderismo", status: "revision", nextCheck: "Por programar" },
+    { name: "Chalecos salvavidas", type: "Seguridad acuatica", activity: "Rafting", status: "revision", nextCheck: "Por programar" },
+    { name: "Cascos para cuatrimoto", type: "Proteccion personal", activity: "Paseo en cuatrimotos", status: "revision", nextCheck: "Por programar" }
   ],
   policies: [
-    { number: "POL-001", insurer: "Aseguradora ejemplo", coverage: "Responsabilidad civil para caminatas", activity: "Caminata ecologica", due: "Por definir", status: "pendiente" }
+    { number: "POL-001", insurer: "Aseguradora ejemplo", coverage: "Responsabilidad civil para senderismo", activity: "Senderismo", due: "Por definir", status: "pendiente" }
   ],
   participantEvidence: [
-    { activity: "Caminata ecologica", kind: "Formulario externo", consent: "pendiente", status: "pendiente" }
+    { activity: "Senderismo", kind: "Formulario externo", consent: "pendiente", status: "pendiente" }
   ],
   risks: [
-    { title: "Caida durante recorrido", activity: "Caminata ecologica", probability: 3, impact: 4, control: "Charla de seguridad y verificacion de calzado" }
+    { title: "Caida durante recorrido", activity: "Senderismo", probability: 3, impact: 4, control: "Charla de seguridad y verificacion de calzado" },
+    { title: "Caida al agua o golpe con roca", activity: "Rafting", probability: 3, impact: 5, control: "Chaleco, casco, guia especializado y verificacion de caudal" },
+    { title: "Colision o volcamiento", activity: "Paseo en cuatrimotos", probability: 3, impact: 5, control: "Casco, induccion, velocidad controlada y ruta definida" }
   ],
   documents: [
     { title: "Politica de seguridad", code: "5.2", status: "borrador", content: "" },
@@ -806,15 +812,48 @@ function fillCompanyForm() {
   });
 }
 
+function primaryActivityName() {
+  return state.activities[0]?.name || "Actividad por definir";
+}
+
+function itemActivityName(item) {
+  return item?.activity || item?.activityName || item?.actividad || "General";
+}
+
+function activityRelatedItems(activityName) {
+  const match = (item) => itemActivityName(item) === activityName;
+  return {
+    risks: state.risks.filter(match),
+    equipment: state.equipment.filter(match),
+    people: state.people.filter(match),
+    training: state.trainingNeeds.filter(match),
+    policies: state.policies.filter(match),
+    participants: state.participantEvidence.filter(match)
+  };
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   container.innerHTML = state.activities.length
-    ? state.activities.map((item, index) => `
+    ? state.activities.map((item, index) => {
+      const related = activityRelatedItems(item.name);
+      return `
       <div class="simple-row module-row">
-        <div><strong>${item.name}</strong><div class="muted">${item.place} - Lider: ${item.leader}</div></div>
+        <div>
+          <strong>${item.name}</strong>
+          <div class="muted">${item.place} - Lider: ${item.leader}</div>
+          <div class="muted">${item.conditions || "Condiciones por definir"}</div>
+          <div class="matrix-metrics">
+            <span>Riesgos ${related.risks.length}</span>
+            <span>Equipos ${related.equipment.length}</span>
+            <span>Guias ${related.people.length}</span>
+            <span>Participantes ${related.participants.length}</span>
+          </div>
+        </div>
         <span class="badge cumple">${item.status}</span>
         <button class="secondary-button" data-remove="activities:${index}" type="button">Quitar</button>
-      </div>`).join("")
+      </div>`;
+    }).join("")
     : `<div class="muted">No hay actividades registradas.</div>`;
   bindRemoveButtons(container);
 }
@@ -824,7 +863,7 @@ function renderPeople() {
   container.innerHTML = state.people.length
     ? state.people.map((person, index) => `
       <div class="simple-row module-row">
-        <div><strong>${person.name}</strong><div class="muted">${person.role} - ${person.training}</div></div>
+        <div><strong>${person.name}</strong><div class="muted">${person.role} - Actividad: ${itemActivityName(person)} - ${person.training}</div></div>
         <span class="badge ${person.competence === "cumple" ? "cumple" : "no_cumple"}">${person.competence}</span>
         <button class="secondary-button" data-toggle-person="${index}" type="button">${person.competence === "cumple" ? "Pendiente" : "Cumple"}</button>
       </div>`).join("")
@@ -845,7 +884,7 @@ function renderTraining() {
   container.innerHTML = state.trainingNeeds.length
     ? state.trainingNeeds.map((item, index) => `
       <div class="simple-row module-row">
-        <div><strong>${item.topic}</strong><div class="muted">Origen: ${item.origin} - Requisito ${item.code}</div></div>
+        <div><strong>${item.topic}</strong><div class="muted">Actividad: ${itemActivityName(item)} - Origen: ${item.origin} - Requisito ${item.code}</div></div>
         <span class="badge ${item.priority === "alta" || item.priority === "critica" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
         <button class="secondary-button" data-close-training="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
       </div>`).join("")
@@ -866,7 +905,7 @@ function renderEquipment() {
   container.innerHTML = state.equipment.length
     ? state.equipment.map((item, index) => `
       <div class="simple-row module-row">
-        <div><strong>${item.name}</strong><div class="muted">${item.type} - Proxima revision: ${item.nextCheck}</div></div>
+        <div><strong>${item.name}</strong><div class="muted">${item.type} - Actividad: ${itemActivityName(item)} - Proxima revision: ${item.nextCheck}</div></div>
         <span class="badge ${item.status === "operativo" ? "cumple" : "en_proceso"}">${item.status}</span>
         <button class="secondary-button" data-toggle-equipment="${index}" type="button">${item.status === "operativo" ? "Revision" : "Operativo"}</button>
       </div>`).join("")
@@ -3331,6 +3370,32 @@ function createAction(title, code, type = "tarea", origin = "agente") {
 
 function buildAgentFindings() {
   const findings = [];
+  state.activities.forEach((activity) => {
+    const name = activity.name || activity.activity;
+    if (!name) return;
+    const hasRisk = state.risks.some((item) => item.activity === name);
+    const hasEquipment = state.equipment.some((item) => item.activity === name);
+    const hasGuide = state.people.some((item) => item.activity === name || String(item.role || "").toLowerCase().includes(String(name).toLowerCase()));
+    const hasParticipants = state.participantEvidence.some((item) => item.activity === name);
+    if (!hasRisk || !hasEquipment || !hasGuide || !hasParticipants) {
+      const missing = [
+        !hasRisk ? "riesgos" : "",
+        !hasEquipment ? "equipos" : "",
+        !hasGuide ? "guias/personal competente" : "",
+        !hasParticipants ? "condiciones/evidencias de participantes" : ""
+      ].filter(Boolean).join(", ");
+      findings.push({
+        title: `Actividad sin controles completos: ${name}`,
+        detail: `Faltan registros especificos de ${missing}.`,
+        priority: "alta",
+        code: "8.1",
+        actionType: "preventiva",
+        origin: "actividad",
+        actionTitle: `Completar controles operacionales de ${name}`
+      });
+    }
+  });
+
   const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12);
   if (highRisks.length) {
     findings.push({
@@ -3553,7 +3618,14 @@ function agentReply(text) {
 
 function addActivity() {
   const count = state.activities.length + 1;
-  state.activities.unshift({ name: `Actividad ${count}`, place: "Lugar por definir", leader: state.ownerName, status: "activa" });
+  state.activities.unshift({
+    name: `Actividad ${count}`,
+    place: "Lugar por definir",
+    leader: state.ownerName,
+    status: "activa",
+    conditions: "Condiciones operacionales por definir.",
+    participantRequirements: "Condiciones de participacion por definir."
+  });
   state.compliance["8.1"] = state.compliance["8.1"] || "en_proceso";
   saveState();
   renderAll();
@@ -3561,14 +3633,16 @@ function addActivity() {
 
 function addPerson() {
   const count = state.people.length + 1;
-  state.people.unshift({ name: `Persona ${count}`, role: "Guia", competence: "pendiente", training: "Competencia por verificar" });
+  const activity = primaryActivityName();
+  state.people.unshift({ name: `Persona ${count}`, role: `Guia ${activity}`, activity, competence: "pendiente", training: "Competencia especifica por verificar" });
   state.compliance["7.2"] = "en_proceso";
   createAction("Verificar competencia y evidencias del personal", "7.2", "preventiva", "competencia");
 }
 
 function addTrainingNeed() {
   const person = state.people[0]?.name || "Personal por definir";
-  state.trainingNeeds.unshift({ topic: `Capacitacion pendiente para ${person}`, origin: "competencia", priority: "alta", status: "pendiente", code: "7.2" });
+  const activity = state.people[0]?.activity || primaryActivityName();
+  state.trainingNeeds.unshift({ topic: `Capacitacion pendiente para ${person}`, activity, origin: "competencia", priority: "alta", status: "pendiente", code: "7.2" });
   state.compliance["7.2"] = "en_proceso";
   state.compliance["7.3"] = "en_proceso";
   createAction("Programar capacitacion y evaluar competencia", "7.2", "preventiva", "capacitacion vencida");
@@ -3576,14 +3650,14 @@ function addTrainingNeed() {
 
 function addEquipment() {
   const count = state.equipment.length + 1;
-  state.equipment.unshift({ name: `Equipo ${count}`, type: "Operacion", status: "revision", nextCheck: "Por programar" });
+  state.equipment.unshift({ name: `Equipo ${count}`, type: "Operacion", activity: primaryActivityName(), status: "revision", nextCheck: "Por programar" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createAction("Programar inspeccion y mantenimiento de equipo", "7.1", "preventiva", "equipo vencido");
 }
 
 function addPolicy() {
-  const activity = state.activities[0]?.name || "Actividad por definir";
+  const activity = primaryActivityName();
   const count = state.policies.length + 1;
   state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: "Cobertura por definir", activity, due: "Por definir", status: "pendiente" });
   state.compliance["6.1.3"] = "en_proceso";
@@ -3591,14 +3665,14 @@ function addPolicy() {
 }
 
 function addParticipantEvidence() {
-  const activity = state.activities[0]?.name || "Actividad por definir";
+  const activity = primaryActivityName();
   state.participantEvidence.unshift({ activity, kind: "Formulario externo", consent: "pendiente", status: "pendiente" });
   state.compliance["7.4.3"] = "en_proceso";
   createAction("Verificar evidencia externa y consentimiento de participantes", "7.4.3", "tarea", "participantes");
 }
 
 function addRisk() {
-  const activity = state.activities[0]?.name || "Actividad por definir";
+  const activity = primaryActivityName();
   state.risks.unshift({ title: "Riesgo por evaluar", activity, probability: 3, impact: 3, control: "Control por definir" });
   state.compliance["6.1.2"] = "en_proceso";
   createAction("Completar tratamiento del nuevo riesgo", "6.1.2", "preventiva", "riesgo");
