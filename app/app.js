@@ -1008,6 +1008,50 @@ function prepareActivityPackage(activityName) {
   renderAll();
 }
 
+function updateActivityReferences(oldName, newName) {
+  if (!oldName || oldName === newName) return;
+  [state.risks, state.equipment, state.people, state.trainingNeeds, state.policies, state.participantEvidence].forEach((collection) => {
+    collection.forEach((item) => {
+      if (item.activity === oldName) item.activity = newName;
+      if (item.activityName === oldName) item.activityName = newName;
+      if (item.actividad === oldName) item.actividad = newName;
+    });
+  });
+  state.formResponses.forEach((response) => {
+    if (response.activity === oldName) response.activity = newName;
+    if (response.values?.actividad === oldName) response.values.actividad = newName;
+    if (response.values?.nombre_actividad === oldName) response.values.nombre_actividad = newName;
+    if (response.values?.id_actividad === oldName) response.values.id_actividad = newName;
+    if (typeof response.form === "string" && response.form.includes(oldName)) response.form = response.form.replace(oldName, newName);
+  });
+  state.evidence.forEach((evidence) => {
+    if (evidence.activity === oldName) evidence.activity = newName;
+    if (evidence.linkedActivity === oldName) evidence.linkedActivity = newName;
+    if (typeof evidence.linkedDocument === "string") evidence.linkedDocument = evidence.linkedDocument.replace(`:${oldName}`, `:${newName}`);
+    if (typeof evidence.title === "string") evidence.title = evidence.title.replace(oldName, newName);
+  });
+}
+
+function saveSelectedActivity() {
+  const activity = state.activities.find((item) => item.name === state.selectedActivityName);
+  if (!activity) return;
+  const oldName = activity.name;
+  const nextName = document.querySelector("#activityName").value.trim() || oldName;
+  activity.name = nextName;
+  activity.place = document.querySelector("#activityPlace").value.trim();
+  activity.leader = document.querySelector("#activityLeader").value.trim();
+  activity.status = document.querySelector("#activityStatus").value;
+  activity.difficulty = document.querySelector("#activityDifficulty").value.trim();
+  activity.conditions = document.querySelector("#activityConditions").value.trim();
+  activity.participantRequirements = document.querySelector("#activityParticipantRequirements").value.trim();
+  updateActivityReferences(oldName, nextName);
+  state.selectedActivityName = nextName;
+  state.compliance["8.1"] = "en_proceso";
+  saveState();
+  addMessage("agent", `Actualice la ficha de actividad ${nextName}. El agente usara estos datos para formularios, riesgos, equipos y participantes.`);
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1067,6 +1111,24 @@ function renderActivities() {
         <div class="report-card"><span>Formularios</span><strong>${selectedStats.approved}/${selectedStats.total}</strong></div>
         <div class="report-card"><span>Evidencias</span><strong>${selectedStats.evidence.length}</strong></div>
       </div>
+      <form id="activityEditForm" class="form-grid activity-edit-form">
+        <label>Nombre<input id="activityName" type="text" value="${escapeHtml(selectedActivity.name)}"></label>
+        <label>Lugar / ruta<input id="activityPlace" type="text" value="${escapeHtml(selectedActivity.place || "")}"></label>
+        <label>Guia responsable<input id="activityLeader" type="text" value="${escapeHtml(selectedActivity.leader || "")}"></label>
+        <label>Estado
+          <select id="activityStatus">
+            <option value="activa" ${selectedActivity.status === "activa" ? "selected" : ""}>Activa</option>
+            <option value="inactiva" ${selectedActivity.status === "inactiva" ? "selected" : ""}>Inactiva</option>
+            <option value="revision" ${selectedActivity.status === "revision" ? "selected" : ""}>Revision</option>
+          </select>
+        </label>
+        <label>Dificultad / nivel<input id="activityDifficulty" type="text" value="${escapeHtml(selectedActivity.difficulty || "")}"></label>
+        <label class="wide">Condiciones de operacion<textarea id="activityConditions">${escapeHtml(selectedActivity.conditions || "")}</textarea></label>
+        <label class="wide">Condiciones de participacion<textarea id="activityParticipantRequirements">${escapeHtml(selectedActivity.participantRequirements || "")}</textarea></label>
+        <div class="wide button-row">
+          <button id="saveActivityProfile" type="submit">Guardar actividad</button>
+        </div>
+      </form>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1099,6 +1161,10 @@ function renderActivities() {
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
+  container.querySelector("#activityEditForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveSelectedActivity();
+  });
 }
 
 function renderPeople() {

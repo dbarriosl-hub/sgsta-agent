@@ -1149,6 +1149,10 @@ textarea {
   margin-top: 14px;
 }
 
+.activity-edit-form {
+  margin: 14px 0;
+}
+
 .finding-row {
   grid-template-columns: minmax(0, 1fr) 120px minmax(130px, auto);
 }
