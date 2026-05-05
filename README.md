@@ -80,3 +80,18 @@ El proyecto incluye:
 - `railway.json` para Railway.
 - `Procfile` para plataformas compatibles.
 - `.env.example` con variables de entorno.
+
+## Agente IA
+
+El backend puede usar DeepSeek para diligenciar borradores de formularios. Si no hay clave configurada, el agente sigue funcionando con reglas locales.
+
+Variables recomendadas en Railway:
+
+```text
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=tu_clave
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
+La IA solo genera borradores. La aprobacion de documentos, formularios y evidencias sigue siendo humana.

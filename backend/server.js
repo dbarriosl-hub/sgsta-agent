@@ -611,6 +611,117 @@ function findFormMatrixItem(table) {
   return formMatrix().find((item) => item.table === table);
 }
 
+function aiConfig() {
+  const provider = process.env.AI_PROVIDER || (process.env.DEEPSEEK_API_KEY ? "deepseek" : "none");
+  if (provider !== "deepseek") return { enabled: false, provider };
+  return {
+    enabled: Boolean(process.env.DEEPSEEK_API_KEY),
+    provider,
+    model: process.env.DEEPSEEK_MODEL || "deepseek-v4-flash",
+    baseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
+  };
+}
+
+function extractJsonObject(text) {
+  const cleaned = String(text || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
+    throw new Error("La respuesta de IA no tuvo JSON valido.");
+  }
+}
+
+function compactSystemContext() {
+  return {
+    organization: state.company || {},
+    activities: list(state.activities).slice(0, 5),
+    risks: list(state.risks).slice(0, 5),
+    people: list(state.people).slice(0, 5),
+    equipment: list(state.equipment).slice(0, 5),
+    policies: list(state.policies).slice(0, 5),
+    actions: list(state.actions).filter((item) => item.status !== "cerrada").slice(0, 8),
+    evidence: list(state.evidence).slice(0, 8)
+  };
+}
+
+function buildAiFormPrompt(form, currentValues = {}) {
+  const requirement = getFormRequirement(form);
+  const relation = findFormMatrixItem(form.table);
+  const baseline = generateFormDraftValues(form);
+  return {
+    form: {
+      table: form.table,
+      title: form.title,
+      module: relation?.module || form.table,
+      phva: relation?.phva || "",
+      requirement,
+      fields: list(form.fields).map((field) => ({
+        name: field.name,
+        type: field.type || "text",
+        label: field.label || field.name
+      }))
+    },
+    currentValues,
+    baseline,
+    systemContext: compactSystemContext()
+  };
+}
+
+async function generateAiFormValues(form, currentValues = {}) {
+  const config = aiConfig();
+  if (!config.enabled) return null;
+  const payload = buildAiFormPrompt(form, currentValues);
+  const response = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "Eres un agente experto en sistemas de gestion NTC ISO 21101 para turismo de aventura.",
+            "Tu tarea es diligenciar borradores auditables de formularios, no aprobar cumplimiento.",
+            "Usa solo datos del contexto. Si falta informacion, escribe un valor profesional con 'Por definir' o 'Pendiente de evidencia'.",
+            "Devuelve unicamente JSON valido con esta forma: {\"values\": {\"campo\": \"valor\"}, \"notes\": \"resumen breve\"}."
+          ].join(" ")
+        },
+        {
+          role: "user",
+          content: JSON.stringify(payload)
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 1800,
+      stream: false
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`DeepSeek respondio ${response.status}: ${detail.slice(0, 240)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  const parsed = extractJsonObject(content);
+  const allowedFields = new Set(list(form.fields).map((field) => field.name));
+  const values = {};
+  Object.entries(parsed.values || {}).forEach(([key, value]) => {
+    if (allowedFields.has(key)) values[key] = String(value ?? "");
+  });
+  return {
+    values,
+    notes: parsed.notes || "",
+    provider: config.provider,
+    model: config.model
+  };
+}
+
 function suggestedValueForField(name, context) {
   const company = state.company || {};
   const org = company.legalName || state.orgName || state.organizations?.[0]?.name || "Organizacion por definir";
@@ -671,14 +782,26 @@ function mergeAgentDraftValues(form, currentValues = {}) {
   return merged;
 }
 
-function upsertFormDraft(form) {
+function mergeAiDraftValues(form, currentValues = {}, aiValues = {}) {
+  const merged = mergeAgentDraftValues(form, currentValues);
+  list(form.fields).forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(aiValues, field.name) && String(aiValues[field.name] || "").trim()) {
+      merged[field.name] = aiValues[field.name];
+    }
+  });
+  return merged;
+}
+
+function upsertFormDraft(form, aiDraft = null) {
   const relation = findFormMatrixItem(form.table);
   const requirement = getFormRequirement(form);
   const existing = list(state.formResponses).find((item) => item.table === form.table);
   if (existing) {
     existing.status = existing.status === "aprobado" ? "revision" : "borrador";
-    existing.values = mergeAgentDraftValues(form, existing.values);
-    existing.source = existing.source || "agente_backend";
+    existing.values = aiDraft ? mergeAiDraftValues(form, existing.values, aiDraft.values) : mergeAgentDraftValues(form, existing.values);
+    existing.source = aiDraft ? "agente_ia_deepseek" : existing.source || "agente_backend";
+    existing.aiNotes = aiDraft?.notes || existing.aiNotes || "";
+    existing.aiModel = aiDraft?.model || existing.aiModel || "";
     existing.requiresApproval = true;
     existing.updatedAt = today();
     return existing;
@@ -692,8 +815,10 @@ function upsertFormDraft(form) {
     status: "borrador",
     code: requirement.code,
     fields: list(form.fields).map((field) => field.name),
-    values: generateFormDraftValues(form),
-    source: "agente_backend",
+    values: aiDraft ? mergeAiDraftValues(form, {}, aiDraft.values) : generateFormDraftValues(form),
+    source: aiDraft ? "agente_ia_deepseek" : "agente_backend",
+    aiNotes: aiDraft?.notes || "",
+    aiModel: aiDraft?.model || "",
     requiresApproval: true,
     approvedBy: "",
     approvedAt: "",
@@ -703,7 +828,7 @@ function upsertFormDraft(form) {
   return response;
 }
 
-function draftForms(input) {
+function formTargetsFromInput(input) {
   const catalog = visibleFormCatalog();
   const tables = [];
   if (input.table) tables.push(input.table);
@@ -712,11 +837,13 @@ function draftForms(input) {
       .filter((form) => getFormRequirement(form).code === input.requirement)
       .forEach((form) => tables.push(form.table));
   }
-  const uniqueTables = [...new Set(tables)];
-  const responses = uniqueTables
+  return [...new Set(tables)]
     .map((table) => catalog.find((form) => form.table === table))
-    .filter(Boolean)
-    .map((form) => upsertFormDraft(form));
+    .filter(Boolean);
+}
+
+function draftForms(input) {
+  const responses = formTargetsFromInput(input).map((form) => upsertFormDraft(form));
 
   if (responses.length) {
     recordEvent({
@@ -728,6 +855,38 @@ function draftForms(input) {
     });
   }
   return responses;
+}
+
+async function draftFormsWithAi(input) {
+  const forms = formTargetsFromInput(input);
+  const ai = {
+    enabled: aiConfig().enabled,
+    used: false,
+    provider: aiConfig().provider,
+    errors: []
+  };
+  const responses = [];
+  for (const form of forms) {
+    let aiDraft = null;
+    const existing = list(state.formResponses).find((item) => item.table === form.table);
+    try {
+      aiDraft = await generateAiFormValues(form, existing?.values || {});
+      if (aiDraft) ai.used = true;
+    } catch (error) {
+      ai.errors.push({ table: form.table, error: serializeError(error) });
+    }
+    responses.push(upsertFormDraft(form, aiDraft));
+  }
+  if (responses.length) {
+    recordEvent({
+      actor: ai.used ? "agente_ia" : "agente",
+      type: ai.used ? "ai_form_draft_created" : "form_draft_created",
+      title: ai.used ? "Borrador(es) de formulario generados con IA" : "Borrador(es) de formulario generados",
+      detail: `${responses.length} formulario(s) quedaron en borrador pendiente de aprobacion humana.`,
+      code: input.requirement || responses[0].code
+    });
+  }
+  return { responses, ai };
 }
 
 function upsertEvidenceFromApprovedForm(response) {
@@ -940,6 +1099,15 @@ async function handle(req, res) {
   if (req.method === "GET" && url.pathname === "/api/reports/audit") return send(res, 200, buildAuditReport());
   if (req.method === "GET" && url.pathname === "/api/audit-events") return send(res, 200, state.auditEvents);
   if (req.method === "GET" && url.pathname === "/api/state") return send(res, 200, state);
+  if (req.method === "GET" && url.pathname === "/api/agent/ai-status") {
+    const config = aiConfig();
+    return send(res, 200, {
+      provider: config.provider,
+      enabled: config.enabled,
+      model: config.model || null,
+      baseUrl: config.baseUrl || null
+    });
+  }
 
   if (req.method === "POST" && url.pathname === "/api/agent/monitor") {
     const body = await parseBody(req);
@@ -969,8 +1137,8 @@ async function handle(req, res) {
       Object.keys(state).forEach((key) => delete state[key]);
       Object.assign(state, mergeSavedState(body.state));
     }
-    const responses = draftForms(body);
-    return send(res, 201, { responses, state });
+    const result = await draftFormsWithAi(body);
+    return send(res, 201, { ...result, state });
   }
 
   if (req.method === "POST" && url.pathname === "/api/agent/requirements/close-gap") {

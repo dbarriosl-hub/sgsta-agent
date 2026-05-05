@@ -1787,7 +1787,12 @@ async function createFormDraftsInBackend(payload) {
     }
     persistLocalState();
     updateBackendStatus("Backend conectado: borrador guardado", true);
-    addMessage("agent", `Genere ${result.responses.length} borrador(es) de formulario en backend. Quedan pendientes de aprobacion humana.`);
+    const aiText = result.ai?.used
+      ? ` con IA (${result.ai.provider})`
+      : result.ai?.enabled
+        ? " con reglas porque la IA no respondio"
+        : " con reglas";
+    addMessage("agent", `Genere ${result.responses.length} borrador(es) de formulario${aiText}. Quedan pendientes de aprobacion humana.`);
     renderAll();
     return true;
   } catch {
