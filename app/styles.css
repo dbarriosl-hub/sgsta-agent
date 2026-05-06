@@ -1153,6 +1153,30 @@ textarea {
   margin: 14px 0;
 }
 
+.activity-risk-editor {
+  margin: 14px 0;
+}
+
+.compact-heading {
+  margin-bottom: 10px;
+}
+
+.risk-edit-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) 92px 92px minmax(180px, 1.2fr) minmax(150px, 0.8fr) 140px 90px 90px;
+  gap: 10px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfe;
+  margin-bottom: 10px;
+}
+
+.risk-edit-row textarea {
+  min-height: 40px;
+}
+
 .finding-row {
   grid-template-columns: minmax(0, 1fr) 120px minmax(130px, auto);
 }
@@ -1272,6 +1296,10 @@ textarea {
   .agenda-row,
   .review-row,
   .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-edit-row {
     grid-template-columns: 1fr;
   }
 

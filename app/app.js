@@ -1052,6 +1052,74 @@ function saveSelectedActivity() {
   renderAll();
 }
 
+function activityRiskRows(activityName) {
+  const risks = state.risks
+    .map((risk, index) => ({ risk, index }))
+    .filter((item) => item.risk.activity === activityName);
+  if (!risks.length) return `<div class="muted">No hay riesgos especificos para esta actividad.</div>`;
+  return risks.map(({ risk, index }) => {
+    const level = riskLevel(risk);
+    const badge = level >= 12 ? "no_cumple" : level >= 6 ? "en_proceso" : "cumple";
+    return `
+      <div class="risk-edit-row">
+        <label>Riesgo / peligro<input data-risk-field="${index}:title" type="text" value="${escapeHtml(risk.title || "")}"></label>
+        <label>Probabilidad
+          <select data-risk-field="${index}:probability">
+            ${[1, 2, 3, 4, 5].map((value) => `<option value="${value}" ${Number(risk.probability) === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Impacto
+          <select data-risk-field="${index}:impact">
+            ${[1, 2, 3, 4, 5].map((value) => `<option value="${value}" ${Number(risk.impact) === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Control<textarea data-risk-field="${index}:control">${escapeHtml(risk.control || "")}</textarea></label>
+        <label>Responsable<input data-risk-field="${index}:responsible" type="text" value="${escapeHtml(risk.responsible || "")}"></label>
+        <label>Estado control
+          <select data-risk-field="${index}:controlStatus">
+            ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <span class="badge ${badge}">nivel ${level}</span>
+        <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
+      </div>`;
+  }).join("");
+}
+
+function updateActivityRiskField(field) {
+  const [rawIndex, key] = field.dataset.riskField.split(":");
+  const risk = state.risks[Number(rawIndex)];
+  if (!risk) return;
+  const previousLevel = riskLevel(risk);
+  risk[key] = ["probability", "impact"].includes(key) ? Number(field.value) : field.value;
+  risk.updatedAt = today();
+  state.compliance["6.1.2"] = "en_proceso";
+  const nextLevel = riskLevel(risk);
+  if (nextLevel >= 12 && previousLevel < 12) {
+    const title = `Definir tratamiento para riesgo alto: ${risk.title}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "6.1.2",
+        status: "abierta",
+        type: "preventiva",
+        origin: "riesgo",
+        priority: "alta",
+        responsible: risk.responsible || "",
+        dueDate: "",
+        cause: `Riesgo alto en ${risk.activity}: nivel ${nextLevel}`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1129,6 +1197,16 @@ function renderActivities() {
           <button id="saveActivityProfile" type="submit">Guardar actividad</button>
         </div>
       </form>
+      <div class="activity-risk-editor">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Riesgos de la actividad</p>
+            <h2>Mapa editable</h2>
+          </div>
+          <span class="badge ${selectedRelated.risks.some((risk) => riskLevel(risk) >= 12) ? "no_cumple" : "cumple"}">${selectedRelated.risks.length}</span>
+        </div>
+        ${activityRiskRows(selectedActivity.name)}
+      </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1164,6 +1242,9 @@ function renderActivities() {
   container.querySelector("#activityEditForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     saveSelectedActivity();
+  });
+  container.querySelectorAll("[data-risk-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityRiskField(field));
   });
 }
 
