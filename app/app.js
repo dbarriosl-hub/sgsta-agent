@@ -988,6 +988,7 @@ function createActivityGapAction(activityName, key) {
 }
 
 function createAllActivityGapActions() {
+  let created = 0;
   state.activities.forEach((activity) => {
     activityGapItems(activity.name).forEach((gap) => {
       if (!state.actions.some((action) => action.title === gap.action && action.status !== "cerrada")) {
@@ -1007,6 +1008,7 @@ function createAllActivityGapActions() {
           efficacyStatus: "pendiente",
           createdAt: today()
         });
+        created += 1;
       }
     });
   });
@@ -1019,6 +1021,37 @@ function createAllActivityGapActions() {
   });
   saveState();
   renderAll();
+  return created;
+}
+
+function activityGapsAgentSummary() {
+  const readiness = state.activities.map((activity) => ({ activity, readiness: activityReadiness(activity.name) }));
+  if (!readiness.length) return "No hay actividades registradas. Primero crea las actividades reales: rafting, senderismo, cuatrimotos u otras.";
+  const high = readiness.filter((item) => item.readiness.status === "critica");
+  const review = readiness.filter((item) => item.readiness.status === "en_revision");
+  const ready = readiness.filter((item) => item.readiness.status === "lista");
+  const priority = readiness
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score)
+    .slice(0, 3);
+  const priorityText = priority.length
+    ? priority.map((item) => {
+      const topGaps = item.readiness.gaps.slice(0, 4).map((gap) => `${gap.label} (${gap.code})`).join(", ");
+      return `${item.activity.name}: ${item.readiness.score}% listo, faltan ${topGaps}`;
+    }).join("; ")
+    : "Todas las actividades tienen controles minimos completos.";
+  return `Revise brechas por actividad: ${ready.length}/${readiness.length} actividad(es) listas, ${high.length} critica(s), ${review.length} en revision. Prioridad: ${priorityText}. Regla del agente: una actividad critica no deberia operarse sin validacion humana y plan de cierre.`;
+}
+
+function createActivityClosurePlan() {
+  const created = createAllActivityGapActions();
+  const readiness = state.activities.map((activity) => ({ activity, readiness: activityReadiness(activity.name) }))
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score);
+  const top = readiness.slice(0, 3).map((item) => `${item.activity.name}: ${item.readiness.gaps.length} brecha(s), ${item.readiness.high} critica(s)`).join("; ");
+  addMessage("agent", created
+    ? `Cree ${created} accion(es) para cerrar brechas por actividad. Prioridad de cierre: ${top || "sin brechas activas"}.`
+    : `No cree acciones nuevas porque ya existian acciones abiertas para esas brechas. Prioridad actual: ${top || "sin brechas activas"}.`);
 }
 
 function activityContext(activityName) {
@@ -4418,6 +4451,9 @@ function agentReply(text) {
   if (lower.includes("phva")) {
     return "El modelo PHVA queda asi: Planear cubre 4, 5 y 6; Hacer cubre 7 y 8; Verificar cubre 9; Actuar cubre 10. Las acciones conectan hallazgos con mejora.";
   }
+  if ((lower.includes("actividad") && (lower.includes("brecha") || lower.includes("lista") || lower.includes("operar"))) || lower.includes("brechas por actividad")) {
+    return activityGapsAgentSummary();
+  }
   if (lower.includes("monitor") || lower.includes("brecha")) {
     const findings = buildAgentFindings();
     return `El monitor encuentra ${findings.length} brechas potenciales. Ahora tambien revisa formularios pendientes por requisito, ademas de riesgos altos, competencia, equipos, seguros, documentos y revision por la direccion.`;
@@ -4732,6 +4768,20 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
     if (action === "participantes") {
       addParticipantEvidence();
       addMessage("agent", "Agregue evidencia externa de participantes sin guardar datos sensibles.");
+    }
+    if (action === "brechas_actividad") {
+      if (!canRunAgent()) return;
+      state.planUsage.agentRuns += 1;
+      addMessage("agent", activityGapsAgentSummary());
+      saveState();
+      renderAll();
+    }
+    if (action === "plan_cierre_actividad") {
+      if (!canRunAgent()) return;
+      state.planUsage.agentRuns += 1;
+      createActivityClosurePlan();
+      saveState();
+      renderAll();
     }
     if (action === "documentos") {
       generateDocumentDraft();
