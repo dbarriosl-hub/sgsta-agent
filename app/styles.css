@@ -1154,7 +1154,8 @@ textarea {
 }
 
 .activity-risk-editor,
-.activity-equipment-editor {
+.activity-equipment-editor,
+.activity-people-editor {
   margin: 14px 0;
 }
 
@@ -1181,6 +1182,18 @@ textarea {
 .equipment-edit-row {
   display: grid;
   grid-template-columns: minmax(170px, 1fr) minmax(130px, 0.7fr) 130px 140px minmax(150px, 0.8fr) minmax(150px, 0.8fr) 90px 90px;
+  gap: 10px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfe;
+  margin-bottom: 10px;
+}
+
+.people-edit-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(150px, 1fr) 130px minmax(170px, 1.1fr) 130px minmax(150px, 0.9fr) 90px 90px;
   gap: 10px;
   align-items: end;
   border: 1px solid var(--line);
@@ -1317,6 +1330,10 @@ textarea {
   }
 
   .equipment-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .people-edit-row {
     grid-template-columns: 1fr;
   }
 

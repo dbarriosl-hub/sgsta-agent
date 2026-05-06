@@ -1179,6 +1179,71 @@ function updateActivityEquipmentField(field) {
   renderAll();
 }
 
+function activityPeopleRows(activityName) {
+  const people = state.people
+    .map((person, index) => ({ person, index }))
+    .filter((item) => item.person.activity === activityName || String(item.person.role || "").toLowerCase().includes(String(activityName).toLowerCase()));
+  if (!people.length) return `<div class="muted">No hay guias o personal asignado para esta actividad.</div>`;
+  return people.map(({ person, index }) => {
+    const trainingOk = person.training && !String(person.training).toLowerCase().includes("pendiente");
+    const evidenceOk = person.evidence && !String(person.evidence).toLowerCase().includes("por ");
+    const dueOk = person.certificateDue && !String(person.certificateDue).toLowerCase().includes("por ");
+    const complete = person.competence === "cumple" && trainingOk && evidenceOk && dueOk;
+    return `
+      <div class="people-edit-row">
+        <label>Nombre<input data-person-field="${index}:name" type="text" value="${escapeHtml(person.name || "")}"></label>
+        <label>Rol<input data-person-field="${index}:role" type="text" value="${escapeHtml(person.role || "")}"></label>
+        <label>Competencia
+          <select data-person-field="${index}:competence">
+            ${["pendiente", "cumple", "no_cumple", "vencida"].map((value) => `<option value="${value}" ${(person.competence || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Capacitacion / certificado<input data-person-field="${index}:training" type="text" value="${escapeHtml(person.training || "")}"></label>
+        <label>Vencimiento<input data-person-field="${index}:certificateDue" type="text" value="${escapeHtml(person.certificateDue || "")}"></label>
+        <label>Evidencia<input data-person-field="${index}:evidence" type="text" value="${escapeHtml(person.evidence || "")}"></label>
+        <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "competente" : "brecha"}</span>
+        <button class="secondary-button" data-remove="people:${index}" type="button">Quitar</button>
+      </div>`;
+  }).join("");
+}
+
+function updateActivityPersonField(field) {
+  const [rawIndex, key] = field.dataset.personField.split(":");
+  const person = state.people[Number(rawIndex)];
+  if (!person) return;
+  person[key] = field.value;
+  person.updatedAt = today();
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  const trainingIncomplete = !person.training || String(person.training).toLowerCase().includes("pendiente");
+  const evidenceIncomplete = !person.evidence || String(person.evidence).toLowerCase().includes("por ");
+  const dueIncomplete = !person.certificateDue || String(person.certificateDue).toLowerCase().includes("por ");
+  const incomplete = person.competence !== "cumple" || trainingIncomplete || evidenceIncomplete || dueIncomplete;
+  if (incomplete) {
+    const title = `Cerrar competencia de guia: ${person.name}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "7.2",
+        status: "abierta",
+        type: "preventiva",
+        origin: "competencia",
+        priority: "alta",
+        responsible: person.name || "",
+        dueDate: person.certificateDue || "",
+        cause: `${person.name || "Persona"} asignada a ${person.activity || state.selectedActivityName} requiere competencia, capacitacion y evidencia vigente.`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1276,6 +1341,16 @@ function renderActivities() {
         </div>
         ${activityEquipmentRows(selectedActivity.name)}
       </div>
+      <div class="activity-people-editor">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Guias y personal de la actividad</p>
+            <h2>Competencia editable</h2>
+          </div>
+          <span class="badge ${selectedRelated.people.some((item) => item.competence === "cumple") ? "cumple" : "no_cumple"}">${selectedRelated.people.length}</span>
+        </div>
+        ${activityPeopleRows(selectedActivity.name)}
+      </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1317,6 +1392,9 @@ function renderActivities() {
   });
   container.querySelectorAll("[data-equipment-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityEquipmentField(field));
+  });
+  container.querySelectorAll("[data-person-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityPersonField(field));
   });
 }
 
