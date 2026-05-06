@@ -924,6 +924,10 @@ function activityReadiness(activityName) {
   };
 }
 
+function activityGapActionExists(gap) {
+  return state.actions.some((action) => action.title === gap.action && action.status !== "cerrada");
+}
+
 function renderActivityGaps() {
   const summary = document.querySelector("#activityGapsSummary");
   const table = document.querySelector("#activityGapsTable");
@@ -932,10 +936,13 @@ function renderActivityGaps() {
   const totalGaps = readiness.reduce((sum, item) => sum + item.readiness.gaps.length, 0);
   const highGaps = readiness.reduce((sum, item) => sum + item.readiness.high, 0);
   const readyActivities = readiness.filter((item) => item.readiness.status === "lista").length;
+  const allGaps = readiness.flatMap((item) => item.readiness.gaps);
+  const openGapActions = allGaps.filter(activityGapActionExists).length;
   summary.innerHTML = `
     <article><span>Actividades listas</span><strong>${readyActivities}/${state.activities.length}</strong></article>
     <article><span>Brechas totales</span><strong>${totalGaps}</strong></article>
     <article><span>Brechas criticas</span><strong>${highGaps}</strong></article>
+    <article><span>Acciones abiertas</span><strong>${openGapActions}</strong></article>
     <article><span>Accion del agente</span><strong>${highGaps ? "Priorizar" : totalGaps ? "Completar" : "Mantener"}</strong></article>`;
   table.innerHTML = readiness.length
     ? readiness.map(({ activity, readiness: item }) => {
@@ -954,12 +961,15 @@ function renderActivityGaps() {
             ${item.gaps.length ? item.gaps.map((gap) => `<span class="gap-pill ${gap.severity}">${gap.label} ${gap.code}</span>`).join("") : `<span class="gap-pill lista">Sin brechas abiertas</span>`}
           </div>
           <div class="simple-table compact-gap-table">
-            ${item.gaps.length ? item.gaps.map((gap) => `
+            ${item.gaps.length ? item.gaps.map((gap) => {
+              const actionOpen = activityGapActionExists(gap);
+              return `
               <div class="simple-row activity-gap-row">
                 <div><strong>${gap.label}</strong><div class="muted">${gap.detail}</div></div>
                 <span class="badge ${gap.severity === "alta" ? "no_cumple" : "en_proceso"}">${gap.severity}</span>
-                <button class="secondary-button" data-create-activity-gap="${escapeHtml(activity.name)}:${gap.key}" type="button">Crear accion</button>
-              </div>`).join("") : `<div class="muted">La actividad tiene controles minimos completos para operar con evidencia.</div>`}
+                <button class="secondary-button ${actionOpen ? "button-done" : ""}" data-create-activity-gap="${escapeHtml(activity.name)}:${gap.key}" type="button" ${actionOpen ? "disabled" : ""}>${actionOpen ? "Accion abierta" : "Crear accion"}</button>
+              </div>`;
+            }).join("") : `<div class="muted">La actividad tiene controles minimos completos para operar con evidencia.</div>`}
           </div>
         </article>`;
     }).join("")
@@ -976,12 +986,15 @@ function renderActivityGaps() {
 function createActivityGapAction(activityName, key) {
   const gap = activityGapItems(activityName).find((item) => item.key === key);
   if (!gap) return;
-  if (!state.actions.some((action) => action.title === gap.action && action.status !== "cerrada")) {
+  if (!activityGapActionExists(gap)) {
     createAction(gap.action, gap.code, gap.severity === "alta" ? "preventiva" : "tarea", "brecha_actividad");
     const action = state.actions[0];
     action.priority = gap.severity === "alta" ? "alta" : "media";
     action.cause = gap.detail;
     action.responsible = state.ownerName || "Responsable SGSTA";
+    addMessage("agent", `Cree la accion: ${gap.action}. Queda abierta hasta que cierres la brecha con evidencia.`);
+  } else {
+    addMessage("agent", `La accion ya estaba abierta: ${gap.action}.`);
   }
   saveState();
   renderAll();
@@ -991,7 +1004,7 @@ function createAllActivityGapActions() {
   let created = 0;
   state.activities.forEach((activity) => {
     activityGapItems(activity.name).forEach((gap) => {
-      if (!state.actions.some((action) => action.title === gap.action && action.status !== "cerrada")) {
+      if (!activityGapActionExists(gap)) {
         state.actions.unshift({
           title: gap.action,
           code: gap.code,
@@ -1014,11 +1027,14 @@ function createAllActivityGapActions() {
   });
   recordAuditEvent({
     title: "Acciones de brechas por actividad",
-    detail: "El agente creo o actualizo acciones preventivas/tareas para brechas operacionales por actividad.",
+    detail: `El agente creo ${created} accion(es) nuevas para brechas operacionales por actividad.`,
     code: "8.1",
     type: "agente",
     actor: "agente"
   });
+  addMessage("agent", created
+    ? `Cree ${created} accion(es) nuevas. Los botones del tablero ahora muestran "Accion abierta" donde ya hay seguimiento.`
+    : `No cree acciones nuevas porque las brechas ya tienen acciones abiertas.`);
   saveState();
   renderAll();
   return created;
