@@ -839,10 +839,17 @@ function activityControlStatus(activityName) {
     guide: related.people.some((person) => person.competence === "cumple"),
     risks: related.risks.length > 0,
     equipment: related.equipment.length > 0 && related.equipment.every((item) => item.status === "operativo"),
-    participants: related.participants.length > 0,
+    participants: related.participants.some(participantEvidenceIsComplete),
     insurance: related.policies.some(policyIsComplete),
     training: related.training.length > 0
   };
+}
+
+function participantEvidenceIsComplete(item) {
+  const consentOk = ["recibido", "aprobado"].includes(String(item.consent || "").toLowerCase());
+  const statusOk = ["recibida", "aprobada"].includes(String(item.status || "").toLowerCase());
+  const supportOk = item.link || item.evidence || item.document;
+  return consentOk && statusOk && supportOk;
 }
 
 function policyIsComplete(policy) {
@@ -916,7 +923,7 @@ function addGuideForActivity(activityName) {
 }
 
 function addParticipantConditionForActivity(activityName) {
-  state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente" });
+  state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente", link: "", evidence: "" });
   state.compliance["7.4.3"] = "en_proceso";
   createAction(`Definir condiciones de participacion para ${activityName}`, "7.4.3", "tarea", "actividad");
 }
@@ -1308,6 +1315,67 @@ function updateActivityPolicyField(field) {
   renderAll();
 }
 
+function activityParticipantRows(activityName) {
+  const participants = state.participantEvidence
+    .map((item, index) => ({ item, index }))
+    .filter((entry) => entry.item.activity === activityName);
+  if (!participants.length) return `<div class="muted">No hay evidencias externas de participantes para esta actividad.</div>`;
+  return participants.map(({ item, index }) => {
+    const complete = participantEvidenceIsComplete(item);
+    return `
+      <div class="participant-edit-row">
+        <label>Soporte requerido<input data-participant-field="${index}:kind" type="text" value="${escapeHtml(item.kind || "")}"></label>
+        <label>Formulario / enlace externo<input data-participant-field="${index}:link" type="text" value="${escapeHtml(item.link || "")}"></label>
+        <label>Consentimiento
+          <select data-participant-field="${index}:consent">
+            ${["pendiente", "recibido", "aprobado", "rechazado"].map((value) => `<option value="${value}" ${(item.consent || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Estado
+          <select data-participant-field="${index}:status">
+            ${["pendiente", "recibida", "aprobada", "rechazada"].map((value) => `<option value="${value}" ${(item.status || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Fecha<input data-participant-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
+        <label>Evidencia<input data-participant-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || item.document || "")}"></label>
+        <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "recibida" : "brecha"}</span>
+        <button class="secondary-button" data-remove="participantEvidence:${index}" type="button">Quitar</button>
+      </div>`;
+  }).join("");
+}
+
+function updateActivityParticipantField(field) {
+  const [rawIndex, key] = field.dataset.participantField.split(":");
+  const item = state.participantEvidence[Number(rawIndex)];
+  if (!item) return;
+  item[key] = field.value;
+  item.updatedAt = today();
+  state.compliance["7.4.3"] = "en_proceso";
+  if (!participantEvidenceIsComplete(item)) {
+    const title = `Completar evidencia externa de participantes: ${item.activity || state.selectedActivityName}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "7.4.3",
+        status: "abierta",
+        type: "preventiva",
+        origin: "participantes",
+        priority: "media",
+        responsible: "",
+        dueDate: item.date || "",
+        cause: `La actividad ${item.activity || state.selectedActivityName} requiere consentimiento, enlace/formulario externo y evidencia sin almacenar datos sensibles.`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1425,6 +1493,16 @@ function renderActivities() {
         </div>
         ${activityPolicyRows(selectedActivity.name)}
       </div>
+      <div class="activity-participant-editor">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Participantes de la actividad</p>
+            <h2>Evidencia externa</h2>
+          </div>
+          <span class="badge ${selectedRelated.participants.some(participantEvidenceIsComplete) ? "cumple" : "no_cumple"}">${selectedRelated.participants.length}</span>
+        </div>
+        ${activityParticipantRows(selectedActivity.name)}
+      </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1472,6 +1550,9 @@ function renderActivities() {
   });
   container.querySelectorAll("[data-policy-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityPolicyField(field));
+  });
+  container.querySelectorAll("[data-participant-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityParticipantField(field));
   });
 }
 
@@ -1565,8 +1646,8 @@ function renderParticipantEvidence() {
   container.innerHTML = state.participantEvidence.length
     ? state.participantEvidence.map((item, index) => `
       <div class="simple-row module-row">
-        <div><strong>${item.activity}</strong><div class="muted">${item.kind} - Consentimiento: ${item.consent}</div></div>
-        <span class="badge ${item.status === "recibida" ? "cumple" : "en_proceso"}">${item.status}</span>
+        <div><strong>${item.activity}</strong><div class="muted">${item.kind} - Consentimiento: ${item.consent} - Enlace: ${item.link || "por definir"}</div></div>
+        <span class="badge ${participantEvidenceIsComplete(item) ? "cumple" : "en_proceso"}">${participantEvidenceIsComplete(item) ? "recibida" : item.status}</span>
         <button class="secondary-button" data-toggle-participant="${index}" type="button">${item.status === "recibida" ? "Pendiente" : "Recibida"}</button>
       </div>`).join("")
     : `<div class="muted">No hay evidencias externas de participantes.</div>`;
