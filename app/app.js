@@ -840,9 +840,16 @@ function activityControlStatus(activityName) {
     risks: related.risks.length > 0,
     equipment: related.equipment.length > 0 && related.equipment.every((item) => item.status === "operativo"),
     participants: related.participants.length > 0,
-    insurance: related.policies.some((item) => item.status === "vigente"),
+    insurance: related.policies.some(policyIsComplete),
     training: related.training.length > 0
   };
+}
+
+function policyIsComplete(policy) {
+  const dueOk = policy.due && !String(policy.due).toLowerCase().includes("por ");
+  const coverageOk = policy.coverage && !String(policy.coverage).toLowerCase().includes("por definir");
+  const supportOk = policy.document || policy.evidence;
+  return policy.status === "vigente" && dueOk && coverageOk && supportOk;
 }
 
 function controlBadge(ok, label) {
@@ -916,7 +923,7 @@ function addParticipantConditionForActivity(activityName) {
 
 function addPolicyForActivity(activityName) {
   const count = state.policies.length + 1;
-  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente" });
+  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente", document: "" });
   state.compliance["6.1.3"] = "en_proceso";
   createAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", "actividad");
 }
@@ -1244,6 +1251,63 @@ function updateActivityPersonField(field) {
   renderAll();
 }
 
+function activityPolicyRows(activityName) {
+  const policies = state.policies
+    .map((policy, index) => ({ policy, index }))
+    .filter((item) => item.policy.activity === activityName || String(item.policy.coverage || "").toLowerCase().includes(String(activityName).toLowerCase()));
+  if (!policies.length) return `<div class="muted">No hay polizas asociadas a esta actividad.</div>`;
+  return policies.map(({ policy, index }) => {
+    const complete = policyIsComplete(policy);
+    return `
+      <div class="policy-edit-row">
+        <label>Poliza<input data-policy-field="${index}:number" type="text" value="${escapeHtml(policy.number || "")}"></label>
+        <label>Aseguradora<input data-policy-field="${index}:insurer" type="text" value="${escapeHtml(policy.insurer || "")}"></label>
+        <label>Estado
+          <select data-policy-field="${index}:status">
+            ${["pendiente", "vigente", "vencida", "revision"].map((value) => `<option value="${value}" ${(policy.status || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Vencimiento<input data-policy-field="${index}:due" type="text" value="${escapeHtml(policy.due || "")}"></label>
+        <label class="wideish">Cobertura<input data-policy-field="${index}:coverage" type="text" value="${escapeHtml(policy.coverage || "")}"></label>
+        <label>Documento soporte<input data-policy-field="${index}:document" type="text" value="${escapeHtml(policy.document || policy.evidence || "")}"></label>
+        <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "cubierta" : "brecha"}</span>
+        <button class="secondary-button" data-remove="policies:${index}" type="button">Quitar</button>
+      </div>`;
+  }).join("");
+}
+
+function updateActivityPolicyField(field) {
+  const [rawIndex, key] = field.dataset.policyField.split(":");
+  const policy = state.policies[Number(rawIndex)];
+  if (!policy) return;
+  policy[key] = field.value;
+  policy.updatedAt = today();
+  state.compliance["6.1.3"] = "en_proceso";
+  if (!policyIsComplete(policy)) {
+    const title = `Cerrar cobertura de seguro: ${policy.activity || state.selectedActivityName}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "6.1.3",
+        status: "abierta",
+        type: "preventiva",
+        origin: "poliza",
+        priority: "alta",
+        responsible: policy.responsible || "",
+        dueDate: policy.due || "",
+        cause: `La actividad ${policy.activity || state.selectedActivityName} requiere poliza vigente con cobertura, vencimiento y documento soporte.`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1351,6 +1415,16 @@ function renderActivities() {
         </div>
         ${activityPeopleRows(selectedActivity.name)}
       </div>
+      <div class="activity-policy-editor">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Seguro de la actividad</p>
+            <h2>Cobertura editable</h2>
+          </div>
+          <span class="badge ${selectedRelated.policies.some(policyIsComplete) ? "cumple" : "no_cumple"}">${selectedRelated.policies.length}</span>
+        </div>
+        ${activityPolicyRows(selectedActivity.name)}
+      </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1395,6 +1469,9 @@ function renderActivities() {
   });
   container.querySelectorAll("[data-person-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityPersonField(field));
+  });
+  container.querySelectorAll("[data-policy-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityPolicyField(field));
   });
 }
 
@@ -1467,8 +1544,8 @@ function renderPolicies() {
   container.innerHTML = state.policies.length
     ? state.policies.map((item, index) => `
       <div class="simple-row module-row">
-        <div><strong>${item.number} - ${item.insurer}</strong><div class="muted">${item.coverage} - Actividad: ${item.activity}</div></div>
-        <span class="badge ${item.status === "vigente" ? "cumple" : "no_cumple"}">${item.status}</span>
+        <div><strong>${item.number} - ${item.insurer}</strong><div class="muted">${item.coverage} - Actividad: ${item.activity} - Vence: ${item.due || "Por definir"}</div></div>
+        <span class="badge ${policyIsComplete(item) ? "cumple" : "no_cumple"}">${policyIsComplete(item) ? "cubierta" : item.status}</span>
         <button class="secondary-button" data-toggle-policy="${index}" type="button">${item.status === "vigente" ? "Pendiente" : "Vigente"}</button>
       </div>`).join("")
     : `<div class="muted">No hay polizas registradas.</div>`;
