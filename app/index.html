@@ -42,6 +42,7 @@
             <button class="nav-item" data-view="capacitacion"><span>Capacitacion</span><em>7.2-7.3</em></button>
             <button class="nav-item" data-view="equipos"><span>Equipos</span><em>7.1/8.1</em></button>
             <button class="nav-item" data-view="actividades"><span>Actividades</span><em>8.1</em></button>
+            <button class="nav-item" data-view="brechas_actividad"><span>Brechas actividad</span><em>8.1</em></button>
             <button class="nav-item" data-view="participantes"><span>Participantes</span><em>7.4.3</em></button>
             <button class="nav-item" data-view="documentos"><span>Documentos</span><em>7.5</em></button>
             <button class="nav-item" data-view="incidentes"><span>Incidentes</span><em>8.3</em></button>
@@ -273,6 +274,20 @@
             <button id="addActivity" type="button">Nueva actividad</button>
           </div>
           <div id="activitiesTable" class="simple-table"></div>
+        </div>
+      </section>
+
+      <section id="brechas_actividad" class="view">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Agente auditor operacional</p>
+              <h2>Brechas por actividad</h2>
+            </div>
+            <button id="createActivityGapActions" type="button">Crear acciones</button>
+          </div>
+          <div id="activityGapsSummary" class="gap-summary"></div>
+          <div id="activityGapsTable" class="activity-gap-list"></div>
         </div>
       </section>
 

@@ -498,6 +498,7 @@ function renderAll() {
   renderChapterProgress();
   renderPhvaBoard();
   renderActivities();
+  renderActivityGaps();
   renderPeople();
   renderTraining();
   renderEquipment();
@@ -886,6 +887,138 @@ function activityFormStats(activityName) {
     pending: activityPackageTables.length - responses.length,
     evidence: state.evidence.filter((item) => item.activity === activityName || item.linkedActivity === activityName)
   };
+}
+
+function activityGapItems(activityName) {
+  const related = activityRelatedItems(activityName);
+  const stats = activityFormStats(activityName);
+  const controls = activityControlStatus(activityName);
+  const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12);
+  const equipmentPending = related.equipment.filter((item) => item.status !== "operativo" || !item.nextCheck || String(item.nextCheck).toLowerCase().includes("por "));
+  const peoplePending = related.people.filter((person) => person.competence !== "cumple" || !person.training || String(person.training).toLowerCase().includes("pendiente") || !person.evidence || !person.certificateDue);
+  const trainingPending = related.training.filter((item) => item.status !== "cerrada" && item.status !== "realizada");
+  const policiesPending = related.policies.filter((policy) => !policyIsComplete(policy));
+  const participantsPending = related.participants.filter((item) => !participantEvidenceIsComplete(item));
+  const gaps = [];
+  if (!controls.risks) gaps.push({ key: "risks", code: "6.1.2", severity: "alta", label: "Riesgos", detail: "No hay matriz de riesgos especifica para la actividad.", action: `Completar matriz de riesgos de ${activityName}` });
+  if (highRisks.length) gaps.push({ key: "high_risks", code: "6.1.2", severity: "alta", label: "Riesgos altos", detail: `${highRisks.length} riesgo(s) alto(s) requieren tratamiento preventivo.`, action: `Definir tratamiento de riesgos altos de ${activityName}` });
+  if (!controls.equipment) gaps.push({ key: "equipment", code: "7.1", severity: "alta", label: "Equipos", detail: equipmentPending.length ? `${equipmentPending.length} equipo(s) sin estado operativo, revision o evidencia completa.` : "No hay equipos especificos asociados a la actividad.", action: `Cerrar control de equipos de ${activityName}` });
+  if (!controls.guide) gaps.push({ key: "guide", code: "7.2", severity: "alta", label: "Guia competente", detail: peoplePending.length ? `${peoplePending.length} persona(s) sin competencia, certificado o evidencia vigente.` : "No hay guia competente asociado a la actividad.", action: `Cerrar competencia de guias de ${activityName}` });
+  if (!controls.training) gaps.push({ key: "training", code: "7.2", severity: "media", label: "Capacitacion", detail: trainingPending.length ? `${trainingPending.length} necesidad(es) de capacitacion siguen abiertas.` : "No hay capacitaciones o necesidades asociadas a la actividad.", action: `Programar capacitacion para ${activityName}` });
+  if (!controls.insurance) gaps.push({ key: "insurance", code: "6.1.3", severity: "alta", label: "Seguro", detail: policiesPending.length ? `${policiesPending.length} poliza(s) sin cobertura completa.` : "No hay poliza vigente con soporte para la actividad.", action: `Validar cobertura de seguro de ${activityName}` });
+  if (!controls.participants) gaps.push({ key: "participants", code: "7.4.3", severity: "media", label: "Participantes", detail: participantsPending.length ? `${participantsPending.length} evidencia(s) externa(s) sin consentimiento/enlace/soporte completo.` : "No hay evidencia externa de condiciones y consentimiento de participantes.", action: `Completar evidencia externa de participantes de ${activityName}` });
+  if (stats.pending > 0) gaps.push({ key: "forms", code: "7.5", severity: "media", label: "Formularios", detail: `${stats.pending} formulario(s) de la actividad siguen pendientes.`, action: `Diligenciar formularios operacionales de ${activityName}` });
+  return gaps;
+}
+
+function activityReadiness(activityName) {
+  const gaps = activityGapItems(activityName);
+  const high = gaps.filter((gap) => gap.severity === "alta").length;
+  const controlKeys = ["risks", "equipment", "guide", "training", "insurance", "participants", "forms"];
+  const missingControls = new Set(gaps.filter((gap) => controlKeys.includes(gap.key)).map((gap) => gap.key));
+  return {
+    gaps,
+    high,
+    score: Math.round(((controlKeys.length - missingControls.size) / controlKeys.length) * 100),
+    status: high ? "critica" : gaps.length ? "en_revision" : "lista"
+  };
+}
+
+function renderActivityGaps() {
+  const summary = document.querySelector("#activityGapsSummary");
+  const table = document.querySelector("#activityGapsTable");
+  if (!summary || !table) return;
+  const readiness = state.activities.map((activity) => ({ activity, readiness: activityReadiness(activity.name) }));
+  const totalGaps = readiness.reduce((sum, item) => sum + item.readiness.gaps.length, 0);
+  const highGaps = readiness.reduce((sum, item) => sum + item.readiness.high, 0);
+  const readyActivities = readiness.filter((item) => item.readiness.status === "lista").length;
+  summary.innerHTML = `
+    <article><span>Actividades listas</span><strong>${readyActivities}/${state.activities.length}</strong></article>
+    <article><span>Brechas totales</span><strong>${totalGaps}</strong></article>
+    <article><span>Brechas criticas</span><strong>${highGaps}</strong></article>
+    <article><span>Accion del agente</span><strong>${highGaps ? "Priorizar" : totalGaps ? "Completar" : "Mantener"}</strong></article>`;
+  table.innerHTML = readiness.length
+    ? readiness.map(({ activity, readiness: item }) => {
+      const badge = item.status === "lista" ? "cumple" : item.status === "critica" ? "no_cumple" : "en_proceso";
+      return `
+        <article class="activity-gap-card">
+          <div class="activity-gap-head">
+            <div>
+              <p class="eyebrow">Actividad</p>
+              <h3>${escapeHtml(activity.name)}</h3>
+              <div class="muted">${escapeHtml(activity.place || "Lugar por definir")} - Lider: ${escapeHtml(activity.leader || "por definir")}</div>
+            </div>
+            <span class="badge ${badge}">${item.score}% ${item.status}</span>
+          </div>
+          <div class="gap-pill-row">
+            ${item.gaps.length ? item.gaps.map((gap) => `<span class="gap-pill ${gap.severity}">${gap.label} ${gap.code}</span>`).join("") : `<span class="gap-pill lista">Sin brechas abiertas</span>`}
+          </div>
+          <div class="simple-table compact-gap-table">
+            ${item.gaps.length ? item.gaps.map((gap) => `
+              <div class="simple-row activity-gap-row">
+                <div><strong>${gap.label}</strong><div class="muted">${gap.detail}</div></div>
+                <span class="badge ${gap.severity === "alta" ? "no_cumple" : "en_proceso"}">${gap.severity}</span>
+                <button class="secondary-button" data-create-activity-gap="${escapeHtml(activity.name)}:${gap.key}" type="button">Crear accion</button>
+              </div>`).join("") : `<div class="muted">La actividad tiene controles minimos completos para operar con evidencia.</div>`}
+          </div>
+        </article>`;
+    }).join("")
+    : `<div class="muted">No hay actividades registradas.</div>`;
+  document.querySelector("#createActivityGapActions")?.addEventListener("click", createAllActivityGapActions);
+  table.querySelectorAll("[data-create-activity-gap]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const [activityName, key] = button.dataset.createActivityGap.split(":");
+      createActivityGapAction(activityName, key);
+    });
+  });
+}
+
+function createActivityGapAction(activityName, key) {
+  const gap = activityGapItems(activityName).find((item) => item.key === key);
+  if (!gap) return;
+  if (!state.actions.some((action) => action.title === gap.action && action.status !== "cerrada")) {
+    createAction(gap.action, gap.code, gap.severity === "alta" ? "preventiva" : "tarea", "brecha_actividad");
+    const action = state.actions[0];
+    action.priority = gap.severity === "alta" ? "alta" : "media";
+    action.cause = gap.detail;
+    action.responsible = state.ownerName || "Responsable SGSTA";
+  }
+  saveState();
+  renderAll();
+}
+
+function createAllActivityGapActions() {
+  state.activities.forEach((activity) => {
+    activityGapItems(activity.name).forEach((gap) => {
+      if (!state.actions.some((action) => action.title === gap.action && action.status !== "cerrada")) {
+        state.actions.unshift({
+          title: gap.action,
+          code: gap.code,
+          status: "abierta",
+          type: gap.severity === "alta" ? "preventiva" : "tarea",
+          origin: "brecha_actividad",
+          priority: gap.severity === "alta" ? "alta" : "media",
+          responsible: state.ownerName || "Responsable SGSTA",
+          dueDate: "",
+          cause: gap.detail,
+          immediateCorrection: "",
+          followUp: "",
+          efficacyVerification: "",
+          efficacyStatus: "pendiente",
+          createdAt: today()
+        });
+      }
+    });
+  });
+  recordAuditEvent({
+    title: "Acciones de brechas por actividad",
+    detail: "El agente creo o actualizo acciones preventivas/tareas para brechas operacionales por actividad.",
+    code: "8.1",
+    type: "agente",
+    actor: "agente"
+  });
+  saveState();
+  renderAll();
 }
 
 function activityContext(activityName) {
