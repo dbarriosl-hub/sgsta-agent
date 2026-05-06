@@ -1120,6 +1120,65 @@ function updateActivityRiskField(field) {
   renderAll();
 }
 
+function activityEquipmentRows(activityName) {
+  const equipmentItems = state.equipment
+    .map((equipment, index) => ({ equipment, index }))
+    .filter((item) => item.equipment.activity === activityName);
+  if (!equipmentItems.length) return `<div class="muted">No hay equipos especificos para esta actividad.</div>`;
+  return equipmentItems.map(({ equipment, index }) => {
+    const complete = equipment.status === "operativo" && equipment.nextCheck && !String(equipment.nextCheck).toLowerCase().includes("por ");
+    return `
+      <div class="equipment-edit-row">
+        <label>Equipo<input data-equipment-field="${index}:name" type="text" value="${escapeHtml(equipment.name || "")}"></label>
+        <label>Tipo<input data-equipment-field="${index}:type" type="text" value="${escapeHtml(equipment.type || "")}"></label>
+        <label>Estado
+          <select data-equipment-field="${index}:status">
+            ${["operativo", "revision", "mantenimiento", "fuera_servicio"].map((value) => `<option value="${value}" ${(equipment.status || "revision") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
+        <label>Proxima revision<input data-equipment-field="${index}:nextCheck" type="text" value="${escapeHtml(equipment.nextCheck || "")}"></label>
+        <label>Responsable<input data-equipment-field="${index}:responsible" type="text" value="${escapeHtml(equipment.responsible || "")}"></label>
+        <label>Evidencia<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}"></label>
+        <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : "pendiente"}</span>
+        <button class="secondary-button" data-remove="equipment:${index}" type="button">Quitar</button>
+      </div>`;
+  }).join("");
+}
+
+function updateActivityEquipmentField(field) {
+  const [rawIndex, key] = field.dataset.equipmentField.split(":");
+  const equipment = state.equipment[Number(rawIndex)];
+  if (!equipment) return;
+  equipment[key] = field.value;
+  equipment.updatedAt = today();
+  state.compliance["7.1"] = "en_proceso";
+  state.compliance["8.1"] = "en_proceso";
+  const incomplete = equipment.status !== "operativo" || !equipment.nextCheck || String(equipment.nextCheck).toLowerCase().includes("por ");
+  if (incomplete) {
+    const title = `Completar control de equipo: ${equipment.name}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "7.1",
+        status: "abierta",
+        type: "preventiva",
+        origin: "equipo",
+        priority: "alta",
+        responsible: equipment.responsible || "",
+        dueDate: "",
+        cause: `Equipo ${equipment.name} de ${equipment.activity} requiere inspeccion, mantenimiento o evidencia.`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -1207,6 +1266,16 @@ function renderActivities() {
         </div>
         ${activityRiskRows(selectedActivity.name)}
       </div>
+      <div class="activity-equipment-editor">
+        <div class="panel-heading compact-heading">
+          <div>
+            <p class="eyebrow">Equipos de la actividad</p>
+            <h2>Inventario editable</h2>
+          </div>
+          <span class="badge ${selectedRelated.equipment.every((item) => item.status === "operativo") && selectedRelated.equipment.length ? "cumple" : "no_cumple"}">${selectedRelated.equipment.length}</span>
+        </div>
+        ${activityEquipmentRows(selectedActivity.name)}
+      </div>
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -1245,6 +1314,9 @@ function renderActivities() {
   });
   container.querySelectorAll("[data-risk-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityRiskField(field));
+  });
+  container.querySelectorAll("[data-equipment-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityEquipmentField(field));
   });
 }
 
