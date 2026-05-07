@@ -3678,11 +3678,13 @@ function renderActions() {
     const assigned = state.actions.filter((item) => item.responsible && item.dueDate).length;
     const efficacy = state.actions.filter((item) => item.efficacyStatus === "eficaz").length;
     const corrective = state.actions.filter((item) => item.type === "correctiva").length;
+    const pendingEfficacy = state.actions.filter((item) => item.status === "pendiente_eficacia" || (item.status === "cerrada" && item.efficacyStatus !== "eficaz")).length;
     summary.innerHTML = `
       <div class="report-card"><span>Abiertas</span><strong>${open}</strong></div>
       <div class="report-card"><span>Asignadas</span><strong>${assigned}</strong></div>
       <div class="report-card"><span>Correctivas</span><strong>${corrective}</strong></div>
-      <div class="report-card"><span>Eficaces</span><strong>${efficacy}</strong></div>`;
+      <div class="report-card"><span>Eficaces</span><strong>${efficacy}</strong></div>
+      <div class="report-card"><span>Pend. eficacia</span><strong>${pendingEfficacy}</strong></div>`;
   }
   container.innerHTML = state.actions.length
     ? state.actions.map((item, index) => actionCardTemplate(item, index)).join("")
@@ -3693,19 +3695,26 @@ function renderActions() {
 function actionCardTemplate(item, index) {
   const related = item.relatedActivity || item.activity || "";
   const sourceDetail = item.sourceDetail || item.gapKey || "";
+  const canClose = actionReadyToClose(item);
+  const statusClass = item.status === "cerrada" ? "cumple" : item.status === "pendiente_eficacia" ? "no_cumple" : "en_proceso";
   return `
     <article class="action-management-card">
       <div class="action-card-head">
         <div>
           <span class="badge requisito">${item.code || "10.1"}</span>
           <span class="badge phva">${item.type || "tarea"}</span>
-          <span class="badge ${item.status === "cerrada" ? "cumple" : "en_proceso"}">${item.status || "abierta"}</span>
+          <span class="badge ${statusClass}">${item.status || "abierta"}</span>
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-action-assign="${index}" type="button">Asignar</button>
           <button data-close-action="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
         </div>
       </div>
+      ${item.status !== "cerrada" ? `
+        <div class="action-close-readiness ${canClose ? "ready" : "pending"}">
+          <strong>${canClose ? "Lista para cierre" : "Falta para cerrar"}</strong>
+          <span>${actionClosureMessage(item)}</span>
+        </div>` : ""}
       ${related || sourceDetail ? `
         <div class="action-trace">
           <span>Actividad: <strong>${escapeHtml(related || "general")}</strong></span>
@@ -3749,6 +3758,10 @@ function actionCardTemplate(item, index) {
             ${["pendiente", "eficaz", "no_eficaz"].map((value) => `<option value="${value}" ${value === (item.efficacyStatus || "pendiente") ? "selected" : ""}>${value}</option>`).join("")}
           </select>
         </label>
+        <label>
+          Evidencia
+          <input data-action-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || "")}" placeholder="enlace, archivo o soporte">
+        </label>
       </div>
       <div class="action-form-grid">
         <label>
@@ -3771,6 +3784,19 @@ function actionCardTemplate(item, index) {
         </label>
       </div>
     </article>`;
+}
+
+function actionReadyToClose(action) {
+  return Boolean(action.followUp && action.evidence && action.efficacyVerification && action.efficacyStatus === "eficaz");
+}
+
+function actionClosureMessage(action) {
+  const missing = [];
+  if (!action.followUp) missing.push("seguimiento");
+  if (!action.evidence) missing.push("evidencia");
+  if (!action.efficacyVerification) missing.push("verificacion de eficacia");
+  if (action.efficacyStatus !== "eficaz") missing.push("estado eficaz");
+  return missing.length ? `Completa: ${missing.join(", ")}.` : "Tiene seguimiento, evidencia y eficacia verificada.";
 }
 
 function bindActionControls(container) {
@@ -3811,9 +3837,25 @@ function bindActionControls(container) {
       const action = state.actions[Number(button.dataset.closeAction)];
       if (!action) return;
       const closing = action.status !== "cerrada";
+      if (closing && !actionReadyToClose(action)) {
+        action.status = "pendiente_eficacia";
+        action.closedAt = "";
+        action.efficacyStatus = action.efficacyStatus || "pendiente";
+        addMessage("agent", `No cerre la accion "${action.title}" porque falta seguimiento, evidencia o eficacia. La deje como pendiente_eficacia.`);
+        recordAuditEvent({
+          title: "Cierre de accion bloqueado",
+          detail: `${action.title}: ${actionClosureMessage(action)}`,
+          code: action.code,
+          type: "accion_gestion",
+          actor: "agente"
+        });
+        saveState();
+        renderAll();
+        return;
+      }
       action.status = closing ? "cerrada" : "abierta";
       action.closedAt = closing ? today() : "";
-      if (closing && !action.efficacyStatus) action.efficacyStatus = "pendiente";
+      if (closing) action.efficacyStatus = "eficaz";
       recordAuditEvent({
         title: closing ? "Accion cerrada" : "Accion reabierta",
         detail: `${action.title} cambio a estado ${action.status}.`,

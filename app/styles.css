@@ -411,6 +411,29 @@ textarea {
   color: var(--text);
 }
 
+.action-close-readiness {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+}
+
+.action-close-readiness.ready {
+  background: #f0fdf4;
+  color: var(--ok);
+}
+
+.action-close-readiness.pending {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.action-close-readiness span {
+  color: inherit;
+  font-size: 13px;
+}
+
 .action-card-head > div:first-child {
   display: flex;
   flex-wrap: wrap;
