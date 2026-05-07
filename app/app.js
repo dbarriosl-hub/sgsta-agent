@@ -928,6 +928,28 @@ function activityGapActionExists(gap) {
   return state.actions.some((action) => action.title === gap.action && action.status !== "cerrada");
 }
 
+function activityGapActionPayload(activityName, gap) {
+  return {
+    title: gap.action,
+    code: gap.code,
+    status: "abierta",
+    type: gap.severity === "alta" ? "preventiva" : "tarea",
+    origin: "brecha_actividad",
+    priority: gap.severity === "alta" ? "alta" : "media",
+    responsible: state.ownerName || "Responsable SGSTA",
+    dueDate: "",
+    cause: gap.detail,
+    immediateCorrection: "",
+    followUp: "",
+    efficacyVerification: "",
+    efficacyStatus: "pendiente",
+    relatedActivity: activityName,
+    gapKey: gap.key,
+    sourceDetail: `${gap.label} - ${gap.code}`,
+    createdAt: today()
+  };
+}
+
 function renderActivityGaps() {
   const summary = document.querySelector("#activityGapsSummary");
   const table = document.querySelector("#activityGapsTable");
@@ -987,11 +1009,14 @@ function createActivityGapAction(activityName, key) {
   const gap = activityGapItems(activityName).find((item) => item.key === key);
   if (!gap) return;
   if (!activityGapActionExists(gap)) {
-    createAction(gap.action, gap.code, gap.severity === "alta" ? "preventiva" : "tarea", "brecha_actividad");
-    const action = state.actions[0];
-    action.priority = gap.severity === "alta" ? "alta" : "media";
-    action.cause = gap.detail;
-    action.responsible = state.ownerName || "Responsable SGSTA";
+    state.actions.unshift(activityGapActionPayload(activityName, gap));
+    recordAuditEvent({
+      title: "Accion creada desde brecha",
+      detail: `${gap.action}. Actividad: ${activityName}.`,
+      code: gap.code,
+      type: "accion_preventiva",
+      actor: "agente"
+    });
     addMessage("agent", `Cree la accion: ${gap.action}. Queda abierta hasta que cierres la brecha con evidencia.`);
   } else {
     addMessage("agent", `La accion ya estaba abierta: ${gap.action}.`);
@@ -1005,22 +1030,7 @@ function createAllActivityGapActions() {
   state.activities.forEach((activity) => {
     activityGapItems(activity.name).forEach((gap) => {
       if (!activityGapActionExists(gap)) {
-        state.actions.unshift({
-          title: gap.action,
-          code: gap.code,
-          status: "abierta",
-          type: gap.severity === "alta" ? "preventiva" : "tarea",
-          origin: "brecha_actividad",
-          priority: gap.severity === "alta" ? "alta" : "media",
-          responsible: state.ownerName || "Responsable SGSTA",
-          dueDate: "",
-          cause: gap.detail,
-          immediateCorrection: "",
-          followUp: "",
-          efficacyVerification: "",
-          efficacyStatus: "pendiente",
-          createdAt: today()
-        });
+        state.actions.unshift(activityGapActionPayload(activity.name, gap));
         created += 1;
       }
     });
@@ -3681,6 +3691,8 @@ function renderActions() {
 }
 
 function actionCardTemplate(item, index) {
+  const related = item.relatedActivity || item.activity || "";
+  const sourceDetail = item.sourceDetail || item.gapKey || "";
   return `
     <article class="action-management-card">
       <div class="action-card-head">
@@ -3694,6 +3706,12 @@ function actionCardTemplate(item, index) {
           <button data-close-action="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
         </div>
       </div>
+      ${related || sourceDetail ? `
+        <div class="action-trace">
+          <span>Actividad: <strong>${escapeHtml(related || "general")}</strong></span>
+          <span>Fuente: <strong>${escapeHtml(sourceDetail || item.origin || "accion")}</strong></span>
+          ${item.origin === "brecha_actividad" ? `<button class="secondary-button" data-open-activity-gaps type="button">Ver brechas</button>` : ""}
+        </div>` : ""}
       <label class="wide">
         Accion propuesta
         <input data-action-field="${index}:title" type="text" value="${escapeHtml(item.title || "")}">
@@ -3756,6 +3774,9 @@ function actionCardTemplate(item, index) {
 }
 
 function bindActionControls(container) {
+  container.querySelectorAll("[data-open-activity-gaps]").forEach((button) => {
+    button.addEventListener("click", () => showView("brechas_actividad"));
+  });
   container.querySelectorAll("[data-action-field]").forEach((field) => {
     field.addEventListener("change", () => {
       const [index, key] = field.dataset.actionField.split(":");

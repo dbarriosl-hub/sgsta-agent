@@ -393,6 +393,24 @@ textarea {
   align-items: center;
 }
 
+.action-trace {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+.action-trace strong {
+  color: var(--text);
+}
+
 .action-card-head > div:first-child {
   display: flex;
   flex-wrap: wrap;
