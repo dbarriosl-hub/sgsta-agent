@@ -3333,11 +3333,17 @@ async function fillCatalogForm(table) {
   renderAll();
 }
 
-function fillActivityCatalogForm(table) {
+async function fillActivityCatalogForm(table) {
   if (internalFormTables.has(table)) return;
   ensureSelectedFormActivity();
   const activityName = state.selectedFormActivity || state.selectedActivityName || primaryActivityName();
   if (!activityName) return;
+  const handledByBackend = await createFormDraftsInBackend({ table, activity: activityName });
+  if (handledByBackend) return;
+  fillActivityCatalogFormLocal(table, activityName);
+}
+
+function fillActivityCatalogFormLocal(table, activityName) {
   const response = upsertActivityFormDraft(table, activityName);
   if (!response) return;
   state.selectedFormTable = table;
@@ -3428,6 +3434,12 @@ async function createFormDraftsInBackend(payload) {
     const result = await response.json();
     state = mergeState(clone(defaultState), apiStateToAppState(result.state));
     if (payload.table) state.selectedFormTable = payload.table;
+    if (payload.activity) {
+      state.selectedFormActivity = payload.activity;
+      state.selectedActivityName = payload.activity;
+      state.formFilters.search = payload.activity;
+      state.formFilters.status = "todos";
+    }
     if (payload.requirement) {
       state.formFilters.search = payload.requirement;
       state.formFilters.status = "todos";

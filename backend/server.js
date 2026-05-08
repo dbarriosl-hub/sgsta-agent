@@ -790,6 +790,10 @@ function suggestedValueForField(name, context) {
   if (lower.includes("telefono")) return company.phone || "Telefono por definir";
   if (lower.includes("direccion") || lower.includes("ubicacion") || lower.includes("lugar")) return company.city || "Ubicacion por definir";
   if (lower.includes("actividad")) return context.activity.name || context.activity.activity || "Actividad por definir";
+  if (lower.includes("condicion")) return context.activity.participantRequirements || context.activity.conditions || context.participant.infoProvided || "Condiciones de participacion por definir";
+  if (lower.includes("participante") || lower.includes("cliente")) return context.participant.participantInfoRequested || "Datos minimos y consentimiento en formulario externo";
+  if (lower.includes("consentimiento")) return context.participant.consent || "pendiente";
+  if (lower.includes("informacion")) return context.participant.infoProvided || context.activity.participantRequirements || "Informacion al participante por completar segun ISO 21103";
   if (lower.includes("persona") || lower.includes("nombre_completo")) return context.person.name || "Persona por definir";
   if (lower.includes("cargo") || lower.includes("rol")) return context.person.role || "Rol por definir";
   if (lower.includes("competencia")) return context.person.training || "Competencia por verificar";
@@ -811,16 +815,33 @@ function suggestedValueForField(name, context) {
   return "Por definir";
 }
 
-function generateFormDraftValues(form) {
+function activityContext(activityName = "") {
+  const activities = list(state.activities);
+  const activity = activities.find((item) => (item.name || item.activity) === activityName) || activities[0] || {};
+  const name = activity.name || activity.activity || activityName || "";
+  const belongs = (item) => item.activity === name || item.activityName === name || item.actividad === name;
+  return {
+    activity,
+    person: list(state.people).find((item) => belongs(item) || String(item.role || "").toLowerCase().includes(String(name).toLowerCase())) || {},
+    equipment: list(state.equipment).find(belongs) || {},
+    policy: list(state.policies).find(belongs) || {},
+    risk: list(state.risks).find(belongs) || {},
+    participant: list(state.participantEvidence).find(belongs) || {}
+  };
+}
+
+function generateFormDraftValues(form, activityName = "") {
+  const contextByActivity = activityContext(activityName);
   const context = {
     form,
     relation: findFormMatrixItem(form.table),
     requirement: getFormRequirement(form),
-    activity: list(state.activities)[0] || {},
-    person: list(state.people)[0] || {},
-    equipment: list(state.equipment)[0] || {},
-    policy: list(state.policies)[0] || {},
-    risk: list(state.risks)[0] || {}
+    activity: contextByActivity.activity,
+    person: contextByActivity.person,
+    equipment: contextByActivity.equipment,
+    policy: contextByActivity.policy,
+    risk: contextByActivity.risk,
+    participant: contextByActivity.participant
   };
   const values = {};
   list(form.fields).forEach((field) => {
@@ -829,8 +850,8 @@ function generateFormDraftValues(form) {
   return values;
 }
 
-function mergeAgentDraftValues(form, currentValues = {}) {
-  const suggestedValues = generateFormDraftValues(form);
+function mergeAgentDraftValues(form, currentValues = {}, activityName = "") {
+  const suggestedValues = generateFormDraftValues(form, activityName);
   const merged = { ...(currentValues || {}) };
   list(form.fields).forEach((field) => {
     if (!String(merged[field.name] || "").trim()) merged[field.name] = suggestedValues[field.name];
@@ -838,8 +859,8 @@ function mergeAgentDraftValues(form, currentValues = {}) {
   return merged;
 }
 
-function mergeAiDraftValues(form, currentValues = {}, aiValues = {}) {
-  const merged = mergeAgentDraftValues(form, currentValues);
+function mergeAiDraftValues(form, currentValues = {}, aiValues = {}, activityName = "") {
+  const merged = mergeAgentDraftValues(form, currentValues, activityName);
   list(form.fields).forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(aiValues, field.name) && String(aiValues[field.name] || "").trim()) {
       merged[field.name] = aiValues[field.name];
@@ -848,14 +869,19 @@ function mergeAiDraftValues(form, currentValues = {}, aiValues = {}) {
   return merged;
 }
 
-function upsertFormDraft(form, aiDraft = null) {
+function upsertFormDraft(form, aiDraft = null, activityName = "") {
   const relation = findFormMatrixItem(form.table);
   const requirement = getFormRequirement(form);
-  const existing = list(state.formResponses).find((item) => item.table === form.table);
+  const existing = list(state.formResponses).find((item) => {
+    if (item.table !== form.table) return false;
+    if (activityName) return item.activity === activityName;
+    return !item.activity;
+  }) || (!activityName ? list(state.formResponses).find((item) => item.table === form.table) : null);
   if (existing) {
     existing.status = existing.status === "aprobado" ? "revision" : "borrador";
-    existing.values = aiDraft ? mergeAiDraftValues(form, existing.values, aiDraft.values) : mergeAgentDraftValues(form, existing.values);
+    existing.values = aiDraft ? mergeAiDraftValues(form, existing.values, aiDraft.values, activityName) : mergeAgentDraftValues(form, existing.values, activityName);
     existing.source = aiDraft ? "agente_ia_deepseek" : existing.source || "agente_backend";
+    if (activityName) existing.activity = activityName;
     existing.aiNotes = aiDraft?.notes || existing.aiNotes || "";
     existing.aiModel = aiDraft?.model || existing.aiModel || "";
     existing.requiresApproval = true;
@@ -866,12 +892,13 @@ function upsertFormDraft(form, aiDraft = null) {
   const response = {
     id: `fr-${Date.now()}-${form.table}`,
     table: form.table,
-    form: form.title,
+    form: activityName ? `${form.title} - ${activityName}` : form.title,
     module: relation?.module || form.table,
+    activity: activityName || "",
     status: "borrador",
     code: requirement.code,
     fields: list(form.fields).map((field) => field.name),
-    values: aiDraft ? mergeAiDraftValues(form, {}, aiDraft.values) : generateFormDraftValues(form),
+    values: aiDraft ? mergeAiDraftValues(form, {}, aiDraft.values, activityName) : generateFormDraftValues(form, activityName),
     source: aiDraft ? "agente_ia_deepseek" : "agente_backend",
     aiNotes: aiDraft?.notes || "",
     aiModel: aiDraft?.model || "",
@@ -899,14 +926,14 @@ function formTargetsFromInput(input) {
 }
 
 function draftForms(input) {
-  const responses = formTargetsFromInput(input).map((form) => upsertFormDraft(form));
+  const responses = formTargetsFromInput(input).map((form) => upsertFormDraft(form, null, input.activity || ""));
 
   if (responses.length) {
     recordEvent({
       actor: "agente",
       type: "form_draft_created",
       title: "Borrador(es) de formulario generados",
-      detail: `${responses.length} formulario(s) quedaron en borrador pendiente de aprobacion humana.`,
+      detail: `${responses.length} formulario(s) quedaron en borrador${input.activity ? ` para ${input.activity}` : ""} pendiente de aprobacion humana.`,
       code: input.requirement || responses[0].code
     });
   }
@@ -924,21 +951,21 @@ async function draftFormsWithAi(input) {
   const responses = [];
   for (const form of forms) {
     let aiDraft = null;
-    const existing = list(state.formResponses).find((item) => item.table === form.table);
+    const existing = list(state.formResponses).find((item) => item.table === form.table && (input.activity ? item.activity === input.activity : !item.activity));
     try {
       aiDraft = await generateAiFormValues(form, existing?.values || {});
       if (aiDraft) ai.used = true;
     } catch (error) {
       ai.errors.push({ table: form.table, error: serializeError(error) });
     }
-    responses.push(upsertFormDraft(form, aiDraft));
+    responses.push(upsertFormDraft(form, aiDraft, input.activity || ""));
   }
   if (responses.length) {
     recordEvent({
       actor: ai.used ? "agente_ia" : "agente",
       type: ai.used ? "ai_form_draft_created" : "form_draft_created",
       title: ai.used ? "Borrador(es) de formulario generados con IA" : "Borrador(es) de formulario generados",
-      detail: `${responses.length} formulario(s) quedaron en borrador pendiente de aprobacion humana.`,
+      detail: `${responses.length} formulario(s) quedaron en borrador${input.activity ? ` para ${input.activity}` : ""} pendiente de aprobacion humana.`,
       code: input.requirement || responses[0].code
     });
   }
@@ -947,7 +974,7 @@ async function draftFormsWithAi(input) {
 
 function upsertEvidenceFromApprovedForm(response) {
   state.evidence = list(state.evidence);
-  const linkedDocument = response.table;
+  const linkedDocument = response.activity ? `${response.table}:${response.activity}` : response.table;
   const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "formulario aprobado");
   const evidence = {
     id: existing?.id || `ev-${Date.now()}-${response.table}`,
@@ -955,6 +982,8 @@ function upsertEvidenceFromApprovedForm(response) {
     code: response.code,
     status: "registrada",
     source: "formulario aprobado",
+    activity: response.activity || "",
+    linkedActivity: response.activity || "",
     linkedDocument,
     approvedBy: response.approvedBy,
     approvedAt: response.approvedAt,
