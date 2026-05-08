@@ -1101,7 +1101,7 @@ function addRiskForActivity(activityName) {
 
 function addEquipmentForActivity(activityName) {
   const count = state.equipment.length + 1;
-  state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar" });
+  state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", "actividad");
@@ -1332,7 +1332,7 @@ function activityEquipmentRows(activityName) {
     .filter((item) => item.equipment.activity === activityName);
   if (!equipmentItems.length) return `<div class="muted">No hay equipos especificos para esta actividad.</div>`;
   return equipmentItems.map(({ equipment, index }) => {
-    const complete = equipment.status === "operativo" && equipment.nextCheck && !String(equipment.nextCheck).toLowerCase().includes("por ");
+    const complete = equipmentIsComplete(equipment);
     return `
       <div class="equipment-edit-row">
         <label>Equipo<input data-equipment-field="${index}:name" type="text" value="${escapeHtml(equipment.name || "")}"></label>
@@ -1344,11 +1344,18 @@ function activityEquipmentRows(activityName) {
         </label>
         <label>Proxima revision<input data-equipment-field="${index}:nextCheck" type="text" value="${escapeHtml(equipment.nextCheck || "")}"></label>
         <label>Responsable<input data-equipment-field="${index}:responsible" type="text" value="${escapeHtml(equipment.responsible || "")}"></label>
+        <label>Inspeccion<input data-equipment-field="${index}:inspectionDate" type="text" value="${escapeHtml(equipment.inspectionDate || "")}"></label>
+        <label>Mantenimiento<input data-equipment-field="${index}:maintenanceDate" type="text" value="${escapeHtml(equipment.maintenanceDate || "")}"></label>
         <label>Evidencia<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}"></label>
         <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : "pendiente"}</span>
         <button class="secondary-button" data-remove="equipment:${index}" type="button">Quitar</button>
       </div>`;
   }).join("");
+}
+
+function equipmentIsComplete(equipment) {
+  const nextOk = equipment.nextCheck && !String(equipment.nextCheck).toLowerCase().includes("por ");
+  return equipment.status === "operativo" && nextOk && equipment.inspectionDate && equipment.maintenanceDate && equipment.evidence;
 }
 
 function updateActivityEquipmentField(field) {
@@ -1359,7 +1366,7 @@ function updateActivityEquipmentField(field) {
   equipment.updatedAt = today();
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
-  const incomplete = equipment.status !== "operativo" || !equipment.nextCheck || String(equipment.nextCheck).toLowerCase().includes("por ");
+  const incomplete = !equipmentIsComplete(equipment);
   if (incomplete) {
     const title = `Completar control de equipo: ${equipment.name}`;
     if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
@@ -1911,16 +1918,104 @@ function renderTraining() {
   });
 }
 
+function detectEquipmentGaps() {
+  let created = 0;
+  state.equipment.forEach((equipment) => {
+    if (equipmentIsComplete(equipment)) return;
+    const title = `Completar inspeccion/mantenimiento de ${equipment.name}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "7.1",
+        status: "abierta",
+        type: "preventiva",
+        origin: "equipo",
+        priority: equipment.status === "fuera_servicio" || equipment.status === "mantenimiento" ? "alta" : "media",
+        responsible: equipment.responsible || state.ownerName || "",
+        dueDate: equipment.nextCheck || "",
+        cause: `Equipo de ${itemActivityName(equipment)} requiere estado operativo, inspeccion, mantenimiento y evidencia.`,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        relatedActivity: itemActivityName(equipment),
+        sourceDetail: "Control de equipo 7.1/8.1",
+        createdAt: today()
+      });
+      created += 1;
+    }
+  });
+  addMessage("agent", created ? `Detecte ${created} brecha(s) de equipos y cree acciones preventivas.` : "No detecte nuevas brechas de equipos; las acciones ya existen o los equipos estan completos.");
+  saveState();
+  renderAll();
+}
+
 function renderEquipment() {
   const container = document.querySelector("#equipmentTable");
+  const summary = document.querySelector("#equipmentSummary");
+  if (summary) {
+    const complete = state.equipment.filter(equipmentIsComplete).length;
+    const pending = state.equipment.length - complete;
+    const out = state.equipment.filter((item) => ["mantenimiento", "fuera_servicio"].includes(item.status)).length;
+    const evidenceMissing = state.equipment.filter((item) => !item.evidence).length;
+    summary.innerHTML = `
+      <div class="report-card"><span>Listos</span><strong>${complete}/${state.equipment.length}</strong></div>
+      <div class="report-card"><span>Pendientes</span><strong>${pending}</strong></div>
+      <div class="report-card"><span>Criticos</span><strong>${out}</strong></div>
+      <div class="report-card"><span>Sin evidencia</span><strong>${evidenceMissing}</strong></div>`;
+  }
   container.innerHTML = state.equipment.length
-    ? state.equipment.map((item, index) => `
-      <div class="simple-row module-row">
-        <div><strong>${item.name}</strong><div class="muted">${item.type} - Actividad: ${itemActivityName(item)} - Proxima revision: ${item.nextCheck}</div></div>
-        <span class="badge ${item.status === "operativo" ? "cumple" : "en_proceso"}">${item.status}</span>
-        <button class="secondary-button" data-toggle-equipment="${index}" type="button">${item.status === "operativo" ? "Revision" : "Operativo"}</button>
-      </div>`).join("")
+    ? state.equipment.map((item, index) => {
+      const complete = equipmentIsComplete(item);
+      return `
+      <div class="equipment-card">
+        <div class="action-card-head">
+          <div>
+            <span class="badge requisito">7.1/8.1</span>
+            <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : item.status}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-equipment-action="${index}" type="button">Crear accion</button>
+            <button class="secondary-button" data-toggle-equipment="${index}" type="button">${item.status === "operativo" ? "Revision" : "Operativo"}</button>
+          </div>
+        </div>
+        <strong>${item.name}</strong>
+        <div class="muted">${item.type} - Actividad: ${itemActivityName(item)} - Proxima revision: ${item.nextCheck || "Por programar"}</div>
+        <div class="training-edit-grid">
+          <label>Estado
+            <select data-equipment-main-field="${index}:status">
+              ${["operativo", "revision", "mantenimiento", "fuera_servicio"].map((value) => `<option value="${value}" ${(item.status || "revision") === value ? "selected" : ""}>${value}</option>`).join("")}
+            </select>
+          </label>
+          <label>Proxima revision<input data-equipment-main-field="${index}:nextCheck" type="text" value="${escapeHtml(item.nextCheck || "")}"></label>
+          <label>Inspeccion<input data-equipment-main-field="${index}:inspectionDate" type="text" value="${escapeHtml(item.inspectionDate || "")}"></label>
+          <label>Mantenimiento<input data-equipment-main-field="${index}:maintenanceDate" type="text" value="${escapeHtml(item.maintenanceDate || "")}"></label>
+          <label>Responsable<input data-equipment-main-field="${index}:responsible" type="text" value="${escapeHtml(item.responsible || "")}"></label>
+          <label>Evidencia<input data-equipment-main-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || "")}"></label>
+        </div>
+      </div>`;
+    }).join("")
     : `<div class="muted">No hay equipos registrados.</div>`;
+  container.querySelectorAll("[data-equipment-main-field]").forEach((field) => {
+    field.addEventListener("change", () => {
+      const [index, key] = field.dataset.equipmentMainField.split(":");
+      const item = state.equipment[Number(index)];
+      if (!item) return;
+      item[key] = field.value;
+      item.updatedAt = today();
+      state.compliance["7.1"] = "en_proceso";
+      state.compliance["8.1"] = "en_proceso";
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-equipment-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = state.equipment[Number(button.dataset.equipmentAction)];
+      if (!item) return;
+      detectEquipmentGaps();
+    });
+  });
   container.querySelectorAll("[data-toggle-equipment]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.equipment[Number(button.dataset.toggleEquipment)];
@@ -4847,7 +4942,7 @@ function addTrainingNeed() {
 
 function addEquipment() {
   const count = state.equipment.length + 1;
-  state.equipment.unshift({ name: `Equipo ${count}`, type: "Operacion", activity: primaryActivityName(), status: "revision", nextCheck: "Por programar" });
+  state.equipment.unshift({ name: `Equipo ${count}`, type: "Operacion", activity: primaryActivityName(), status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createAction("Programar inspeccion y mantenimiento de equipo", "7.1", "preventiva", "equipo vencido");
@@ -5084,8 +5179,8 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
       addMessage("agent", "Revise competencias, actividades y riesgos para detectar necesidades de capacitacion.");
     }
     if (action === "equipos") {
-      addEquipment();
-      addMessage("agent", "Agregue un equipo en revision y cree una accion de inspeccion.");
+      detectEquipmentGaps();
+      addMessage("agent", "Revise equipos, inspecciones, mantenimientos, estados y evidencias.");
     }
     if (action === "seguros") {
       addPolicy();
@@ -5129,6 +5224,7 @@ document.querySelector("#addPerson").addEventListener("click", addPerson);
 document.querySelector("#addTrainingNeed").addEventListener("click", addTrainingNeed);
 document.querySelector("#detectTrainingNeeds").addEventListener("click", detectTrainingNeeds);
 document.querySelector("#addEquipment").addEventListener("click", addEquipment);
+document.querySelector("#detectEquipmentGaps").addEventListener("click", detectEquipmentGaps);
 document.querySelector("#addPolicy").addEventListener("click", addPolicy);
 document.querySelector("#addParticipantEvidence").addEventListener("click", addParticipantEvidence);
 document.querySelector("#addRisk").addEventListener("click", addRisk);

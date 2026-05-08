@@ -1416,7 +1416,8 @@ textarea {
   margin: 0;
 }
 
-.training-card {
+.training-card,
+.equipment-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
