@@ -162,7 +162,7 @@ const implementationSteps = [
   { id: "capacitacion", stage: "Hacer", title: "Programar y cerrar capacitaciones", code: "7.2-7.3", check: (s) => s.trainingNeeds.length > 0 && s.trainingNeeds.every((t) => t.status === "cerrada"), action: "Programar capacitaciones pendientes" },
   { id: "equipos", stage: "Hacer", title: "Controlar equipos, inspecciones y mantenimiento", code: "7.1/8.1", check: (s) => s.equipment.length > 0 && s.equipment.every((e) => e.status === "operativo"), action: "Completar inspeccion de equipos" },
   { id: "documentos", stage: "Hacer", title: "Aprobar documentos controlados", code: "7.5", check: (s) => s.documents.length > 0 && s.documents.every((d) => d.status === "aprobado"), action: "Revisar y aprobar documentos" },
-  { id: "participantes", stage: "Hacer", title: "Recibir evidencias externas de participantes", code: "7.4.3", check: (s) => s.activities.length > 0 && s.activities.every((activity) => s.participantEvidence.some((p) => itemActivityName(p) === activity.name && participantEvidenceIsComplete(p))), action: "Recibir consentimientos/evidencias externas" },
+  { id: "participantes", stage: "Hacer", title: "Recibir evidencias externas de participantes", code: "7.4.3", check: (s) => s.activities.length > 0 && s.activities.every((activity) => participantActivityInformationIsComplete(activity.name)), action: "Recibir consentimientos/evidencias externas" },
   { id: "auditoria", stage: "Verificar", title: "Preparar auditoria interna", code: "9.2", check: (s) => s.audits.length > 0, action: "Programar auditoria interna" },
   { id: "revision", stage: "Verificar", title: "Preparar revision por la direccion", code: "9.3", check: (s) => s.managementReviews.length > 0, action: "Preparar revision por la direccion" },
   { id: "mejora", stage: "Actuar", title: "Gestionar acciones correctivas, preventivas y mejora", code: "10.1-10.2", check: (s) => s.actions.length > 0, action: "Crear y dar seguimiento a acciones" }
@@ -840,17 +840,45 @@ function activityControlStatus(activityName) {
     guide: related.people.some((person) => person.competence === "cumple"),
     risks: related.risks.length > 0,
     equipment: related.equipment.length > 0 && related.equipment.every((item) => item.status === "operativo"),
-    participants: related.participants.some(participantEvidenceIsComplete),
+    participants: participantActivityInformationIsComplete(activityName),
     insurance: related.policies.some(policyIsComplete),
     training: related.training.length > 0
   };
+}
+
+function participantActivityInformationCoverage(activityName) {
+  const evidences = state.participantEvidence.filter((item) => itemActivityName(item) === activityName && participantEvidenceIsComplete(item));
+  return {
+    before: evidences.some((item) => (item.phase || "antes") === "antes"),
+    during: evidences.some((item) => item.phase === "durante"),
+    after: evidences.some((item) => item.phase === "despues")
+  };
+}
+
+function participantActivityInformationIsComplete(activityName) {
+  const coverage = participantActivityInformationCoverage(activityName);
+  return coverage.before && coverage.during && coverage.after;
+}
+
+function participantActivityGapReason(activityName, evidences) {
+  const coverage = participantActivityInformationCoverage(activityName);
+  const missingPhases = [];
+  if (!coverage.before) missingPhases.push("informacion antes de la actividad");
+  if (!coverage.during) missingPhases.push("informacion durante la actividad");
+  if (!coverage.after) missingPhases.push("informacion despues de la actividad");
+  const incomplete = evidences.filter((item) => !participantEvidenceIsComplete(item)).map(participantGapReason);
+  const messages = [];
+  if (missingPhases.length) messages.push(`Falta evidencia de ${missingPhases.join(", ")} segun ISO 21103.`);
+  if (incomplete.length) messages.push(incomplete.join(" "));
+  return messages.length ? messages.join(" ") : "Informacion al participante completa para antes, durante y despues.";
 }
 
 function participantEvidenceIsComplete(item) {
   const consentOk = ["recibido", "aprobado"].includes(String(item.consent || "").toLowerCase());
   const statusOk = ["recibida", "aprobada"].includes(String(item.status || "").toLowerCase());
   const supportOk = item.link || item.evidence || item.document;
-  return consentOk && statusOk && supportOk;
+  const communicationOk = item.infoProvided || item.communicationNotes || item.participantInfoRequested;
+  return consentOk && statusOk && supportOk && communicationOk;
 }
 
 function participantGapReason(item) {
@@ -861,6 +889,7 @@ function participantGapReason(item) {
   if (!["recibida", "aprobada"].includes(status)) missing.push("estado recibido/aprobado");
   if (!item.link && !item.evidence && !item.document) missing.push("enlace o soporte externo");
   if (!item.kind) missing.push("tipo de soporte");
+  if (!item.infoProvided && !item.communicationNotes && !item.participantInfoRequested) missing.push("informacion comunicada ISO 21103");
   return missing.length ? `Falta ${missing.join(", ")}.` : "Evidencia externa completa.";
 }
 
@@ -926,7 +955,7 @@ function activityGapItems(activityName) {
   if (!controls.guide) gaps.push({ key: "guide", code: "7.2", severity: "alta", label: "Guia competente", detail: peoplePending.length ? `${peoplePending.length} persona(s) sin competencia, certificado o evidencia vigente.` : "No hay guia competente asociado a la actividad.", action: `Cerrar competencia de guias de ${activityName}` });
   if (!controls.training) gaps.push({ key: "training", code: "7.2", severity: "media", label: "Capacitacion", detail: trainingPending.length ? `${trainingPending.length} necesidad(es) de capacitacion siguen abiertas.` : "No hay capacitaciones o necesidades asociadas a la actividad.", action: `Programar capacitacion para ${activityName}` });
   if (!controls.insurance) gaps.push({ key: "insurance", code: "6.1.3", severity: "alta", label: "Seguro", detail: policiesPending.length ? `${policiesPending.length} poliza(s) sin cobertura completa.` : "No hay poliza vigente con soporte para la actividad.", action: `Validar cobertura de seguro de ${activityName}` });
-  if (!controls.participants) gaps.push({ key: "participants", code: "7.4.3", severity: "media", label: "Participantes", detail: participantsPending.length ? `${participantsPending.length} evidencia(s) externa(s) sin consentimiento/enlace/soporte completo.` : "No hay evidencia externa de condiciones y consentimiento de participantes.", action: `Completar evidencia externa de participantes de ${activityName}` });
+  if (!controls.participants) gaps.push({ key: "participants", code: "7.4.3", severity: "media", label: "Participantes", detail: participantActivityGapReason(activityName, related.participants), action: `Completar informacion ISO 21103 de participantes de ${activityName}` });
   if (stats.pending > 0) gaps.push({ key: "forms", code: "7.5", severity: "media", label: "Formularios", detail: `${stats.pending} formulario(s) de la actividad siguen pendientes.`, action: `Diligenciar formularios operacionales de ${activityName}` });
   return gaps;
 }
@@ -1545,6 +1574,11 @@ function activityParticipantRows(activityName) {
     const complete = participantEvidenceIsComplete(item);
     return `
       <div class="participant-edit-row">
+        <label>Etapa ISO 21103
+          <select data-participant-field="${index}:phase">
+            ${["antes", "durante", "despues"].map((value) => `<option value="${value}" ${(item.phase || "antes") === value ? "selected" : ""}>${value}</option>`).join("")}
+          </select>
+        </label>
         <label>Soporte requerido<input data-participant-field="${index}:kind" type="text" value="${escapeHtml(item.kind || "")}"></label>
         <label>Formulario / enlace externo<input data-participant-field="${index}:link" type="text" value="${escapeHtml(item.link || "")}"></label>
         <label>Consentimiento
@@ -1559,6 +1593,8 @@ function activityParticipantRows(activityName) {
         </label>
         <label>Fecha<input data-participant-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
         <label>Evidencia<input data-participant-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || item.document || "")}"></label>
+        <label class="wideish">Informacion comunicada<input data-participant-field="${index}:infoProvided" type="text" value="${escapeHtml(item.infoProvided || "")}"></label>
+        <label class="wideish">Datos solicitados<input data-participant-field="${index}:participantInfoRequested" type="text" value="${escapeHtml(item.participantInfoRequested || "")}"></label>
         <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "recibida" : "brecha"}</span>
         <button class="secondary-button" data-remove="participantEvidence:${index}" type="button">Quitar</button>
       </div>`;
@@ -1584,11 +1620,13 @@ function updateActivityParticipantField(field) {
         priority: "media",
         responsible: "",
         dueDate: item.date || "",
-        cause: `La actividad ${item.activity || state.selectedActivityName} requiere consentimiento, enlace/formulario externo y evidencia sin almacenar datos sensibles.`,
+        cause: participantGapReason(item),
         immediateCorrection: "",
         followUp: "",
         efficacyVerification: "",
         efficacyStatus: "pendiente",
+        relatedActivity: item.activity || state.selectedActivityName,
+        sourceDetail: "Participantes 7.4.3 / ISO 21103",
         createdAt: today()
       });
     }
@@ -2158,15 +2196,15 @@ function renderParticipantEvidence() {
   const container = document.querySelector("#participantsTable");
   const summary = document.querySelector("#participantsSummary");
   if (summary) {
-    const coveredActivities = state.activities.filter((activity) => state.participantEvidence.some((item) => itemActivityName(item) === activity.name && participantEvidenceIsComplete(item))).length;
+    const coveredActivities = state.activities.filter((activity) => participantActivityInformationIsComplete(activity.name)).length;
     const complete = state.participantEvidence.filter(participantEvidenceIsComplete).length;
     const pending = state.participantEvidence.length - complete;
     const missingActivities = Math.max(0, state.activities.length - coveredActivities);
     summary.innerHTML = `
-      <div class="report-card"><span>Actividades con soporte</span><strong>${coveredActivities}/${state.activities.length}</strong></div>
+      <div class="report-card"><span>Actividades ISO 21103</span><strong>${coveredActivities}/${state.activities.length}</strong></div>
       <div class="report-card"><span>Evidencias completas</span><strong>${complete}</strong></div>
       <div class="report-card"><span>Evidencias pendientes</span><strong>${pending}</strong></div>
-      <div class="report-card"><span>Actividades sin soporte</span><strong>${missingActivities}</strong></div>`;
+      <div class="report-card"><span>Actividades incompletas</span><strong>${missingActivities}</strong></div>`;
   }
   container.innerHTML = state.participantEvidence.length
     ? state.participantEvidence.map((item, index) => {
@@ -2175,7 +2213,7 @@ function renderParticipantEvidence() {
       <div class="participant-card">
         <div class="action-card-head">
           <div>
-            <span class="badge requisito">7.4.3</span>
+            <span class="badge requisito">7.4.3 / ISO 21103</span>
             <span class="badge ${complete ? "cumple" : "en_proceso"}">${complete ? "recibida" : item.status}</span>
           </div>
           <div class="row-actions">
@@ -2184,10 +2222,15 @@ function renderParticipantEvidence() {
           </div>
         </div>
         <strong>${item.activity || "Actividad por definir"}</strong>
-        <div class="muted">${item.kind || "Soporte externo"} - Consentimiento: ${item.consent || "pendiente"} - Enlace: ${item.link || "por definir"}</div>
+        <div class="muted">${item.kind || "Soporte externo"} - Etapa: ${item.phase || "antes"} - Consentimiento: ${item.consent || "pendiente"} - Enlace: ${item.link || "por definir"}</div>
         <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Evidencia lista" : "Brecha de participantes"}</strong><span>${participantGapReason(item)}</span></div>
         <div class="training-edit-grid">
           <label>Actividad<input data-participant-main-field="${index}:activity" type="text" value="${escapeHtml(item.activity || "")}"></label>
+          <label>Etapa ISO 21103
+            <select data-participant-main-field="${index}:phase">
+              ${["antes", "durante", "despues"].map((value) => `<option value="${value}" ${(item.phase || "antes") === value ? "selected" : ""}>${value}</option>`).join("")}
+            </select>
+          </label>
           <label>Soporte requerido<input data-participant-main-field="${index}:kind" type="text" value="${escapeHtml(item.kind || "")}"></label>
           <label>Consentimiento
             <select data-participant-main-field="${index}:consent">
@@ -2202,6 +2245,9 @@ function renderParticipantEvidence() {
           <label>Fecha<input data-participant-main-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
           <label>Enlace externo<input data-participant-main-field="${index}:link" type="text" value="${escapeHtml(item.link || "")}"></label>
           <label>Evidencia<input data-participant-main-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || item.document || "")}"></label>
+          <label>Informacion comunicada<input data-participant-main-field="${index}:infoProvided" type="text" value="${escapeHtml(item.infoProvided || "")}"></label>
+          <label>Datos solicitados al participante<input data-participant-main-field="${index}:participantInfoRequested" type="text" value="${escapeHtml(item.participantInfoRequested || "")}"></label>
+          <label>Notas de comunicacion<input data-participant-main-field="${index}:communicationNotes" type="text" value="${escapeHtml(item.communicationNotes || "")}"></label>
         </div>
       </div>`;
     }).join("")
@@ -2237,9 +2283,9 @@ function detectParticipantGaps() {
   let created = 0;
   state.activities.forEach((activity) => {
     const evidences = state.participantEvidence.filter((item) => itemActivityName(item) === activity.name);
-    const hasComplete = evidences.some(participantEvidenceIsComplete);
+    const hasComplete = participantActivityInformationIsComplete(activity.name);
     if (hasComplete) return;
-    const title = `Completar evidencia externa de participantes para ${activity.name}`;
+    const title = `Completar informacion ISO 21103 de participantes para ${activity.name}`;
     if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
       state.actions.unshift({
         title,
@@ -2250,19 +2296,19 @@ function detectParticipantGaps() {
         priority: "media",
         responsible: state.ownerName || "Responsable SGSTA",
         dueDate: "",
-        cause: evidences.length ? evidences.map(participantGapReason).join(" ") : "La actividad no tiene evidencia externa de condiciones, consentimiento o soporte de participantes.",
+        cause: participantActivityGapReason(activity.name, evidences),
         immediateCorrection: "",
         followUp: "",
         efficacyVerification: "",
         efficacyStatus: "pendiente",
         relatedActivity: activity.name,
-        sourceDetail: "Participantes 7.4.3",
+        sourceDetail: "Participantes 7.4.3 / ISO 21103",
         createdAt: today()
       });
       created += 1;
     }
   });
-  addMessage("agent", created ? `Detecte ${created} brecha(s) de participantes por actividad y cree acciones preventivas.` : "No detecte nuevas brechas de participantes; las actividades ya tienen acciones abiertas o evidencia completa.");
+  addMessage("agent", created ? `Detecte ${created} brecha(s) ISO 21103 de participantes por actividad y cree acciones preventivas.` : "No detecte nuevas brechas ISO 21103 de participantes; las actividades ya tienen acciones abiertas o evidencia completa.");
   state.compliance["7.4.3"] = "en_proceso";
   saveState();
   renderAll();
@@ -5155,7 +5201,19 @@ function addPolicy() {
 
 function addParticipantEvidence() {
   const activity = primaryActivityName();
-  state.participantEvidence.unshift({ activity, kind: "Formulario externo de condiciones y consentimiento", consent: "pendiente", status: "pendiente", date: "", link: "", evidence: "" });
+  state.participantEvidence.unshift({
+    activity,
+    phase: "antes",
+    kind: "Formulario externo de condiciones, riesgos y consentimiento",
+    consent: "pendiente",
+    status: "pendiente",
+    date: "",
+    link: "",
+    evidence: "",
+    infoProvided: "Descripcion de actividad, requisitos de participacion, riesgos, equipo requerido, seguro y conducta esperada.",
+    participantInfoRequested: "Confirmacion de lectura, consentimiento y datos minimos en formulario externo.",
+    communicationNotes: "No guardar datos sensibles en la plataforma; conservar solo enlace o evidencia externa."
+  });
   state.compliance["7.4.3"] = "en_proceso";
   createAction("Verificar evidencia externa y consentimiento de participantes", "7.4.3", "tarea", "participantes");
 }
