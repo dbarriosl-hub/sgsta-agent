@@ -860,6 +860,15 @@ function policyIsComplete(policy) {
   return policy.status === "vigente" && dueOk && coverageOk && supportOk;
 }
 
+function policyGapReason(policy) {
+  const missing = [];
+  if (policy.status !== "vigente") missing.push("estado vigente");
+  if (!policy.due || String(policy.due).toLowerCase().includes("por ")) missing.push("vigencia");
+  if (!policy.coverage || String(policy.coverage).toLowerCase().includes("por definir")) missing.push("cobertura");
+  if (!policy.document && !policy.evidence) missing.push("documento soporte");
+  return missing.length ? `Falta ${missing.join(", ")}.` : "Cobertura completa.";
+}
+
 function controlBadge(ok, label) {
   return `<span class="badge ${ok ? "cumple" : "no_cumple"}">${label}</span>`;
 }
@@ -2028,16 +2037,99 @@ function renderEquipment() {
   });
 }
 
+function detectPolicyGaps() {
+  let created = 0;
+  state.activities.forEach((activity) => {
+    const policies = state.policies.filter((policy) => itemActivityName(policy) === activity.name);
+    const hasComplete = policies.some(policyIsComplete);
+    if (hasComplete) return;
+    const title = `Validar cobertura de seguro para ${activity.name}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "6.1.3",
+        status: "abierta",
+        type: "preventiva",
+        origin: "seguro",
+        priority: "alta",
+        responsible: state.ownerName || "Responsable SGSTA",
+        dueDate: "",
+        cause: policies.length ? policies.map(policyGapReason).join(" ") : "La actividad no tiene poliza asociada.",
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        relatedActivity: activity.name,
+        sourceDetail: "Cobertura de seguro 6.1.3",
+        createdAt: today()
+      });
+      created += 1;
+    }
+  });
+  addMessage("agent", created ? `Detecte ${created} brecha(s) de seguro por actividad y cree acciones preventivas.` : "No detecte nuevas brechas de seguro; las actividades ya tienen acciones o cobertura completa.");
+  state.compliance["6.1.3"] = "en_proceso";
+  saveState();
+  renderAll();
+}
+
 function renderPolicies() {
   const container = document.querySelector("#policiesTable");
+  const summary = document.querySelector("#policiesSummary");
+  if (summary) {
+    const coveredActivities = state.activities.filter((activity) => state.policies.some((policy) => itemActivityName(policy) === activity.name && policyIsComplete(policy))).length;
+    const complete = state.policies.filter(policyIsComplete).length;
+    const pending = state.policies.length - complete;
+    const missingActivities = Math.max(0, state.activities.length - coveredActivities);
+    summary.innerHTML = `
+      <div class="report-card"><span>Actividades cubiertas</span><strong>${coveredActivities}/${state.activities.length}</strong></div>
+      <div class="report-card"><span>Polizas completas</span><strong>${complete}</strong></div>
+      <div class="report-card"><span>Polizas pendientes</span><strong>${pending}</strong></div>
+      <div class="report-card"><span>Actividades sin cobertura</span><strong>${missingActivities}</strong></div>`;
+  }
   container.innerHTML = state.policies.length
-    ? state.policies.map((item, index) => `
-      <div class="simple-row module-row">
-        <div><strong>${item.number} - ${item.insurer}</strong><div class="muted">${item.coverage} - Actividad: ${item.activity} - Vence: ${item.due || "Por definir"}</div></div>
-        <span class="badge ${policyIsComplete(item) ? "cumple" : "no_cumple"}">${policyIsComplete(item) ? "cubierta" : item.status}</span>
-        <button class="secondary-button" data-toggle-policy="${index}" type="button">${item.status === "vigente" ? "Pendiente" : "Vigente"}</button>
-      </div>`).join("")
+    ? state.policies.map((item, index) => {
+      const complete = policyIsComplete(item);
+      return `
+      <div class="policy-card">
+        <div class="action-card-head">
+          <div>
+            <span class="badge requisito">6.1.3</span>
+            <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "cubierta" : item.status}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-policy-action="${index}" type="button">Crear accion</button>
+            <button class="secondary-button" data-toggle-policy="${index}" type="button">${item.status === "vigente" ? "Pendiente" : "Vigente"}</button>
+          </div>
+        </div>
+        <strong>${item.number} - ${item.insurer}</strong>
+        <div class="muted">${item.coverage} - Actividad: ${item.activity} - Vence: ${item.due || "Por definir"}</div>
+        <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Cobertura lista" : "Brecha de cobertura"}</strong><span>${policyGapReason(item)}</span></div>
+        <div class="training-edit-grid">
+          <label>Poliza<input data-policy-main-field="${index}:number" type="text" value="${escapeHtml(item.number || "")}"></label>
+          <label>Aseguradora<input data-policy-main-field="${index}:insurer" type="text" value="${escapeHtml(item.insurer || "")}"></label>
+          <label>Actividad<input data-policy-main-field="${index}:activity" type="text" value="${escapeHtml(item.activity || "")}"></label>
+          <label>Vence<input data-policy-main-field="${index}:due" type="text" value="${escapeHtml(item.due || "")}"></label>
+          <label>Cobertura<input data-policy-main-field="${index}:coverage" type="text" value="${escapeHtml(item.coverage || "")}"></label>
+          <label>Documento<input data-policy-main-field="${index}:document" type="text" value="${escapeHtml(item.document || item.evidence || "")}"></label>
+        </div>
+      </div>`;
+    }).join("")
     : `<div class="muted">No hay polizas registradas.</div>`;
+  container.querySelectorAll("[data-policy-main-field]").forEach((field) => {
+    field.addEventListener("change", () => {
+      const [index, key] = field.dataset.policyMainField.split(":");
+      const item = state.policies[Number(index)];
+      if (!item) return;
+      item[key] = field.value;
+      item.updatedAt = today();
+      state.compliance["6.1.3"] = "en_proceso";
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-policy-action]").forEach((button) => {
+    button.addEventListener("click", () => detectPolicyGaps());
+  });
   container.querySelectorAll("[data-toggle-policy]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.policies[Number(button.dataset.togglePolicy)];
@@ -4951,7 +5043,7 @@ function addEquipment() {
 function addPolicy() {
   const activity = primaryActivityName();
   const count = state.policies.length + 1;
-  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: "Cobertura por definir", activity, due: "Por definir", status: "pendiente" });
+  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: "Cobertura por definir", activity, due: "Por definir", status: "pendiente", document: "" });
   state.compliance["6.1.3"] = "en_proceso";
   createAction("Validar cobertura y vigencia de poliza", "6.1.3", "preventiva", "seguro");
 }
@@ -5183,8 +5275,8 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
       addMessage("agent", "Revise equipos, inspecciones, mantenimientos, estados y evidencias.");
     }
     if (action === "seguros") {
-      addPolicy();
-      addMessage("agent", "Agregue una poliza pendiente para controlar cobertura por actividad.");
+      detectPolicyGaps();
+      addMessage("agent", "Revise cobertura por actividad, vigencias y documentos soporte.");
     }
     if (action === "participantes") {
       addParticipantEvidence();
@@ -5226,6 +5318,7 @@ document.querySelector("#detectTrainingNeeds").addEventListener("click", detectT
 document.querySelector("#addEquipment").addEventListener("click", addEquipment);
 document.querySelector("#detectEquipmentGaps").addEventListener("click", detectEquipmentGaps);
 document.querySelector("#addPolicy").addEventListener("click", addPolicy);
+document.querySelector("#detectPolicyGaps").addEventListener("click", detectPolicyGaps);
 document.querySelector("#addParticipantEvidence").addEventListener("click", addParticipantEvidence);
 document.querySelector("#addRisk").addEventListener("click", addRisk);
 document.querySelector("#addDocument").addEventListener("click", addDocument);
