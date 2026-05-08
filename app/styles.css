@@ -1403,6 +1403,67 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.management-review-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.management-review-card h3 {
+  margin: 0;
+}
+
+.review-input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.review-input-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 10px;
+}
+
+.review-input-grid span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.review-input-grid strong {
+  font-size: 22px;
+}
+
+.review-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-detail-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 10px;
+}
+
+.review-detail-grid ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.review-detail-grid li {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
 .audit-log {
   display: grid;
   gap: 10px;
@@ -1496,7 +1557,8 @@ textarea {
 
   .gap-summary,
   .activity-gap-head,
-  .activity-gap-row {
+  .activity-gap-row,
+  .review-detail-grid {
     grid-template-columns: 1fr;
   }
 

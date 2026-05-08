@@ -1949,13 +1949,49 @@ function renderAudits() {
 
 function renderManagementReviews() {
   const container = document.querySelector("#managementReviewTable");
+  const inputs = managementReviewInputs();
   container.innerHTML = state.managementReviews.length
     ? state.managementReviews.map((item, index) => `
-      <div class="simple-row module-row">
-        <div><strong>${item.period}</strong><div class="muted">${item.summary}</div></div>
-        <span class="badge ${item.status === "aprobada" ? "cumple" : "en_proceso"}">${item.status}</span>
-        <button class="secondary-button" data-toggle-review="${index}" type="button">${item.status === "aprobada" ? "Borrador" : "Aprobar"}</button>
-      </div>`).join("")
+      <article class="management-review-card">
+        <div class="action-card-head">
+          <div>
+            <span class="badge requisito">9.3</span>
+            <span class="badge ${item.status === "aprobada" ? "cumple" : "en_proceso"}">${item.status}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-review-actions="${index}" type="button">Crear acciones</button>
+            <button class="secondary-button" data-toggle-review="${index}" type="button">${item.status === "aprobada" ? "Borrador" : "Aprobar"}</button>
+          </div>
+        </div>
+        <h3>${item.period}</h3>
+        <p class="muted">${item.summary}</p>
+        <div class="review-input-grid">
+          <div><span>Acciones abiertas</span><strong>${item.inputs?.openActions ?? inputs.openActions}</strong></div>
+          <div><span>Brechas actividad</span><strong>${item.inputs?.activityGaps ?? inputs.activityGaps}</strong></div>
+          <div><span>Riesgos altos</span><strong>${item.inputs?.highRisks ?? inputs.highRisks}</strong></div>
+          <div><span>Capacitacion</span><strong>${item.inputs?.trainingOpen ?? inputs.trainingOpen}</strong></div>
+          <div><span>Equipos no listos</span><strong>${item.inputs?.equipmentPending ?? inputs.equipmentPending}</strong></div>
+          <div><span>Polizas pendientes</span><strong>${item.inputs?.policiesPending ?? inputs.policiesPending}</strong></div>
+        </div>
+        <div class="review-detail-grid">
+          <div>
+            <strong>Entradas principales</strong>
+            <ul>${(item.entries || []).map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <strong>Decisiones sugeridas</strong>
+            <ul>${(item.decisions || []).map((decision) => `<li>${escapeHtml(decision)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <strong>Recursos requeridos</strong>
+            <ul>${(item.resources || []).map((resource) => `<li>${escapeHtml(resource)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <strong>Salidas / acciones</strong>
+            <ul>${(item.outputs || []).map((output) => `<li>${escapeHtml(output)}</li>`).join("")}</ul>
+          </div>
+        </div>
+      </article>`).join("")
     : `<div class="muted">No hay revisiones por la direccion preparadas.</div>`;
   container.querySelectorAll("[data-toggle-review]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1966,6 +2002,100 @@ function renderManagementReviews() {
       renderAll();
     });
   });
+  container.querySelectorAll("[data-review-actions]").forEach((button) => {
+    button.addEventListener("click", () => createManagementReviewActions(Number(button.dataset.reviewActions)));
+  });
+}
+
+function managementReviewInputs() {
+  const activityGaps = state.activities.reduce((sum, activity) => sum + activityGapItems(activity.name).length, 0);
+  return {
+    openActions: state.actions.filter((item) => item.status !== "cerrada").length,
+    pendingEfficacy: state.actions.filter((item) => item.status === "pendiente_eficacia").length,
+    highRisks: state.risks.filter((risk) => riskLevel(risk) >= 12).length,
+    activityGaps,
+    audits: state.audits.length,
+    incidents: state.incidents.length,
+    trainingOpen: state.trainingNeeds.filter((item) => item.status !== "cerrada" && item.status !== "realizada").length,
+    equipmentPending: state.equipment.filter((item) => item.status !== "operativo").length,
+    policiesPending: state.policies.filter((policy) => !policyIsComplete(policy)).length,
+    formsPending: formCoverageByRequirement().reduce((sum, group) => sum + group.pending, 0)
+  };
+}
+
+function buildManagementReviewDraft() {
+  const inputs = managementReviewInputs();
+  const priorityActivities = state.activities
+    .map((activity) => ({ name: activity.name, readiness: activityReadiness(activity.name) }))
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score)
+    .slice(0, 3);
+  const entries = [
+    `Acciones abiertas: ${inputs.openActions}, con ${inputs.pendingEfficacy} pendiente(s) de eficacia.`,
+    `Brechas operacionales por actividad: ${inputs.activityGaps}.`,
+    `Riesgos altos: ${inputs.highRisks}; incidentes registrados: ${inputs.incidents}.`,
+    `Capacitaciones abiertas: ${inputs.trainingOpen}; equipos no operativos: ${inputs.equipmentPending}.`,
+    `Polizas sin cobertura completa: ${inputs.policiesPending}; formularios pendientes: ${inputs.formsPending}.`
+  ];
+  const decisions = [
+    inputs.activityGaps ? `Priorizar cierre de brechas en actividades: ${priorityActivities.map((item) => item.name).join(", ") || "por definir"}.` : "Mantener controles operacionales actuales.",
+    inputs.highRisks ? "Aprobar tratamiento inmediato para riesgos altos antes de operar actividades criticas." : "Mantener seguimiento preventivo de riesgos.",
+    inputs.trainingOpen ? "Aprobar plan de capacitacion y competencia por actividad." : "Mantener vigilancia de competencias vigentes.",
+    inputs.policiesPending ? "Exigir validacion documental de polizas antes de ofertar actividades no cubiertas." : "Mantener control de vigencias de polizas."
+  ];
+  const resources = [
+    inputs.equipmentPending ? "Presupuesto/tiempo para inspeccion, mantenimiento o reposicion de equipos." : "Recursos actuales de equipos sin solicitud critica.",
+    inputs.trainingOpen ? "Horas de instructor, evaluacion de competencia y emision de certificados." : "Recursos de capacitacion bajo demanda.",
+    inputs.formsPending ? "Tiempo del responsable SGSTA para revisar formularios y evidencias." : "Tiempo de seguimiento documental normal."
+  ];
+  const outputs = [
+    "Asignar responsables y fechas a acciones abiertas prioritarias.",
+    "Validar evidencias antes de cerrar acciones.",
+    "Actualizar tablero de brechas por actividad despues de cada cierre.",
+    "Registrar decisiones aprobadas por direccion y recursos autorizados."
+  ];
+  return {
+    period: `Revision ${today()}`,
+    summary: `Entradas 9.3 preparadas por el agente: ${inputs.openActions} acciones, ${inputs.activityGaps} brechas por actividad, ${inputs.highRisks} riesgos altos y ${inputs.trainingOpen} capacitaciones abiertas.`,
+    status: "borrador",
+    inputs,
+    entries,
+    decisions,
+    resources,
+    outputs,
+    preparedBy: "agente",
+    createdAt: today()
+  };
+}
+
+function createManagementReviewActions(index) {
+  const review = state.managementReviews[index];
+  if (!review) return;
+  (review.outputs || []).forEach((output) => {
+    const title = `Revision direccion: ${output}`;
+    if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title,
+        code: "9.3",
+        status: "abierta",
+        type: "mejora",
+        origin: "revision direccion",
+        priority: "media",
+        responsible: state.ownerName || "Responsable SGSTA",
+        dueDate: "",
+        cause: review.summary,
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        evidence: "",
+        createdAt: today()
+      });
+    }
+  });
+  addMessage("agent", "Cree acciones de seguimiento para las salidas de la revision por la direccion.");
+  saveState();
+  renderAll();
 }
 
 function reportStats() {
@@ -4700,11 +4830,7 @@ function addAudit() {
 }
 
 function addManagementReview() {
-  state.managementReviews.unshift({
-    period: `Revision ${today()}`,
-    summary: `${state.actions.length} acciones, ${state.incidents.length} incidentes, ${state.trainingNeeds.length} necesidades de capacitacion, ${state.risks.length} riesgos.`,
-    status: "borrador"
-  });
+  state.managementReviews.unshift(buildManagementReviewDraft());
   state.compliance["9.3"] = "en_proceso";
   createAction("Aprobar salidas de revision por la direccion", "9.3", "mejora", "revision direccion");
 }
