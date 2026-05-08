@@ -1418,7 +1418,8 @@ textarea {
 
 .training-card,
 .equipment-card,
-.policy-card {
+.policy-card,
+.participant-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
