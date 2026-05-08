@@ -4579,10 +4579,87 @@ function renderActions() {
       <div class="report-card"><span>Eficaces</span><strong>${efficacy}</strong></div>
       <div class="report-card"><span>Pend. eficacia</span><strong>${pendingEfficacy}</strong></div>`;
   }
+  renderActionWorkQueue();
   container.innerHTML = state.actions.length
     ? state.actions.map((item, index) => actionCardTemplate(item, index)).join("")
     : `<div class="muted">No hay acciones registradas.</div>`;
   bindActionControls(container);
+}
+
+function actionPriorityScore(action) {
+  const priority = { alta: 30, media: 20, baja: 10 }[action.priority || "media"] || 20;
+  const type = { correctiva: 20, preventiva: 16, mejora: 10, tarea: 8 }[action.type || "tarea"] || 8;
+  const status = action.status === "pendiente_eficacia" ? 18 : action.status === "cerrada" ? -100 : 10;
+  const evidenceGap = actionReadyToClose(action) ? 0 : 8;
+  return priority + type + status + evidenceGap;
+}
+
+function simpleActionNextStep(action) {
+  if (!action.responsible || !action.dueDate) return "Asignar responsable y fecha.";
+  if (!action.followUp) return "Registrar seguimiento corto.";
+  if (!action.evidence) return "Adjuntar o enlazar evidencia.";
+  if (!action.efficacyVerification) return "Escribir como se verifico que funciono.";
+  if (action.efficacyStatus !== "eficaz") return "Marcar eficacia cuando este comprobada.";
+  return "Cerrar accion.";
+}
+
+function renderActionWorkQueue() {
+  const container = document.querySelector("#actionWorkQueue");
+  if (!container) return;
+  const items = state.actions
+    .map((action, index) => ({ action, index, score: actionPriorityScore(action) }))
+    .filter((item) => item.action.status !== "cerrada")
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+  if (!items.length) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `
+    <div class="queue-head">
+      <div>
+        <p class="eyebrow">Cola operativa</p>
+        <h3>Acciones que conviene atender primero</h3>
+      </div>
+      <span class="badge phva">${items.length}</span>
+    </div>
+    <div class="queue-grid">
+      ${items.map(({ action, index }, position) => `
+        <article class="queue-card ${position === 0 ? "primary" : ""}">
+          <div class="gap-guide-title">
+            <span class="badge requisito">${action.code || "10.1"}</span>
+            <span class="badge ${action.priority === "alta" ? "no_cumple" : "en_proceso"}">${action.priority || "media"}</span>
+          </div>
+          <strong>${escapeHtml(action.title || "Accion sin titulo")}</strong>
+          <p>${simpleActionNextStep(action)}</p>
+          <div class="matrix-metrics">
+            <span>${action.relatedActivity || action.activity || "general"}</span>
+            <span>${action.type || "tarea"}</span>
+            <span>${action.status || "abierta"}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-queue-assign="${index}" type="button">Asignar</button>
+            <button data-queue-focus="${index}" type="button">Ver accion</button>
+          </div>
+        </article>`).join("")}
+    </div>`;
+  container.querySelectorAll("[data-queue-assign]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = state.actions[Number(button.dataset.queueAssign)];
+      if (!action) return;
+      assignActionDefaults(action);
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-queue-focus]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = state.actions[Number(button.dataset.queueFocus)];
+      if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
+      showView("acciones");
+      document.querySelector("#actionsTable")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 }
 
 function actionCardTemplate(item, index) {

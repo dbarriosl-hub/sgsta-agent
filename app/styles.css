@@ -1204,6 +1204,53 @@ textarea {
   gap: 8px;
 }
 
+.action-work-queue {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.queue-head {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.queue-head h3,
+.queue-card p {
+  margin: 0;
+}
+
+.queue-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.queue-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.queue-card.primary {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.queue-card p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .closure-heading {
   display: flex;
   justify-content: space-between;
@@ -1646,7 +1693,8 @@ textarea {
   .audit-requirement-head,
   .audit-grid,
   .catalog-summary,
-  .gap-guide-grid {
+  .gap-guide-grid,
+  .queue-grid {
     grid-template-columns: 1fr;
   }
 
