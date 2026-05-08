@@ -592,7 +592,7 @@ textarea {
 
 .step-row {
   display: grid;
-  grid-template-columns: 42px minmax(220px, 1fr) 110px 100px;
+  grid-template-columns: 42px minmax(220px, 1fr) 110px minmax(150px, auto);
   gap: 12px;
   align-items: center;
   border: 1px solid var(--line);
@@ -603,6 +603,13 @@ textarea {
 
 .step-row.completo {
   background: #f0fdf4;
+}
+
+.step-row p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 6px 0 0;
 }
 
 .step-index {

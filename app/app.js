@@ -154,18 +154,18 @@ const subscriptionPlans = {
 };
 
 const implementationSteps = [
-  { id: "alcance", stage: "Planear", title: "Definir empresa, alcance y partes interesadas", code: "4.1-4.3", check: (s) => Boolean(s.company.scope && s.company.stakeholders), action: "Completar alcance y partes interesadas" },
-  { id: "actividades", stage: "Planear", title: "Registrar actividades de turismo", code: "8.1", check: (s) => s.activities.length > 0, action: "Registrar actividades y responsables" },
-  { id: "riesgos", stage: "Planear", title: "Construir mapa de riesgos", code: "6.1.2", check: (s) => s.risks.length > 0, action: "Construir o completar mapa de riesgos" },
-  { id: "seguros", stage: "Planear", title: "Validar seguros por actividad", code: "6.1.3", check: (s) => s.policies.some((p) => p.status === "vigente"), action: "Validar polizas y cobertura" },
-  { id: "personal", stage: "Hacer", title: "Verificar personal y competencias", code: "5.3/7.2", check: (s) => s.people.length > 0 && s.people.every((p) => p.competence === "cumple"), action: "Evaluar competencias del personal" },
-  { id: "capacitacion", stage: "Hacer", title: "Programar y cerrar capacitaciones", code: "7.2-7.3", check: (s) => s.trainingNeeds.length > 0 && s.trainingNeeds.every((t) => t.status === "cerrada"), action: "Programar capacitaciones pendientes" },
-  { id: "equipos", stage: "Hacer", title: "Controlar equipos, inspecciones y mantenimiento", code: "7.1/8.1", check: (s) => s.equipment.length > 0 && s.equipment.every((e) => e.status === "operativo"), action: "Completar inspeccion de equipos" },
-  { id: "documentos", stage: "Hacer", title: "Aprobar documentos controlados", code: "7.5", check: (s) => s.documents.length > 0 && s.documents.every((d) => d.status === "aprobado"), action: "Revisar y aprobar documentos" },
-  { id: "participantes", stage: "Hacer", title: "Recibir evidencias externas de participantes", code: "7.4.3", check: (s) => s.activities.length > 0 && s.activities.every((activity) => participantActivityInformationIsComplete(activity.name)), action: "Recibir consentimientos/evidencias externas" },
-  { id: "auditoria", stage: "Verificar", title: "Preparar auditoria interna", code: "9.2", check: (s) => s.audits.length > 0, action: "Programar auditoria interna" },
-  { id: "revision", stage: "Verificar", title: "Preparar revision por la direccion", code: "9.3", check: (s) => s.managementReviews.length > 0, action: "Preparar revision por la direccion" },
-  { id: "mejora", stage: "Actuar", title: "Gestionar acciones correctivas, preventivas y mejora", code: "10.1-10.2", check: (s) => s.actions.length > 0, action: "Crear y dar seguimiento a acciones" }
+  { id: "alcance", view: "empresa", stage: "Planear", title: "Definir empresa, alcance y partes interesadas", code: "4.1-4.3", outcome: "Que todos sepan que actividades cubre el sistema y donde opera.", check: (s) => Boolean(s.company.scope && s.company.stakeholders), action: "Completar alcance y partes interesadas" },
+  { id: "actividades", view: "actividades", stage: "Planear", title: "Registrar actividades de turismo", code: "8.1", outcome: "Separar rafting, senderismo, cuatrimotos u otras actividades reales.", check: (s) => s.activities.length > 0, action: "Registrar actividades y responsables" },
+  { id: "riesgos", view: "riesgos", stage: "Planear", title: "Construir mapa de riesgos", code: "6.1.2", outcome: "Saber que puede salir mal en cada actividad y que control aplica.", check: (s) => s.risks.length > 0, action: "Construir o completar mapa de riesgos" },
+  { id: "seguros", view: "seguros", stage: "Planear", title: "Validar seguros por actividad", code: "6.1.3", outcome: "Evitar operar una actividad sin cobertura vigente.", check: (s) => s.policies.some((p) => p.status === "vigente"), action: "Validar polizas y cobertura" },
+  { id: "personal", view: "personal", stage: "Hacer", title: "Verificar personal y competencias", code: "5.3/7.2", outcome: "Confirmar que cada actividad tiene guia/persona competente.", check: (s) => s.people.length > 0 && s.people.every((p) => p.competence === "cumple"), action: "Evaluar competencias del personal" },
+  { id: "capacitacion", view: "capacitacion", stage: "Hacer", title: "Programar y cerrar capacitaciones", code: "7.2-7.3", outcome: "Cerrar brechas de entrenamiento antes de operar.", check: (s) => s.trainingNeeds.length > 0 && s.trainingNeeds.every((t) => t.status === "cerrada"), action: "Programar capacitaciones pendientes" },
+  { id: "equipos", view: "equipos", stage: "Hacer", title: "Controlar equipos, inspecciones y mantenimiento", code: "7.1/8.1", outcome: "Tener equipos listos, revisados y con soporte.", check: (s) => s.equipment.length > 0 && s.equipment.every((e) => e.status === "operativo"), action: "Completar inspeccion de equipos" },
+  { id: "documentos", view: "documentos", stage: "Hacer", title: "Aprobar documentos controlados", code: "7.5", outcome: "Convertir borradores en documentos usados por la empresa.", check: (s) => s.documents.length > 0 && s.documents.every((d) => d.status === "aprobado"), action: "Revisar y aprobar documentos" },
+  { id: "participantes", view: "participantes", stage: "Hacer", title: "Recibir evidencias externas de participantes", code: "7.4.3", outcome: "Comprobar informacion y consentimiento sin guardar datos sensibles.", check: (s) => s.activities.length > 0 && s.activities.every((activity) => participantActivityInformationIsComplete(activity.name)), action: "Recibir consentimientos/evidencias externas" },
+  { id: "auditoria", view: "auditorias", stage: "Verificar", title: "Preparar auditoria interna", code: "9.2", outcome: "Revisar si lo planeado se esta cumpliendo.", check: (s) => s.audits.length > 0, action: "Programar auditoria interna" },
+  { id: "revision", view: "revision", stage: "Verificar", title: "Preparar revision por la direccion", code: "9.3", outcome: "Que la direccion tome decisiones con datos reales.", check: (s) => s.managementReviews.length > 0, action: "Preparar revision por la direccion" },
+  { id: "mejora", view: "acciones", stage: "Actuar", title: "Gestionar acciones correctivas, preventivas y mejora", code: "10.1-10.2", outcome: "Cerrar problemas con evidencia y verificar que funciono.", check: (s) => s.actions.length > 0, action: "Crear y dar seguimiento a acciones" }
 ];
 
 const stateKey = "sgsta-agent-demo-v3";
@@ -699,12 +699,22 @@ function renderImplementation() {
           <div>
             <strong>${step.title}</strong>
             <div class="muted">${step.stage} - Requisito ${step.code}</div>
+            <p>${step.outcome}</p>
           </div>
           <span class="badge ${status === "completo" ? "cumple" : "pendiente"}">${status}</span>
-          <button class="secondary-button" data-step-action="${step.id}" type="button">Accion</button>
+          <div class="row-actions">
+            <button class="secondary-button" data-step-open="${step.id}" type="button">Abrir</button>
+            <button data-step-action="${step.id}" type="button">Avanzar</button>
+          </div>
         </div>`;
     }).join("")}`;
 
+  container.querySelectorAll("[data-step-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const step = implementationSteps.find((item) => item.id === button.dataset.stepOpen);
+      if (step?.view) showView(step.view);
+    });
+  });
   container.querySelectorAll("[data-step-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const step = implementationSteps.find((item) => item.id === button.dataset.stepAction);
@@ -717,9 +727,14 @@ function renderImplementation() {
     <div class="guide-callout">
       <span class="badge en_proceso">${next.stage}</span>
       <h3>${next.title}</h3>
+      <p>${next.outcome}</p>
       <p>Requisito relacionado: ${next.code}. El agente recomienda: ${next.action}.</p>
-      <button id="guidePrimaryAction" type="button">Crear accion sugerida</button>
+      <div class="row-actions">
+        <button class="secondary-button" id="guideOpenModule" type="button">Abrir modulo</button>
+        <button id="guidePrimaryAction" type="button">Avanzar con agente</button>
+      </div>
     </div>`;
+  document.querySelector("#guideOpenModule").addEventListener("click", () => showView(next.view));
   document.querySelector("#guidePrimaryAction").addEventListener("click", () => handleImplementationStep(next));
 }
 
@@ -5695,6 +5710,7 @@ function addFormResponse() {
 
 function handleImplementationStep(step) {
   if (!step) return;
+  if (step.view) showView(step.view);
   if (step.id === "actividades") addActivity();
   if (step.id === "riesgos") addRisk();
   if (step.id === "seguros") addPolicy();
