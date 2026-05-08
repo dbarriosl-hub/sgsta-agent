@@ -511,6 +511,7 @@ function renderAll() {
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
   renderMetrics();
+  renderTodayWork();
   renderRequirements();
   renderClosurePackages();
   renderImplementation();
@@ -557,6 +558,74 @@ function renderMetrics() {
   document.querySelector("#metricPeoplePending").textContent = peoplePending;
   document.querySelector("#metricTraining").textContent = trainingOpen;
   document.querySelector("#metricPoliciesDue").textContent = policiesDue;
+}
+
+function todayWorkItems() {
+  const closure = requirements
+    .map((item) => closurePathForRequirement(item.code))
+    .filter((item) => item.score < 100)
+    .sort((a, b) => a.score - b.score)[0];
+  const activity = state.activities
+    .map((item) => ({ activity: item, readiness: activityReadiness(item.name) }))
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score)[0];
+  const reviewForms = state.formResponses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
+  const openActions = state.actions.filter((item) => item.status !== "cerrada").length;
+  return { closure, activity, reviewForms, openActions };
+}
+
+function renderTodayWork() {
+  const container = document.querySelector("#todayWork");
+  if (!container) return;
+  const work = todayWorkItems();
+  const activityGap = work.activity?.readiness.gaps[0];
+  container.innerHTML = `
+    <div class="today-grid">
+      <article class="today-card primary">
+        <span class="badge en_proceso">Primero</span>
+        <h3>${work.activity ? `Asegurar ${work.activity.activity.name}` : "Crear actividades reales"}</h3>
+        <p>${work.activity ? `${activityGap?.label || "Brecha"}: ${activityGap?.detail || "Revisar controles de la actividad."}` : "Registra rafting, senderismo, cuatrimotos u otras actividades para empezar el control operativo."}</p>
+        <div class="row-actions">
+          <button data-today-action="activity" type="button">${work.activity ? "Ver actividad" : "Crear actividad"}</button>
+          ${work.activity ? `<button class="secondary-button" data-today-action="activity-action" type="button">Crear accion</button>` : ""}
+        </div>
+      </article>
+      <article class="today-card">
+        <span class="badge requisito">${work.closure?.code || "SG"}</span>
+        <h3>${work.closure ? "Cerrar requisito" : "Requisitos al dia"}</h3>
+        <p>${work.closure ? `${work.closure.title}: ${work.closure.steps[0]}` : "No hay brechas de requisito visibles en este momento."}</p>
+        <div class="row-actions">
+          ${work.closure ? `<button class="secondary-button" data-today-action="requirement" type="button">Preparar</button>` : `<button class="secondary-button" data-today-action="diagnostic" type="button">Ver diagnostico</button>`}
+        </div>
+      </article>
+      <article class="today-card">
+        <span class="badge phva">Revision</span>
+        <h3>${work.reviewForms} borrador(es)</h3>
+        <p>${work.reviewForms ? "Revise/apruebe formularios para que cuenten como evidencia." : "No hay formularios pendientes de revision humana."}</p>
+        <div class="row-actions">
+          <button class="secondary-button" data-today-action="review" type="button">Abrir revision</button>
+        </div>
+      </article>
+    </div>`;
+  container.querySelector("[data-today-action='activity']")?.addEventListener("click", () => {
+    if (work.activity) {
+      state.selectedActivityName = work.activity.activity.name;
+      showView("actividades");
+    } else {
+      addActivity();
+      showView("actividades");
+    }
+    renderAll();
+  });
+  container.querySelector("[data-today-action='activity-action']")?.addEventListener("click", () => {
+    if (!work.activity || !activityGap) return;
+    createActivityGapAction(work.activity.activity.name, activityGap.key);
+  });
+  container.querySelector("[data-today-action='requirement']")?.addEventListener("click", () => {
+    if (work.closure) closeRequirementGap(work.closure.code);
+  });
+  container.querySelector("[data-today-action='diagnostic']")?.addEventListener("click", () => showView("diagnostico"));
+  container.querySelector("[data-today-action='review']")?.addEventListener("click", () => showView("revision_humana"));
 }
 
 function renderChapterProgress() {
