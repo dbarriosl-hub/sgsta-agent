@@ -671,6 +671,7 @@ function renderRequirements() {
       <div class="report-card"><span>Requisitos parciales</span><strong>${partial}</strong></div>
       <div class="report-card"><span>Requisitos pendientes</span><strong>${pending}</strong></div>`;
   }
+  renderGapClosureGuide();
   container.innerHTML = requirements.map((item) => {
     const manualValue = state.compliance[item.code] || "pendiente";
     const value = requirementCompletionStatus(item.code);
@@ -726,6 +727,95 @@ function renderRequirements() {
       saveState();
       renderAll();
     });
+  });
+}
+
+function closurePathForRequirement(code) {
+  const req = requirements.find((item) => item.code === code);
+  const stats = requirementEvidenceStats(code);
+  const gap = buildRequirementGap(code);
+  const actions = state.actions.filter((action) => action.code === code && action.status !== "cerrada");
+  const score = Math.round(requirementCompletionScore(code) * 100);
+  const steps = [];
+  if (stats.formsPending > 0) steps.push(`Crear ${stats.formsPending} borrador(es) de formulario.`);
+  if (stats.formsDraft > 0 || stats.activityFormsDraft > 0) steps.push("Revisar y aprobar los borradores preparados por el agente.");
+  if (stats.registeredEvidence === 0) steps.push(stats.suggestedEvidence > 0 ? "Validar evidencia sugerida o adjuntar soporte real." : "Asociar evidencia del requisito.");
+  if (actions.length > 0) steps.push(`Cerrar o actualizar ${actions.length} accion(es) abierta(s).`);
+  if (!steps.length) steps.push("Verificar vigencia y mantener seguimiento.");
+  return {
+    code,
+    title: req?.title || code,
+    evidence: req?.evidence || "Evidencia por definir",
+    score,
+    gap,
+    stats,
+    actions,
+    steps
+  };
+}
+
+function renderGapClosureGuide() {
+  const container = document.querySelector("#gapClosureGuide");
+  if (!container) return;
+  const items = requirements
+    .map((item) => closurePathForRequirement(item.code))
+    .filter((item) => item.score < 100)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3);
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="gap-guide-card">
+        <div>
+          <p class="eyebrow">Ruta de cierre</p>
+          <h3>Sistema sin brechas evidentes</h3>
+          <p class="muted">Mantener revision periodica, vigencias y eficacia de acciones.</p>
+        </div>
+      </div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="gap-guide-head">
+      <div>
+        <p class="eyebrow">Ruta de cierre guiada</p>
+        <h3>Proximas brechas que debe cerrar el agente</h3>
+      </div>
+      <button id="prepareNextGap" type="button">Preparar primera brecha</button>
+    </div>
+    <div class="gap-guide-grid">
+      ${items.map((item, index) => `
+        <article class="gap-guide-card">
+          <div class="gap-guide-title">
+            <span class="code">${item.code}</span>
+            <span class="badge ${item.score >= 50 ? "en_proceso" : "pendiente"}">${item.score}%</span>
+          </div>
+          <strong>${item.title}</strong>
+          <p>${item.gap.title}</p>
+          <div class="closure-detail">
+            <strong>Camino sugerido:</strong>
+            <ul>${item.steps.map((step) => `<li>${step}</li>`).join("")}</ul>
+          </div>
+          <div class="matrix-metrics">
+            <span>Formularios ${item.stats.formsApproved}/${item.stats.formsTotal}</span>
+            <span>Actividad ${item.stats.activityFormsApproved}/${item.stats.activityFormsTotal}</span>
+            <span>Acciones ${item.actions.length}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-gap-view="${item.code}" type="button">Ver</button>
+            <button ${index === 0 ? "" : "class=\"secondary-button\""} data-gap-prepare="${item.code}" type="button">Preparar</button>
+          </div>
+        </article>`).join("")}
+    </div>`;
+  container.querySelector("#prepareNextGap")?.addEventListener("click", () => closeRequirementGap(items[0].code));
+  container.querySelectorAll("[data-gap-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.formFilters.search = button.dataset.gapView;
+      state.formFilters.status = "todos";
+      showView("formularios");
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-gap-prepare]").forEach((button) => {
+    button.addEventListener("click", () => closeRequirementGap(button.dataset.gapPrepare));
   });
 }
 

@@ -1126,6 +1126,50 @@ textarea {
   margin: 14px 0;
 }
 
+.gap-closure-guide {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.gap-guide-head {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.gap-guide-head h3,
+.gap-guide-card p {
+  margin: 0;
+}
+
+.gap-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gap-guide-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.gap-guide-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .closure-heading {
   display: flex;
   justify-content: space-between;
@@ -1566,7 +1610,8 @@ textarea {
   .report-summary,
   .audit-requirement-head,
   .audit-grid,
-  .catalog-summary {
+  .catalog-summary,
+  .gap-guide-grid {
     grid-template-columns: 1fr;
   }
 
