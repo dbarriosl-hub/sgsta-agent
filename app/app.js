@@ -234,6 +234,7 @@ const defaultState = {
   agentFindings: [],
   closurePackages: [],
   selectedActivityName: "Senderismo",
+  selectedFormActivity: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
   formFilters: { search: "", phva: "todos", status: "todos" },
   formResponses: [
@@ -291,6 +292,7 @@ function mergeState(base, current) {
     executiveReport: current.executiveReport || base.executiveReport,
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
+    selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
     selectedFormTable: current.selectedFormTable || base.selectedFormTable,
     formFilters: { ...base.formFilters, ...(current.formFilters || {}) },
     formResponses: current.formResponses || base.formResponses,
@@ -1138,7 +1140,8 @@ function activityContext(activityName) {
     risk: related.risks[0] || {},
     person: related.people[0] || {},
     equipment: related.equipment[0] || {},
-    policy: related.policies[0] || {}
+    policy: related.policies[0] || {},
+    participant: related.participants[0] || {}
   };
 }
 
@@ -1191,10 +1194,20 @@ function generateFormDraftValuesForActivity(form, activityName) {
       person: context.person,
       equipment: context.equipment,
       policy: context.policy,
-      risk: context.risk
+      risk: context.risk,
+      participant: context.participant
     });
   });
   return values;
+}
+
+function mergeActivityDraftValues(form, currentValues = {}, activityName) {
+  const suggestedValues = generateFormDraftValuesForActivity(form, activityName);
+  const merged = { ...(currentValues || {}) };
+  form.fields.forEach((field) => {
+    if (!String(merged[field.name] || "").trim()) merged[field.name] = suggestedValues[field.name];
+  });
+  return merged;
 }
 
 function upsertActivityFormDraft(table, activityName) {
@@ -1206,7 +1219,7 @@ function upsertActivityFormDraft(table, activityName) {
   const values = generateFormDraftValuesForActivity(form, activityName);
   if (existing) {
     existing.status = existing.status === "aprobado" ? "revision" : "borrador";
-    existing.values = { ...(existing.values || {}), ...values };
+    existing.values = mergeActivityDraftValues(form, existing.values, activityName);
     existing.activity = activityName;
     existing.source = existing.source || "agente_actividad";
     existing.requiresApproval = true;
@@ -1257,6 +1270,7 @@ function prepareActivityPackage(activityName) {
   suggestActivityEvidence(activityName);
   createAction(`Revisar paquete operativo de ${activityName}`, "8.1", "tarea", "actividad");
   state.selectedActivityName = activityName;
+  state.selectedFormActivity = activityName;
   state.formFilters.search = activityName;
   saveState();
   addMessage("agent", `Prepare ${created.length} formulario(s) y evidencias sugeridas para ${activityName}. Quedan pendientes de revision humana.`);
@@ -2867,6 +2881,7 @@ function renderForms() {
   const catalog = visibleCatalogForms(window.formCatalog || []);
   const matrix = window.formMatrix || [];
   const container = document.querySelector("#formsTable");
+  ensureSelectedFormActivity();
   const totalFields = catalog.reduce((sum, form) => sum + form.fields.length, 0);
   const relatedTables = new Set(matrix.flatMap((item) => item.relatedTables || []));
   const filledTables = new Set(state.formResponses.map((item) => item.table).filter((table) => table && !internalFormTables.has(table)));
@@ -2896,11 +2911,12 @@ function renderForms() {
     </div>`;
 
   bindFormFilters();
+  bindFormActivityTools();
   renderFormRequirementCoverage();
 
   container.innerHTML = visibleForms.length
     ? visibleForms.map((form) => {
-      const response = state.formResponses.find((item) => item.table === form.table || item.form === form.title);
+      const response = selectedFormResponse(form);
       const status = normalizedFormStatus(response?.status);
       const requirement = getFormRequirement(form);
       const relation = getFormMatrixItem(form.table);
@@ -2912,10 +2928,12 @@ function renderForms() {
           </div>
           <span class="badge requisito">${requirement.code}</span>
           <span class="badge phva">${relation?.phva || getPhvaForRequirement(requirement.code)}</span>
+          ${response?.activity ? `<span class="badge cumple">${response.activity}</span>` : ""}
           <span class="badge ${formStatusBadge(status)}">${status}</span>
           <div class="row-actions">
             <button class="secondary-button" data-view-form="${form.table}" type="button">Ver</button>
             <button class="secondary-button" data-fill-form="${form.table}" type="button">Diligenciar</button>
+            <button class="secondary-button" data-fill-activity-form="${form.table}" type="button">Actividad</button>
           </div>
         </div>`;
     }).join("")
@@ -2933,7 +2951,22 @@ function renderForms() {
       await fillCatalogForm(button.dataset.fillForm);
     });
   });
+  container.querySelectorAll("[data-fill-activity-form]").forEach((button) => {
+    button.addEventListener("click", () => fillActivityCatalogForm(button.dataset.fillActivityForm));
+  });
   renderFormPreview();
+}
+
+function ensureSelectedFormActivity() {
+  if (!state.activities.some((activity) => activity.name === state.selectedFormActivity)) {
+    state.selectedFormActivity = state.selectedActivityName || state.activities[0]?.name || "";
+  }
+}
+
+function selectedFormResponse(form) {
+  return formResponseForActivity(form.table, state.selectedFormActivity)
+    || state.formResponses.find((item) => item.table === form.table && !item.activity)
+    || state.formResponses.find((item) => item.form === form.title && !item.activity);
 }
 
 function formCoverageByRequirement() {
@@ -3054,6 +3087,23 @@ function bindFormFilters() {
   };
 }
 
+function bindFormActivityTools() {
+  const select = document.querySelector("#formActivitySelect");
+  const button = document.querySelector("#fillActivityFormPackage");
+  if (!select || !button) return;
+  ensureSelectedFormActivity();
+  const options = state.activities.map((activity) => `<option value="${escapeHtml(activity.name)}" ${activity.name === state.selectedFormActivity ? "selected" : ""}>${activity.name}</option>`).join("");
+  select.innerHTML = options || `<option value="">Sin actividades</option>`;
+  select.onchange = () => {
+    state.selectedFormActivity = select.value;
+    state.selectedActivityName = select.value || state.selectedActivityName;
+    state.formFilters.search = select.value || state.formFilters.search;
+    saveState();
+    renderForms();
+  };
+  button.onclick = () => fillSelectedActivityPackage();
+}
+
 function selectedCatalogForm() {
   const catalog = visibleCatalogForms(window.formCatalog || []);
   return catalog.find((form) => form.table === state.selectedFormTable) || catalog[0];
@@ -3081,7 +3131,8 @@ function renderFormPreview() {
     preview.innerHTML = `<p class="muted">No hay formulario seleccionado.</p>`;
     return;
   }
-  const response = state.formResponses.find((item) => item.table === form.table);
+  ensureSelectedFormActivity();
+  const response = selectedFormResponse(form);
   const requirement = getFormRequirement(form);
   const relation = getFormMatrixItem(form.table);
   const canApprove = canCurrentUserApprove();
@@ -3091,6 +3142,7 @@ function renderFormPreview() {
       <span class="badge en_proceso">${form.table}</span>
       <span class="badge requisito">${requirement.code}</span>
       <span class="badge phva">${relation?.phva || getPhvaForRequirement(requirement.code)}</span>
+      <span class="badge cumple">${response?.activity || state.selectedFormActivity || "general"}</span>
       <span class="badge ${formStatusBadge(normalizedFormStatus(response?.status))}">${normalizedFormStatus(response?.status)}</span>
     </div>
     <h3>${form.title}</h3>
@@ -3149,6 +3201,8 @@ function renderFormPreview() {
       <p class="agent-note"><strong>Accion del agente:</strong> ${relation.agentAction}</p>
       <div class="button-row">
         <button data-fill-form-preview="${form.table}" type="button">Diligenciar con agente</button>
+        <button class="secondary-button" data-fill-activity-form-preview="${form.table}" type="button">Diligenciar para ${state.selectedFormActivity || "actividad"}</button>
+        <button class="secondary-button" data-fill-activity-package-preview="${state.selectedFormActivity || ""}" type="button">Paquete actividad</button>
         <button class="secondary-button" data-fill-requirement="${requirement.code}" type="button">Crear borradores de ${requirement.code}</button>
         <button class="secondary-button" data-filter-requirement="${requirement.code}" type="button">Filtrar este requisito</button>
         ${response ? `<button class="secondary-button" data-form-review="${form.table}" type="button">${response.status === "revision" ? "Volver a borrador" : "Enviar a revision"}</button>` : ""}
@@ -3169,6 +3223,12 @@ function renderFormPreview() {
     </div>`;
   preview.querySelector("[data-fill-form-preview]")?.addEventListener("click", async (event) => {
     await fillCatalogForm(event.currentTarget.dataset.fillFormPreview);
+  });
+  preview.querySelector("[data-fill-activity-form-preview]")?.addEventListener("click", (event) => {
+    fillActivityCatalogForm(event.currentTarget.dataset.fillActivityFormPreview);
+  });
+  preview.querySelector("[data-fill-activity-package-preview]")?.addEventListener("click", () => {
+    fillSelectedActivityPackage();
   });
   preview.querySelector("[data-fill-requirement]")?.addEventListener("click", async (event) => {
     await fillRequirementForms(event.currentTarget.dataset.fillRequirement);
@@ -3241,6 +3301,35 @@ async function fillCatalogForm(table) {
   state.selectedFormTable = table;
   saveState();
   renderAll();
+}
+
+function fillActivityCatalogForm(table) {
+  if (internalFormTables.has(table)) return;
+  ensureSelectedFormActivity();
+  const activityName = state.selectedFormActivity || state.selectedActivityName || primaryActivityName();
+  if (!activityName) return;
+  const response = upsertActivityFormDraft(table, activityName);
+  if (!response) return;
+  state.selectedFormTable = table;
+  state.selectedActivityName = activityName;
+  state.formFilters.search = activityName;
+  recordAuditEvent({
+    title: "Borrador por actividad creado",
+    detail: `${response.form} fue diligenciado por el agente con contexto de ${activityName}.`,
+    code: response.code,
+    type: "formulario",
+    actor: "agente"
+  });
+  saveState();
+  renderAll();
+}
+
+function fillSelectedActivityPackage() {
+  ensureSelectedFormActivity();
+  const activityName = state.selectedFormActivity || state.selectedActivityName || primaryActivityName();
+  if (!activityName) return;
+  prepareActivityPackage(activityName);
+  showView("formularios");
 }
 
 async function fillRequirementForms(code) {
@@ -3603,6 +3692,7 @@ function generateFormDraftValues(form) {
   const equipment = state.equipment[0] || {};
   const policy = state.policies[0] || {};
   const risk = state.risks[0] || {};
+  const participant = state.participantEvidence[0] || {};
   const values = {};
   form.fields.forEach((field) => {
     const name = field.name.toLowerCase();
@@ -3614,7 +3704,8 @@ function generateFormDraftValues(form) {
       person,
       equipment,
       policy,
-      risk
+      risk,
+      participant
     });
   });
   return values;
@@ -3639,6 +3730,10 @@ function suggestedValueForField(name, context) {
   if (name.includes("telefono")) return state.company.phone || "Telefono por definir";
   if (name.includes("direccion") || name.includes("ubicacion") || name.includes("lugar")) return state.company.city || "Ubicacion por definir";
   if (name.includes("actividad")) return context.activity.name || context.activity.activity || "Actividad por definir";
+  if (name.includes("condicion")) return context.activity.participantRequirements || context.activity.conditions || context.participant.infoProvided || "Condiciones de participacion por definir";
+  if (name.includes("participante") || name.includes("cliente")) return context.participant.participantInfoRequested || "Datos minimos y consentimiento en formulario externo";
+  if (name.includes("consentimiento")) return context.participant.consent || "pendiente";
+  if (name.includes("informacion")) return context.participant.infoProvided || context.activity.participantRequirements || "Informacion al participante por completar segun ISO 21103";
   if (name.includes("persona") || name.includes("nombre_completo")) return context.person.name || "Persona por definir";
   if (name.includes("cargo") || name.includes("rol")) return context.person.role || "Rol por definir";
   if (name.includes("competencia")) return context.person.training || "Competencia por verificar";
