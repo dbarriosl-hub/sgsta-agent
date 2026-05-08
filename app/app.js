@@ -1769,21 +1769,142 @@ function renderPeople() {
   });
 }
 
+function trainingNeedComplete(item) {
+  return ["cerrada", "realizada"].includes(item.status) && item.evaluation && item.certificate && item.evidence;
+}
+
+function detectTrainingNeeds() {
+  let created = 0;
+  state.people.forEach((person) => {
+    const incomplete = person.competence !== "cumple" || !person.training || String(person.training).toLowerCase().includes("pendiente") || !person.evidence || !person.certificateDue;
+    if (!incomplete) return;
+    const topic = `Cerrar competencia de ${person.name} para ${itemActivityName(person)}`;
+    if (!state.trainingNeeds.some((item) => item.topic === topic && item.status !== "cerrada")) {
+      state.trainingNeeds.unshift({
+        topic,
+        activity: itemActivityName(person),
+        person: person.name,
+        origin: "competencia",
+        priority: person.competence === "vencida" || person.competence === "no_cumple" ? "alta" : "media",
+        status: "pendiente",
+        code: "7.2",
+        objective: "Verificar competencia, conciencia y evidencia vigente para operar la actividad.",
+        evaluation: "",
+        certificate: "",
+        evidence: ""
+      });
+      created += 1;
+    }
+  });
+  state.activities.forEach((activity) => {
+    const highRisks = state.risks.filter((risk) => itemActivityName(risk) === activity.name && riskLevel(risk) >= 12);
+    if (!highRisks.length) return;
+    const topic = `Capacitacion en controles criticos para ${activity.name}`;
+    if (!state.trainingNeeds.some((item) => item.topic === topic && item.status !== "cerrada")) {
+      state.trainingNeeds.unshift({
+        topic,
+        activity: activity.name,
+        person: activity.leader || "",
+        origin: "riesgo alto",
+        priority: "alta",
+        status: "pendiente",
+        code: "7.2",
+        objective: `Reforzar controles de ${highRisks.map((risk) => risk.title).join(", ")}.`,
+        evaluation: "",
+        certificate: "",
+        evidence: ""
+      });
+      created += 1;
+    }
+  });
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  addMessage("agent", created ? `Detecte ${created} necesidad(es) de capacitacion por competencia, actividad o riesgo.` : "No detecte nuevas necesidades de capacitacion; las brechas ya estaban registradas.");
+  saveState();
+  renderAll();
+}
+
 function renderTraining() {
   const container = document.querySelector("#trainingTable");
+  const summary = document.querySelector("#trainingSummary");
+  if (summary) {
+    const open = state.trainingNeeds.filter((item) => !trainingNeedComplete(item)).length;
+    const high = state.trainingNeeds.filter((item) => item.priority === "alta" || item.priority === "critica").length;
+    const complete = state.trainingNeeds.filter(trainingNeedComplete).length;
+    const peopleGap = state.people.filter((person) => person.competence !== "cumple").length;
+    summary.innerHTML = `
+      <div class="report-card"><span>Abiertas</span><strong>${open}</strong></div>
+      <div class="report-card"><span>Alta prioridad</span><strong>${high}</strong></div>
+      <div class="report-card"><span>Completas</span><strong>${complete}</strong></div>
+      <div class="report-card"><span>Personas brecha</span><strong>${peopleGap}</strong></div>`;
+  }
   container.innerHTML = state.trainingNeeds.length
-    ? state.trainingNeeds.map((item, index) => `
-      <div class="simple-row module-row">
-        <div><strong>${item.topic}</strong><div class="muted">Actividad: ${itemActivityName(item)} - Origen: ${item.origin} - Requisito ${item.code}</div></div>
-        <span class="badge ${item.priority === "alta" || item.priority === "critica" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
-        <button class="secondary-button" data-close-training="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
-      </div>`).join("")
+    ? state.trainingNeeds.map((item, index) => {
+      const complete = trainingNeedComplete(item);
+      return `
+      <div class="training-card">
+        <div class="action-card-head">
+          <div>
+            <span class="badge requisito">${item.code || "7.2"}</span>
+            <span class="badge ${complete ? "cumple" : item.priority === "alta" || item.priority === "critica" ? "no_cumple" : "en_proceso"}">${complete ? "completa" : item.priority}</span>
+            <span class="badge phva">${item.status || "pendiente"}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-training-action="${index}" type="button">Crear accion</button>
+            <button class="secondary-button" data-close-training="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
+          </div>
+        </div>
+        <strong>${item.topic}</strong>
+        <div class="muted">Actividad: ${itemActivityName(item)} - Persona: ${item.person || "por definir"} - Origen: ${item.origin}</div>
+        <div class="training-edit-grid">
+          <label>Objetivo<input data-training-field="${index}:objective" type="text" value="${escapeHtml(item.objective || "")}"></label>
+          <label>Fecha<input data-training-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
+          <label>Evaluacion<input data-training-field="${index}:evaluation" type="text" value="${escapeHtml(item.evaluation || "")}"></label>
+          <label>Certificado<input data-training-field="${index}:certificate" type="text" value="${escapeHtml(item.certificate || "")}"></label>
+          <label>Evidencia<input data-training-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || "")}"></label>
+        </div>
+      </div>`;
+    }).join("")
     : `<div class="muted">No hay necesidades de capacitacion registradas.</div>`;
+  container.querySelectorAll("[data-training-field]").forEach((field) => {
+    field.addEventListener("change", () => {
+      const [index, key] = field.dataset.trainingField.split(":");
+      const item = state.trainingNeeds[Number(index)];
+      if (!item) return;
+      item[key] = field.value;
+      item.updatedAt = today();
+      if (trainingNeedComplete(item)) {
+        state.compliance["7.2"] = "en_proceso";
+        state.compliance["7.3"] = "en_proceso";
+      }
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-training-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = state.trainingNeeds[Number(button.dataset.trainingAction)];
+      if (!item) return;
+      createAction(`Ejecutar capacitacion: ${item.topic}`, item.code || "7.2", "preventiva", "capacitacion");
+      const action = state.actions[0];
+      action.relatedActivity = itemActivityName(item);
+      action.responsible = item.person || state.ownerName || "";
+      action.cause = item.objective || `Necesidad de capacitacion originada en ${item.origin}.`;
+    });
+  });
   container.querySelectorAll("[data-close-training]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.trainingNeeds[Number(button.dataset.closeTraining)];
-      item.status = item.status === "cerrada" ? "pendiente" : "cerrada";
-      if (item.status === "cerrada") state.compliance["7.2"] = "en_proceso";
+      if (item.status !== "cerrada" && !trainingNeedComplete(item)) {
+        item.status = "pendiente_evidencia";
+        addMessage("agent", `No cerre la capacitacion "${item.topic}" porque falta evaluacion, certificado o evidencia.`);
+      } else {
+        item.status = item.status === "cerrada" ? "pendiente" : "cerrada";
+      }
+      if (item.status === "cerrada") {
+        state.compliance["7.2"] = "en_proceso";
+        state.compliance["7.3"] = "en_proceso";
+      }
       saveState();
       renderAll();
     });
@@ -4959,8 +5080,8 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
       addMessage("agent", "Agregue una persona pendiente de verificacion y cree una accion de competencia.");
     }
     if (action === "capacitacion") {
-      addTrainingNeed();
-      addMessage("agent", "Detecte una necesidad de capacitacion y cree una accion preventiva.");
+      detectTrainingNeeds();
+      addMessage("agent", "Revise competencias, actividades y riesgos para detectar necesidades de capacitacion.");
     }
     if (action === "equipos") {
       addEquipment();
@@ -5006,6 +5127,7 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
 document.querySelector("#addActivity").addEventListener("click", addActivity);
 document.querySelector("#addPerson").addEventListener("click", addPerson);
 document.querySelector("#addTrainingNeed").addEventListener("click", addTrainingNeed);
+document.querySelector("#detectTrainingNeeds").addEventListener("click", detectTrainingNeeds);
 document.querySelector("#addEquipment").addEventListener("click", addEquipment);
 document.querySelector("#addPolicy").addEventListener("click", addPolicy);
 document.querySelector("#addParticipantEvidence").addEventListener("click", addParticipantEvidence);

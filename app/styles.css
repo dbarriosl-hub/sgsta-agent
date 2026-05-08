@@ -1416,6 +1416,21 @@ textarea {
   margin: 0;
 }
 
+.training-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.training-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
 .review-input-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
