@@ -346,6 +346,54 @@ textarea {
   line-height: 1.45;
 }
 
+.activity-decision-mini {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  min-width: 130px;
+}
+
+.activity-decision-mini small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.activity-operational-status {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr) auto;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.activity-operational-status h3,
+.activity-operational-status p {
+  margin: 0;
+}
+
+.activity-operational-status p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.activity-readiness-meter {
+  display: grid;
+  gap: 6px;
+}
+
+.activity-readiness-meter strong {
+  font-size: 28px;
+}
+
+.activity-readiness-meter span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .panel {
   padding: 18px;
   min-width: 0;
@@ -1692,6 +1740,7 @@ textarea {
   .org-form,
   .form-grid,
   .action-form-grid,
+  .activity-operational-status,
   .form-filters,
   .activity-form-tools,
   .plan-usage,

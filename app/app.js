@@ -1111,6 +1111,28 @@ function controlBadge(ok, label) {
   return `<span class="badge ${ok ? "cumple" : "no_cumple"}">${label}</span>`;
 }
 
+function activityOperationDecision(readiness) {
+  if (readiness.status === "lista") {
+    return {
+      label: "Lista para ofertar",
+      badge: "cumple",
+      summary: "La actividad tiene los controles minimos para operar. Mantener vigencias y evidencias al dia."
+    };
+  }
+  if (readiness.high > 0) {
+    return {
+      label: "No ofertar todavia",
+      badge: "no_cumple",
+      summary: "Hay brechas criticas. Cierre riesgos, guia, equipos o seguro antes de vender u operar."
+    };
+  }
+  return {
+    label: "Operar con revision",
+    badge: "en_proceso",
+    summary: "Puede avanzar en preparacion, pero faltan soportes o aprobaciones antes de dejarla cerrada."
+  };
+}
+
 const activityPackageTables = [
   "contexto_actividades",
   "mapa_riesgos",
@@ -1857,11 +1879,15 @@ function renderActivities() {
   const selectedActivity = state.activities.find((item) => item.name === state.selectedActivityName) || state.activities[0];
   const selectedRelated = activityRelatedItems(selectedActivity.name);
   const selectedStats = activityFormStats(selectedActivity.name);
+  const selectedReadiness = activityReadiness(selectedActivity.name);
+  const selectedDecision = activityOperationDecision(selectedReadiness);
   container.innerHTML = `
     <div class="simple-table">
       ${state.activities.map((item, index) => {
       const related = activityRelatedItems(item.name);
       const controls = activityControlStatus(item.name);
+      const readiness = activityReadiness(item.name);
+      const decision = activityOperationDecision(readiness);
       return `
       <div class="simple-row module-row ${state.selectedActivityName === item.name ? "selected-row" : ""}">
         <div>
@@ -1882,7 +1908,10 @@ function renderActivities() {
             ${controlBadge(controls.insurance, "seguro")}
           </div>
         </div>
-        <span class="badge cumple">${item.status}</span>
+        <div class="activity-decision-mini">
+          <span class="badge ${decision.badge}">${decision.label}</span>
+          <small>${readiness.score}% listo</small>
+        </div>
         <button class="secondary-button" data-select-activity="${item.name}" type="button">Ver ficha</button>
         <button class="secondary-button" data-remove="activities:${index}" type="button">Quitar</button>
       </div>`;
@@ -1894,7 +1923,23 @@ function renderActivities() {
           <p class="eyebrow">Ficha de actividad</p>
           <h2>${selectedActivity.name}</h2>
         </div>
-        <span class="badge phva">8.1</span>
+        <span class="badge ${selectedDecision.badge}">${selectedDecision.label}</span>
+      </div>
+      <div class="activity-operational-status">
+        <div>
+          <p class="eyebrow">Decision operativa</p>
+          <h3>${selectedDecision.label}</h3>
+          <p>${selectedDecision.summary}</p>
+        </div>
+        <div class="activity-readiness-meter">
+          <strong>${selectedReadiness.score}%</strong>
+          <span>${selectedReadiness.gaps.length} brecha(s), ${selectedReadiness.high} critica(s)</span>
+          <div class="progress"><span style="width:${selectedReadiness.score}%"></span></div>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button" data-open-selected-gaps="${selectedActivity.name}" type="button">Ver brechas</button>
+          <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
+        </div>
       </div>
       <div class="report-summary">
         <div class="report-card"><span>Riesgos</span><strong>${selectedRelated.risks.length}</strong></div>
@@ -2004,6 +2049,20 @@ function renderActivities() {
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
+  container.querySelector("[data-open-selected-gaps]")?.addEventListener("click", () => showView("brechas_actividad"));
+  container.querySelector("[data-create-selected-gap-actions]")?.addEventListener("click", (event) => {
+    const activityName = event.currentTarget.dataset.createSelectedGapActions;
+    let created = 0;
+    activityGapItems(activityName).forEach((gap) => {
+      if (!activityGapActionExists(gap)) {
+        state.actions.unshift(activityGapActionPayload(activityName, gap));
+        created += 1;
+      }
+    });
+    addMessage("agent", created ? `Cree ${created} accion(es) para preparar ${activityName} antes de operar.` : `Ya existen acciones abiertas para las brechas de ${activityName}.`);
+    saveState();
+    renderAll();
+  });
   container.querySelector("#activityEditForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     saveSelectedActivity();
