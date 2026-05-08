@@ -426,6 +426,9 @@ function statusScore(value) {
 function requirementEvidenceStats(code) {
   const coverage = formCoverageByRequirement().find((group) => group.code === code);
   const evidences = state.evidence.filter((item) => item.code === code);
+  const activityScopedForms = activityScopedFormsForRequirement(code);
+  const activityDraft = activityScopedForms.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
+  const activityApproved = activityScopedForms.filter((item) => normalizedFormStatus(item.status) === "aprobado" || normalizedFormStatus(item.status) === "completo").length;
   const registeredEvidence = evidences.filter((item) => item.status !== "sugerida").length;
   const suggestedEvidence = evidences.filter((item) => item.status === "sugerida").length;
   return {
@@ -433,14 +436,32 @@ function requirementEvidenceStats(code) {
     formsDraft: coverage?.draft || 0,
     formsApproved: coverage?.complete || 0,
     formsPending: coverage?.pending || 0,
+    activityFormsTotal: activityScopedForms.length,
+    activityFormsDraft: activityDraft,
+    activityFormsApproved: activityApproved,
     registeredEvidence,
     suggestedEvidence
   };
 }
 
 function formEvidenceScore(stats) {
-  if (!stats.formsTotal) return 0;
-  return Math.min(1, (stats.formsApproved + stats.formsDraft * 0.4) / stats.formsTotal);
+  const catalogScore = stats.formsTotal ? (stats.formsApproved + stats.formsDraft * 0.4) / stats.formsTotal : 0;
+  const activityTarget = activityFormTargetForRequirement(stats);
+  const activityScore = activityTarget ? (stats.activityFormsApproved + stats.activityFormsDraft * 0.4) / activityTarget : 0;
+  return Math.min(1, Math.max(catalogScore, activityScore));
+}
+
+function activityFormTargetForRequirement(stats) {
+  if (!stats.activityFormsTotal) return 0;
+  return Math.max(1, Math.min(stats.activityFormsTotal, state.activities.length || stats.activityFormsTotal));
+}
+
+function activityScopedFormsForRequirement(code) {
+  const activityTables = new Set(activityPackageTables);
+  return state.formResponses.filter((response) => {
+    if (!response.activity || response.code !== code) return false;
+    return activityTables.has(response.table);
+  });
 }
 
 function explicitEvidenceScore(stats) {
@@ -664,6 +685,7 @@ function renderRequirements() {
           <div class="muted">Evidencia esperada: ${item.evidence}</div>
           <div class="matrix-metrics">
             <span>Formularios ${stats.formsApproved}/${stats.formsTotal}</span>
+            <span>Por actividad ${stats.activityFormsApproved}/${stats.activityFormsTotal}</span>
             <span>Borradores ${stats.formsDraft}</span>
             <span>Evidencias ${stats.registeredEvidence}</span>
             <span>Sugeridas ${stats.suggestedEvidence}</span>
@@ -2674,7 +2696,7 @@ function renderAuditReport() {
       <div class="audit-grid">
         <div>
           <strong>Formularios</strong>
-          <p>${row.stats.formsApproved}/${row.stats.formsTotal} aprobados, ${row.stats.formsDraft} borrador(es), ${row.stats.formsPending} pendiente(s)</p>
+          <p>${row.stats.formsApproved}/${row.stats.formsTotal} aprobados generales; ${row.stats.activityFormsApproved}/${row.stats.activityFormsTotal} por actividad.</p>
         </div>
         <div>
           <strong>Evidencias</strong>
@@ -2724,7 +2746,7 @@ function generateAuditReport() {
       `${row.code} ${row.title}`,
       `Estado: ${labelStatus(row.status)} - ${row.score}%`,
       `Evidencia esperada: ${row.evidence}`,
-      `Formularios: ${row.stats.formsApproved}/${row.stats.formsTotal} aprobados; ${row.stats.formsDraft} borrador(es); ${row.stats.formsPending} pendiente(s).`,
+      `Formularios: ${row.stats.formsApproved}/${row.stats.formsTotal} aprobados generales; ${row.stats.activityFormsApproved}/${row.stats.activityFormsTotal} por actividad.`,
       `Evidencias: ${row.stats.registeredEvidence} registrada(s); ${row.stats.suggestedEvidence} sugerida(s).`,
       `Acciones abiertas: ${row.actions.length}.`,
       `Brecha/lectura agente: ${row.gap.title}. ${row.gap.detail}`,
