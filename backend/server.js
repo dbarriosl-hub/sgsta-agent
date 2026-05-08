@@ -1075,7 +1075,11 @@ function roleLabel(role) {
 }
 
 function updateFormWorkflow(input) {
-  const response = list(state.formResponses).find((item) => item.table === input.table);
+  const response = list(state.formResponses).find((item) => {
+    if (item.table !== input.table) return false;
+    if (input.activity) return item.activity === input.activity;
+    return !item.activity;
+  }) || list(state.formResponses).find((item) => item.table === input.table);
   if (!response) {
     return { status: 404, payload: { error: "form_response_not_found" } };
   }

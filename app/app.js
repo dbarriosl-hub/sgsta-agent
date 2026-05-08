@@ -2986,9 +2986,17 @@ function ensureSelectedFormActivity() {
 }
 
 function selectedFormResponse(form) {
-  return formResponseForActivity(form.table, state.selectedFormActivity)
-    || state.formResponses.find((item) => item.table === form.table && !item.activity)
-    || state.formResponses.find((item) => item.form === form.title && !item.activity);
+  return getFormResponse(form.table, state.selectedFormActivity, form.title);
+}
+
+function getFormResponse(table, activity = "", formTitle = "") {
+  if (activity) {
+    const activityResponse = formResponseForActivity(table, activity);
+    if (activityResponse) return activityResponse;
+  }
+  return state.formResponses.find((item) => item.table === table && !item.activity)
+    || (formTitle ? state.formResponses.find((item) => item.form === formTitle && !item.activity) : null)
+    || state.formResponses.find((item) => item.table === table);
 }
 
 function formCoverageByRequirement() {
@@ -3227,9 +3235,9 @@ function renderFormPreview() {
         <button class="secondary-button" data-fill-activity-package-preview="${state.selectedFormActivity || ""}" type="button">Paquete actividad</button>
         <button class="secondary-button" data-fill-requirement="${requirement.code}" type="button">Crear borradores de ${requirement.code}</button>
         <button class="secondary-button" data-filter-requirement="${requirement.code}" type="button">Filtrar este requisito</button>
-        ${response ? `<button class="secondary-button" data-form-review="${form.table}" type="button">${response.status === "revision" ? "Volver a borrador" : "Enviar a revision"}</button>` : ""}
-        ${response ? `<button class="secondary-button" data-form-approve="${form.table}" type="button" ${canApprove ? "" : "disabled"}>Aprobar humano</button>` : ""}
-        ${response ? `<button class="secondary-button" data-form-evidence="${form.table}" type="button">Enviar a evidencias</button>` : ""}
+        ${response ? `<button class="secondary-button" data-form-review="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button">${response.status === "revision" ? "Volver a borrador" : "Enviar a revision"}</button>` : ""}
+        ${response ? `<button class="secondary-button" data-form-approve="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button" ${canApprove ? "" : "disabled"}>Aprobar humano</button>` : ""}
+        ${response ? `<button class="secondary-button" data-form-evidence="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button">Enviar a evidencias</button>` : ""}
       </div>
       ${!canApprove && response ? `<p class="muted">Tu rol actual puede preparar y revisar, pero no aprobar. Cambia a Direccion para aprobar.</p>` : ""}
     ` : ""}
@@ -3263,13 +3271,13 @@ function renderFormPreview() {
     renderForms();
   });
   preview.querySelector("[data-form-evidence]")?.addEventListener("click", (event) => {
-    convertFormResponseToEvidence(event.currentTarget.dataset.formEvidence);
+    convertFormResponseToEvidence(event.currentTarget.dataset.formEvidence, event.currentTarget.dataset.formActivity || "");
   });
   preview.querySelector("[data-form-review]")?.addEventListener("click", async (event) => {
-    await setFormReviewStatus(event.currentTarget.dataset.formReview);
+    await setFormReviewStatus(event.currentTarget.dataset.formReview, event.currentTarget.dataset.formActivity || "");
   });
   preview.querySelector("[data-form-approve]")?.addEventListener("click", async (event) => {
-    await approveFormResponse(event.currentTarget.dataset.formApprove);
+    await approveFormResponse(event.currentTarget.dataset.formApprove, event.currentTarget.dataset.formActivity || "");
   });
 }
 
@@ -3491,11 +3499,11 @@ async function updateFormWorkflowInBackend(payload) {
   }
 }
 
-async function setFormReviewStatus(table) {
-  const handledByBackend = await updateFormWorkflowInBackend({ table, status: "revision" });
+async function setFormReviewStatus(table, activity = "") {
+  const handledByBackend = await updateFormWorkflowInBackend({ table, activity, status: "revision" });
   if (handledByBackend) return;
 
-  const response = state.formResponses.find((item) => item.table === table);
+  const response = getFormResponse(table, activity);
   if (!response) return;
   response.status = response.status === "revision" ? "borrador" : "revision";
   response.requiresApproval = true;
@@ -3511,11 +3519,11 @@ async function setFormReviewStatus(table) {
   renderAll();
 }
 
-async function approveFormResponse(table) {
-  const handledByBackend = await updateFormWorkflowInBackend({ table, status: "aprobado" });
+async function approveFormResponse(table, activity = "") {
+  const handledByBackend = await updateFormWorkflowInBackend({ table, activity, status: "aprobado" });
   if (handledByBackend) return;
 
-  const response = state.formResponses.find((item) => item.table === table);
+  const response = getFormResponse(table, activity);
   if (!response) return;
   if (!canCurrentUserApprove()) {
     addMessage("agent", "No aprobe el formulario: el rol actual no tiene permiso de aprobacion. Usa Direccion o Admin.");
@@ -3777,27 +3785,31 @@ function suggestedValueForField(name, context) {
   return "Por definir";
 }
 
-function convertFormResponseToEvidence(table) {
-  const response = state.formResponses.find((item) => item.table === table);
+function convertFormResponseToEvidence(table, activity = "") {
+  const response = getFormResponse(table, activity);
   if (!response) return;
   const approved = normalizedFormStatus(response.status) === "aprobado";
   addEvidenceRecord({
     title: `Formulario: ${response.form}`,
     code: response.code,
     source: "formulario agente",
-    linkedDocument: response.table,
+    activity: response.activity || "",
+    linkedActivity: response.activity || "",
+    linkedDocument: response.activity ? `${response.table}:${response.activity}` : response.table,
     status: approved ? "registrada" : "sugerida"
   });
   addMessage("agent", `Asocie el formulario "${response.form}" como evidencia del requisito ${response.code}. ${approved ? "Ya cuenta como evidencia registrada." : "Queda sugerida porque falta aprobacion humana."}`);
 }
 
 function upsertEvidenceFromApprovedForm(response) {
-  const linkedDocument = response.table;
+  const linkedDocument = response.activity ? `${response.table}:${response.activity}` : response.table;
   const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "formulario aprobado");
   const evidence = {
     title: `Formulario aprobado: ${response.form}`,
     code: response.code,
     source: "formulario aprobado",
+    activity: response.activity || "",
+    linkedActivity: response.activity || "",
     linkedDocument,
     status: "registrada",
     approvedBy: response.approvedBy,
@@ -4046,6 +4058,10 @@ function bindReviewInboxButtons(container) {
       const response = state.formResponses[Number(button.dataset.reviewOpenForm)];
       if (!response) return;
       state.selectedFormTable = response.table;
+      if (response.activity) {
+        state.selectedFormActivity = response.activity;
+        state.selectedActivityName = response.activity;
+      }
       showView("formularios");
       renderAll();
     });
@@ -4053,13 +4069,13 @@ function bindReviewInboxButtons(container) {
   container.querySelectorAll("[data-review-form]").forEach((button) => {
     button.addEventListener("click", async () => {
       const response = state.formResponses[Number(button.dataset.reviewForm)];
-      if (response) await setFormReviewStatus(response.table);
+      if (response) await setFormReviewStatus(response.table, response.activity || "");
     });
   });
   container.querySelectorAll("[data-review-approve-form]").forEach((button) => {
     button.addEventListener("click", async () => {
       const response = state.formResponses[Number(button.dataset.reviewApproveForm)];
-      if (response) await approveFormResponse(response.table);
+      if (response) await approveFormResponse(response.table, response.activity || "");
     });
   });
   container.querySelectorAll("[data-review-evidence]").forEach((button) => {
