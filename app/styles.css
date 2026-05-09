@@ -848,6 +848,89 @@ textarea {
   font-size: 30px;
 }
 
+.implementation-roadmap {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.onboarding-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+}
+
+.onboarding-card h3,
+.onboarding-card p,
+.onboarding-card .eyebrow {
+  margin: 0;
+}
+
+.onboarding-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.onboarding-score {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: center;
+}
+
+.onboarding-score strong {
+  font-size: 28px;
+}
+
+.onboarding-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.phase-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.phase-card.active {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.phase-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.phase-card p,
+.phase-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+}
+
 .step-row {
   display: grid;
   grid-template-columns: 42px minmax(220px, 1fr) 110px minmax(150px, auto);
@@ -2055,6 +2138,8 @@ textarea {
   .panel-grid,
   .agent-layout,
   .implementation-layout,
+  .onboarding-card,
+  .phase-grid,
   .documents-layout,
   .forms-layout,
   .org-form,

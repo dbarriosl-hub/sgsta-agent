@@ -723,13 +723,72 @@ function implementationProgress() {
   };
 }
 
+const implementationPhases = [
+  { id: "base", label: "Arranque", steps: ["alcance", "actividades"], promise: "La empresa queda ubicada, con alcance y actividades reales." },
+  { id: "operacion", label: "Operacion", steps: ["riesgos", "seguros", "personal", "capacitacion", "equipos", "participantes"], promise: "Cada actividad tiene riesgos, guias, equipos, seguros y condiciones." },
+  { id: "evidencia", label: "Evidencia", steps: ["documentos", "auditoria", "revision"], promise: "El sistema deja soportes defendibles para auditoria y direccion." },
+  { id: "mejora", label: "Mejora", steps: ["mejora"], promise: "Las brechas se cierran con acciones, evidencia y eficacia." }
+];
+
 function nextImplementationStep() {
   return implementationSteps.find((step) => !step.check(state)) || implementationSteps[implementationSteps.length - 1];
+}
+
+function implementationPhaseProgress(phase) {
+  const steps = implementationSteps.filter((step) => phase.steps.includes(step.id));
+  const completed = steps.filter((step) => step.check(state)).length;
+  return {
+    ...phase,
+    completed,
+    total: steps.length,
+    pct: steps.length ? Math.round((completed / steps.length) * 100) : 0,
+    next: steps.find((step) => !step.check(state)) || steps[steps.length - 1]
+  };
+}
+
+function renderImplementationRoadmap() {
+  const container = document.querySelector("#implementationRoadmap");
+  if (!container) return;
+  const progress = implementationProgress();
+  const next = nextImplementationStep();
+  const phases = implementationPhases.map(implementationPhaseProgress);
+  const currentPhase = phases.find((phase) => phase.pct < 100) || phases[phases.length - 1];
+  container.innerHTML = `
+    <div class="onboarding-card">
+      <div>
+        <p class="eyebrow">Hito MVP demostrable</p>
+        <h3>Implementar una empresa real sin perderse en la norma</h3>
+        <p>Avance general: ${progress.completed}/${progress.total} pasos. Ahora conviene trabajar: ${next.title}.</p>
+      </div>
+      <div class="onboarding-score">
+        <strong>${progress.pct}%</strong>
+        <span>${currentPhase.label}</span>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" id="roadmapOpenNext" type="button">Abrir paso</button>
+        <button id="roadmapRunNext" type="button">Hacer con agente</button>
+      </div>
+    </div>
+    <div class="phase-grid">
+      ${phases.map((phase) => `
+        <article class="phase-card ${phase.id === currentPhase.id ? "active" : ""}">
+          <div class="phase-card-head">
+            <strong>${phase.label}</strong>
+            <span class="badge ${phase.pct >= 100 ? "cumple" : phase.id === currentPhase.id ? "en_proceso" : "pendiente"}">${phase.pct}%</span>
+          </div>
+          <div class="progress"><span style="width:${phase.pct}%"></span></div>
+          <p>${phase.promise}</p>
+          <small>${phase.completed}/${phase.total} pasos</small>
+        </article>`).join("")}
+    </div>`;
+  document.querySelector("#roadmapOpenNext")?.addEventListener("click", () => showView(next.view));
+  document.querySelector("#roadmapRunNext")?.addEventListener("click", () => handleImplementationStep(next));
 }
 
 function renderImplementation() {
   const container = document.querySelector("#implementationSteps");
   const progress = implementationProgress();
+  renderImplementationRoadmap();
   container.innerHTML = `
     <div class="implementation-summary">
       <strong>${progress.pct}%</strong>
