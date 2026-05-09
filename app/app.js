@@ -2890,6 +2890,112 @@ function renderAudits() {
   bindRemoveButtons(container);
 }
 
+function managementReviewOperationalDecisions() {
+  const readiness = state.activities.map((activity) => {
+    const status = activityReadiness(activity.name);
+    const decision = activityOperationDecision(status);
+    return { activity, status, decision };
+  });
+  const blocked = readiness.filter((item) => item.decision.badge === "no_cumple");
+  const review = readiness.filter((item) => item.decision.badge === "en_proceso");
+  const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12);
+  const equipmentPending = state.equipment.filter((item) => item.status !== "operativo");
+  const peoplePending = state.people.filter((person) => person.competence !== "vigente");
+  const trainingOpen = state.trainingNeeds.filter((item) => item.status !== "cerrada" && item.status !== "realizada");
+  const policiesPending = state.policies.filter((policy) => !policyIsComplete(policy));
+  const formsPending = formCoverageByRequirement().reduce((sum, group) => sum + group.pending, 0);
+  const decisions = [];
+  if (blocked.length) {
+    decisions.push({
+      title: "No ofertar actividades bloqueadas",
+      detail: `${blocked.map((item) => item.activity.name).join(", ")} tienen brechas criticas antes de operar.`,
+      requirement: "8.1",
+      priority: "alta",
+      type: "preventiva",
+      origin: "revision direccion",
+      actionTitle: "Bloquear oferta de actividades con brechas criticas hasta cierre validado"
+    });
+  }
+  if (review.length) {
+    decisions.push({
+      title: "Operar solo con revision documentada",
+      detail: `${review.map((item) => item.activity.name).join(", ")} requieren soportes o aprobaciones pendientes.`,
+      requirement: "8.1",
+      priority: "media",
+      type: "mejora",
+      origin: "revision direccion",
+      actionTitle: "Definir condiciones de operacion para actividades en revision"
+    });
+  }
+  if (highRisks.length) {
+    decisions.push({
+      title: "Aprobar tratamiento de riesgos altos",
+      detail: `${highRisks.length} riesgo(s) alto(s) necesitan controles preventivos y responsable.`,
+      requirement: "6.1.2",
+      priority: "alta",
+      type: "preventiva",
+      origin: "riesgo",
+      actionTitle: "Aprobar y ejecutar tratamiento de riesgos altos"
+    });
+  }
+  if (equipmentPending.length) {
+    decisions.push({
+      title: "Asignar recursos para equipos",
+      detail: `${equipmentPending.length} equipo(s) no estan operativos o requieren revision/mantenimiento.`,
+      requirement: "7.1",
+      priority: "alta",
+      type: "preventiva",
+      origin: "equipo vencido",
+      actionTitle: "Aprobar inspeccion, mantenimiento o reposicion de equipos"
+    });
+  }
+  if (peoplePending.length || trainingOpen.length) {
+    decisions.push({
+      title: "Cerrar competencia y capacitacion",
+      detail: `${peoplePending.length} persona(s) sin competencia vigente y ${trainingOpen.length} necesidad(es) de capacitacion abiertas.`,
+      requirement: "7.2",
+      priority: peoplePending.length ? "alta" : "media",
+      type: "mejora",
+      origin: "capacitacion vencida",
+      actionTitle: "Aprobar plan de capacitacion y evaluacion de competencia"
+    });
+  }
+  if (policiesPending.length) {
+    decisions.push({
+      title: "Validar seguros antes de vender",
+      detail: `${policiesPending.length} poliza(s) no tienen cobertura completa, vigencia o soporte.`,
+      requirement: "6.1.3",
+      priority: "alta",
+      type: "preventiva",
+      origin: "documento vencido",
+      actionTitle: "Validar cobertura de polizas por actividad"
+    });
+  }
+  if (formsPending) {
+    decisions.push({
+      title: "Aprobar evidencias y formularios",
+      detail: `${formsPending} formulario(s) siguen sin diligenciar y no cuentan para completitud.`,
+      requirement: "7.5",
+      priority: "media",
+      type: "tarea",
+      origin: "documento vencido",
+      actionTitle: "Revisar, completar y aprobar formularios pendientes"
+    });
+  }
+  if (!decisions.length) {
+    decisions.push({
+      title: "Mantener seguimiento del SGSTA",
+      detail: "No hay bloqueos criticos. Mantener revision periodica, vigencias y eficacia de acciones.",
+      requirement: "9.3",
+      priority: "baja",
+      type: "mejora",
+      origin: "revision direccion",
+      actionTitle: "Mantener seguimiento periodico del SGSTA"
+    });
+  }
+  return decisions;
+}
+
 function renderManagementReviews() {
   const container = document.querySelector("#managementReviewTable");
   const inputs = managementReviewInputs();
@@ -2911,10 +3017,29 @@ function renderManagementReviews() {
         <div class="review-input-grid">
           <div><span>Acciones abiertas</span><strong>${item.inputs?.openActions ?? inputs.openActions}</strong></div>
           <div><span>Brechas actividad</span><strong>${item.inputs?.activityGaps ?? inputs.activityGaps}</strong></div>
+          <div><span>No ofertar todavia</span><strong>${item.inputs?.activitiesBlocked ?? inputs.activitiesBlocked}</strong></div>
+          <div><span>Con revision</span><strong>${item.inputs?.activitiesInReview ?? inputs.activitiesInReview}</strong></div>
           <div><span>Riesgos altos</span><strong>${item.inputs?.highRisks ?? inputs.highRisks}</strong></div>
           <div><span>Capacitacion</span><strong>${item.inputs?.trainingOpen ?? inputs.trainingOpen}</strong></div>
           <div><span>Equipos no listos</span><strong>${item.inputs?.equipmentPending ?? inputs.equipmentPending}</strong></div>
           <div><span>Polizas pendientes</span><strong>${item.inputs?.policiesPending ?? inputs.policiesPending}</strong></div>
+        </div>
+        <div class="review-decision-panel">
+          <div>
+            <p class="eyebrow">Agenda de decisiones</p>
+            <strong>Lo que la direccion debe resolver</strong>
+          </div>
+          <div class="review-decision-grid">
+            ${(item.operationalDecisions?.length ? item.operationalDecisions : managementReviewOperationalDecisions()).map((decision) => `
+              <article class="review-decision-card">
+                <div>
+                  <span class="badge requisito">${decision.requirement}</span>
+                  <span class="badge ${decision.priority === "alta" ? "no_cumple" : decision.priority === "media" ? "en_proceso" : "cumple"}">${decision.priority}</span>
+                </div>
+                <strong>${escapeHtml(decision.title)}</strong>
+                <p>${escapeHtml(decision.detail)}</p>
+              </article>`).join("")}
+          </div>
         </div>
         <div class="review-detail-grid">
           <div>
@@ -2952,11 +3077,18 @@ function renderManagementReviews() {
 
 function managementReviewInputs() {
   const activityGaps = state.activities.reduce((sum, activity) => sum + activityGapItems(activity.name).length, 0);
+  const activityStatuses = state.activities.map((activity) => {
+    const readiness = activityReadiness(activity.name);
+    return activityOperationDecision(readiness).badge;
+  });
   return {
     openActions: state.actions.filter((item) => item.status !== "cerrada").length,
     pendingEfficacy: state.actions.filter((item) => item.status === "pendiente_eficacia").length,
     highRisks: state.risks.filter((risk) => riskLevel(risk) >= 12).length,
     activityGaps,
+    activitiesReady: activityStatuses.filter((status) => status === "cumple").length,
+    activitiesInReview: activityStatuses.filter((status) => status === "en_proceso").length,
+    activitiesBlocked: activityStatuses.filter((status) => status === "no_cumple").length,
     audits: state.audits.length,
     incidents: state.incidents.length,
     trainingOpen: state.trainingNeeds.filter((item) => item.status !== "cerrada" && item.status !== "realizada").length,
@@ -2968,6 +3100,7 @@ function managementReviewInputs() {
 
 function buildManagementReviewDraft() {
   const inputs = managementReviewInputs();
+  const operationalDecisions = managementReviewOperationalDecisions();
   const priorityActivities = state.activities
     .map((activity) => ({ name: activity.name, readiness: activityReadiness(activity.name) }))
     .filter((item) => item.readiness.gaps.length)
@@ -2976,12 +3109,14 @@ function buildManagementReviewDraft() {
   const entries = [
     `Acciones abiertas: ${inputs.openActions}, con ${inputs.pendingEfficacy} pendiente(s) de eficacia.`,
     `Brechas operacionales por actividad: ${inputs.activityGaps}.`,
+    `Actividades listas: ${inputs.activitiesReady}; con revision: ${inputs.activitiesInReview}; no ofertar todavia: ${inputs.activitiesBlocked}.`,
     `Riesgos altos: ${inputs.highRisks}; incidentes registrados: ${inputs.incidents}.`,
     `Capacitaciones abiertas: ${inputs.trainingOpen}; equipos no operativos: ${inputs.equipmentPending}.`,
     `Polizas sin cobertura completa: ${inputs.policiesPending}; formularios pendientes: ${inputs.formsPending}.`
   ];
   const decisions = [
     inputs.activityGaps ? `Priorizar cierre de brechas en actividades: ${priorityActivities.map((item) => item.name).join(", ") || "por definir"}.` : "Mantener controles operacionales actuales.",
+    inputs.activitiesBlocked ? "La direccion debe decidir no ofertar actividades bloqueadas hasta cerrar brechas criticas." : "No hay actividades bloqueadas por brechas criticas.",
     inputs.highRisks ? "Aprobar tratamiento inmediato para riesgos altos antes de operar actividades criticas." : "Mantener seguimiento preventivo de riesgos.",
     inputs.trainingOpen ? "Aprobar plan de capacitacion y competencia por actividad." : "Mantener vigilancia de competencias vigentes.",
     inputs.policiesPending ? "Exigir validacion documental de polizas antes de ofertar actividades no cubiertas." : "Mantener control de vigencias de polizas."
@@ -3006,6 +3141,7 @@ function buildManagementReviewDraft() {
     decisions,
     resources,
     outputs,
+    operationalDecisions,
     preparedBy: "agente",
     createdAt: today()
   };
@@ -3014,19 +3150,35 @@ function buildManagementReviewDraft() {
 function createManagementReviewActions(index) {
   const review = state.managementReviews[index];
   if (!review) return;
-  (review.outputs || []).forEach((output) => {
-    const title = `Revision direccion: ${output}`;
+  const outputActions = (review.outputs || []).map((output) => ({
+    title: `Revision direccion: ${output}`,
+    code: "9.3",
+    type: "mejora",
+    origin: "revision direccion",
+    priority: "media",
+    cause: review.summary
+  }));
+  const decisionActions = (review.operationalDecisions || []).map((decision) => ({
+    title: `Decision direccion: ${decision.actionTitle}`,
+    code: decision.requirement || "9.3",
+    type: decision.type || "mejora",
+    origin: decision.origin || "revision direccion",
+    priority: decision.priority || "media",
+    cause: `${decision.title}: ${decision.detail}`
+  }));
+  [...decisionActions, ...outputActions].forEach((payload) => {
+    const title = payload.title;
     if (!state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
       state.actions.unshift({
         title,
-        code: "9.3",
+        code: payload.code,
         status: "abierta",
-        type: "mejora",
-        origin: "revision direccion",
-        priority: "media",
+        type: payload.type,
+        origin: payload.origin,
+        priority: payload.priority,
         responsible: state.ownerName || "Responsable SGSTA",
         dueDate: "",
-        cause: review.summary,
+        cause: payload.cause,
         immediateCorrection: "",
         followUp: "",
         efficacyVerification: "",
