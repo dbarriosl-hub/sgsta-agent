@@ -5712,6 +5712,10 @@ function refreshAgenda() {
 
 function renderEvidence() {
   const container = document.querySelector("#evidenceTable");
+  const summary = document.querySelector("#evidenceSummary");
+  const packages = document.querySelector("#evidencePackages");
+  if (summary) renderEvidenceSummary(summary);
+  if (packages) renderEvidencePackages(packages);
   container.innerHTML = state.evidence.length
     ? state.evidence.map((item, index) => `
       <div class="simple-row module-row">
@@ -5721,6 +5725,112 @@ function renderEvidence() {
       </div>`).join("")
     : `<div class="muted">Todavia no hay evidencias. Puedes registrar ejemplos para probar el flujo.</div>`;
   bindRemoveButtons(container);
+}
+
+function evidencePackageForRequirement(req) {
+  const stats = requirementEvidenceStats(req.code);
+  const forms = visibleCatalogForms(window.formCatalog || [])
+    .filter((form) => getFormRequirement(form).code === req.code)
+    .map((form) => {
+      const response = state.formResponses.find((item) => item.table === form.table || item.form === form.title);
+      return { title: form.title, status: normalizedFormStatus(response?.status), activity: response?.activity || "" };
+    });
+  const activityForms = activityScopedFormsForRequirement(req.code).map((response) => ({
+    title: response.form || response.table,
+    status: normalizedFormStatus(response.status),
+    activity: response.activity || ""
+  }));
+  const evidences = state.evidence.filter((item) => item.code === req.code);
+  const documents = state.documents.filter((doc) => doc.code === req.code);
+  const actions = state.actions.filter((action) => action.code === req.code && action.status !== "cerrada");
+  const score = Math.round(requirementCompletionScore(req.code) * 100);
+  const status = requirementCompletionStatus(req.code);
+  const missing = [];
+  if (!stats.registeredEvidence) missing.push("evidencia real");
+  if (stats.formsPending) missing.push("formularios");
+  if (stats.activityFormsTotal && stats.activityFormsApproved < activityFormTargetForRequirement(stats)) missing.push("formularios por actividad");
+  if (actions.length) missing.push("acciones abiertas");
+  return { req, stats, forms, activityForms, evidences, documents, actions, score, status, missing };
+}
+
+function renderEvidenceSummary(container) {
+  const packages = requirements.map(evidencePackageForRequirement);
+  const complete = packages.filter((item) => item.score >= 100).length;
+  const partial = packages.filter((item) => item.score > 0 && item.score < 100).length;
+  const suggested = state.evidence.filter((item) => item.status === "sugerida").length;
+  const real = state.evidence.filter((item) => item.status !== "sugerida").length;
+  const activityDrafts = state.formResponses.filter((item) => item.activity && ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
+  container.innerHTML = `
+    <div class="report-card"><span>Requisitos completos</span><strong>${complete}</strong></div>
+    <div class="report-card"><span>Parciales</span><strong>${partial}</strong></div>
+    <div class="report-card"><span>Evidencias reales</span><strong>${real}</strong></div>
+    <div class="report-card"><span>Sugeridas</span><strong>${suggested}</strong></div>
+    <div class="report-card"><span>Borradores actividad</span><strong>${activityDrafts}</strong></div>`;
+}
+
+function renderEvidencePackages(container) {
+  const packages = requirements
+    .map(evidencePackageForRequirement)
+    .sort((a, b) => a.score - b.score || b.actions.length - a.actions.length)
+    .slice(0, 6);
+  container.innerHTML = `
+    <div class="evidence-package-head">
+      <div>
+        <p class="eyebrow">Paquetes de evidencia</p>
+        <h3>Requisitos que mas necesitan soporte</h3>
+      </div>
+      <span class="badge phva">${packages.length}</span>
+    </div>
+    <div class="evidence-package-grid">
+      ${packages.map((item) => `
+        <article class="evidence-package-card">
+          <div class="evidence-package-title">
+            <span class="badge requisito">${item.req.code}</span>
+            <span class="badge ${item.status === "cumple" ? "cumple" : item.status === "pendiente" ? "no_cumple" : "en_proceso"}">${item.score}%</span>
+          </div>
+          <strong>${escapeHtml(item.req.title)}</strong>
+          <p>${item.missing.length ? `Falta: ${item.missing.join(", ")}.` : "Paquete sin brechas visibles."}</p>
+          <div class="matrix-metrics">
+            <span>Formularios ${item.stats.formsApproved}/${item.stats.formsTotal}</span>
+            <span>Actividad ${item.stats.activityFormsApproved}/${activityFormTargetForRequirement(item.stats) || item.stats.activityFormsTotal}</span>
+            <span>Evidencias ${item.stats.registeredEvidence}</span>
+            <span>Acciones ${item.actions.length}</span>
+          </div>
+          <div class="evidence-linked-list">
+            ${evidencePackageLinkedItems(item).map((linked) => `<span>${escapeHtml(linked)}</span>`).join("")}
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-evidence-open="${item.req.code}" type="button">Ver requisito</button>
+            <button data-evidence-prepare="${item.req.code}" type="button">Preparar paquete</button>
+          </div>
+        </article>`).join("")}
+    </div>`;
+  container.querySelectorAll("[data-evidence-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.formFilters.search = button.dataset.evidenceOpen;
+      showView("diagnostico");
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelectorAll("[data-evidence-prepare]").forEach((button) => {
+    button.addEventListener("click", () => prepareEvidencePackage(button.dataset.evidencePrepare));
+  });
+}
+
+function evidencePackageLinkedItems(item) {
+  const linked = [];
+  item.forms.slice(0, 2).forEach((form) => linked.push(`${form.title}: ${form.status}`));
+  item.activityForms.slice(0, 2).forEach((form) => linked.push(`${form.activity}: ${form.status}`));
+  item.documents.slice(0, 1).forEach((doc) => linked.push(`Documento: ${doc.status || "borrador"}`));
+  item.evidences.slice(0, 1).forEach((evidence) => linked.push(`Evidencia: ${evidence.status || "registrada"}`));
+  if (!linked.length) linked.push("Sin soportes enlazados todavia");
+  return linked;
+}
+
+async function prepareEvidencePackage(code) {
+  await closeRequirementGap(code);
+  showView("evidencias");
 }
 
 function addEvidenceRecord(record) {
