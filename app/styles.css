@@ -1026,6 +1026,62 @@ textarea {
   line-height: 1.45;
 }
 
+.work-plan-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.work-plan-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.work-plan-head h3,
+.work-plan-head .eyebrow {
+  margin: 0;
+}
+
+.work-plan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.work-week {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.work-week.active {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.work-week > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.work-week p,
+.work-week small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .document-preview {
   border: 1px solid var(--line);
   border-radius: 8px;

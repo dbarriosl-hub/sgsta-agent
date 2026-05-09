@@ -747,6 +747,76 @@ function implementationPhaseProgress(phase) {
   };
 }
 
+function implementationWorkPlan() {
+  const pendingSteps = implementationSteps.filter((step) => !step.check(state));
+  const weeks = [
+    {
+      label: "Semana 1",
+      title: "Base de la empresa",
+      focus: ["alcance", "actividades", "riesgos"],
+      objective: "Dejar claro donde opera la empresa, que actividades ofrece y cuales son sus riesgos iniciales."
+    },
+    {
+      label: "Semana 2",
+      title: "Controles operativos",
+      focus: ["seguros", "personal", "capacitacion", "equipos", "participantes"],
+      objective: "Verificar que cada actividad tenga guia, equipo, seguro y condiciones de participacion."
+    },
+    {
+      label: "Semana 3",
+      title: "Evidencias y documentos",
+      focus: ["documentos", "auditoria"],
+      objective: "Preparar documentos, formularios y evidencias que soportan los requisitos."
+    },
+    {
+      label: "Semana 4",
+      title: "Direccion y mejora",
+      focus: ["revision", "mejora"],
+      objective: "Revisar resultados con direccion y cerrar acciones con evidencia y eficacia."
+    }
+  ];
+  return weeks.map((week) => {
+    const steps = implementationSteps.filter((step) => week.focus.includes(step.id));
+    const pending = steps.filter((step) => !step.check(state));
+    return {
+      ...week,
+      steps,
+      pending,
+      pct: steps.length ? Math.round(((steps.length - pending.length) / steps.length) * 100) : 100,
+      next: pending[0] || steps[0]
+    };
+  }).map((week) => ({
+    ...week,
+    isCurrent: week.pending.some((step) => pendingSteps[0]?.id === step.id)
+  }));
+}
+
+function renderImplementationWorkPlan() {
+  const weeks = implementationWorkPlan();
+  return `
+    <div class="work-plan-card">
+      <div class="work-plan-head">
+        <div>
+          <p class="eyebrow">Plan 30 dias</p>
+          <h3>Ruta para demostrar valor rapido</h3>
+        </div>
+        <button class="secondary-button" id="workPlanActions" type="button">Crear acciones</button>
+      </div>
+      <div class="work-plan-list">
+        ${weeks.map((week) => `
+          <article class="work-week ${week.isCurrent ? "active" : ""}">
+            <div>
+              <span class="badge ${week.pct >= 100 ? "cumple" : week.isCurrent ? "en_proceso" : "pendiente"}">${week.label}</span>
+              <strong>${week.title}</strong>
+            </div>
+            <p>${week.objective}</p>
+            <div class="progress"><span style="width:${week.pct}%"></span></div>
+            <small>${week.pending.length ? `Pendiente: ${week.pending.map((step) => step.title).join(", ")}` : "Semana cubierta por los datos actuales."}</small>
+          </article>`).join("")}
+      </div>
+    </div>`;
+}
+
 function renderImplementationRoadmap() {
   const container = document.querySelector("#implementationRoadmap");
   if (!container) return;
@@ -838,9 +908,11 @@ function renderImplementation() {
         <button class="secondary-button" id="guideOpenModule" type="button">Abrir modulo</button>
         <button id="guidePrimaryAction" type="button">Avanzar con agente</button>
       </div>
-    </div>`;
+    </div>
+    ${renderImplementationWorkPlan()}`;
   document.querySelector("#guideOpenModule").addEventListener("click", () => showView(next.view));
   document.querySelector("#guidePrimaryAction").addEventListener("click", () => handleImplementationStep(next));
+  document.querySelector("#workPlanActions")?.addEventListener("click", createImplementationWorkPlanActions);
 }
 
 function renderRequirements() {
@@ -6597,6 +6669,42 @@ function handleImplementationStep(step) {
   if (step.id === "alcance") createAction(step.action, "4.3", "tarea", "implementacion");
   if (step.id === "mejora") createAction(step.action, "10.1", "mejora", "implementacion");
   addMessage("agent", `Paso PHVA: ${step.title}. Cree o sugeri la accion necesaria para avanzar.`);
+  saveState();
+  renderAll();
+}
+
+function createImplementationWorkPlanActions() {
+  const pending = implementationSteps.filter((step) => !step.check(state)).slice(0, 6);
+  let created = 0;
+  pending.forEach((step) => {
+    const title = `Plan 30 dias: ${step.action}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: step.code.split("/")[0].split("-")[0],
+      status: "abierta",
+      type: step.stage === "Actuar" ? "mejora" : "tarea",
+      origin: "plan 30 dias",
+      priority: step.stage === "Planear" || step.stage === "Hacer" ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: step.outcome,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Plan 30 dias convertido en acciones",
+    detail: `El agente creo ${created} accion(es) desde la ruta de implementacion.`,
+    code: "4.4",
+    type: "implementacion",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) desde el plan de 30 dias.` : "El plan de 30 dias ya tenia acciones abiertas para los primeros pendientes.");
   saveState();
   renderAll();
 }
