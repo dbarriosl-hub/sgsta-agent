@@ -572,7 +572,8 @@ function todayWorkItems() {
     .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score)[0];
   const reviewForms = state.formResponses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
   const openActions = state.actions.filter((item) => item.status !== "cerrada").length;
-  return { closure, activity, reviewForms, openActions };
+  const reviewDecisions = managementReviewOperationalDecisions().filter((decision) => decision.priority !== "baja");
+  return { closure, activity, reviewForms, openActions, reviewDecisions };
 }
 
 function renderTodayWork() {
@@ -600,11 +601,12 @@ function renderTodayWork() {
         </div>
       </article>
       <article class="today-card">
-        <span class="badge phva">Revision</span>
-        <h3>${work.reviewForms} borrador(es)</h3>
-        <p>${work.reviewForms ? "Revise/apruebe formularios para que cuenten como evidencia." : "No hay formularios pendientes de revision humana."}</p>
+        <span class="badge requisito">9.3</span>
+        <h3>${work.reviewDecisions.length ? `${work.reviewDecisions.length} decision(es)` : `${work.reviewForms} borrador(es)`}</h3>
+        <p>${work.reviewDecisions.length ? `${work.reviewDecisions[0].title}: ${work.reviewDecisions[0].detail}` : work.reviewForms ? "Revise/apruebe formularios para que cuenten como evidencia." : "No hay decisiones criticas de direccion en este momento."}</p>
         <div class="row-actions">
-          <button class="secondary-button" data-today-action="review" type="button">Abrir revision</button>
+          <button class="secondary-button" data-today-action="management-review" type="button">Preparar 9.3</button>
+          <button class="secondary-button" data-today-action="review" type="button">Revision humana</button>
         </div>
       </article>
     </div>`;
@@ -627,6 +629,10 @@ function renderTodayWork() {
   });
   container.querySelector("[data-today-action='diagnostic']")?.addEventListener("click", () => showView("diagnostico"));
   container.querySelector("[data-today-action='review']")?.addEventListener("click", () => showView("revision_humana"));
+  container.querySelector("[data-today-action='management-review']")?.addEventListener("click", () => {
+    addManagementReview();
+    showView("revision");
+  });
 }
 
 function renderOperationReadinessSummary() {
@@ -3158,7 +3164,7 @@ function createManagementReviewActions(index) {
     priority: "media",
     cause: review.summary
   }));
-  const decisionActions = (review.operationalDecisions || []).map((decision) => ({
+  const decisionActions = (review.operationalDecisions?.length ? review.operationalDecisions : managementReviewOperationalDecisions()).map((decision) => ({
     title: `Decision direccion: ${decision.actionTitle}`,
     code: decision.requirement || "9.3",
     type: decision.type || "mejora",
@@ -5858,6 +5864,20 @@ function buildAgentFindings() {
       origin: "revision direccion",
       actionTitle: "Preparar revision por la direccion"
     });
+  } else {
+    const decisions = managementReviewOperationalDecisions().filter((decision) => decision.priority !== "baja");
+    if (decisions.length) {
+      const high = decisions.filter((decision) => decision.priority === "alta").length;
+      findings.push({
+        title: "Decisiones de direccion pendientes",
+        detail: `${decisions.length} decision(es) operativas siguen abiertas para direccion; ${high} de alta prioridad.`,
+        priority: high ? "alta" : "media",
+        code: "9.3",
+        actionType: "mejora",
+        origin: "revision direccion",
+        actionTitle: "Actualizar revision por direccion y convertir decisiones en acciones"
+      });
+    }
   }
   return findings;
 }
