@@ -541,6 +541,7 @@ function renderAll() {
   renderAuditLog();
   renderSubscriptionPlans();
   renderForms();
+  renderCompanyImplementationProfile();
 }
 
 function renderMetrics() {
@@ -1114,6 +1115,88 @@ function fillCompanyForm() {
     const element = document.querySelector(`#${id}`);
     if (element && document.activeElement !== element) element.value = state.company[key] || "";
   });
+}
+
+function companyProfileGaps() {
+  const gaps = [];
+  if (!state.company.legalName) gaps.push("nombre legal");
+  if (!state.company.city && !state.company.operatingArea) gaps.push("ubicacion/zona de operacion");
+  if (!state.company.scope) gaps.push("alcance");
+  if (!state.company.stakeholders) gaps.push("partes interesadas");
+  if (!state.company.localContext) gaps.push("condiciones locales");
+  if (!state.activities.length) gaps.push("actividades");
+  const activitiesWithoutRisk = state.activities.filter((activity) => !state.risks.some((risk) => risk.activity === activity.name));
+  const activitiesWithoutEquipment = state.activities.filter((activity) => !state.equipment.some((equipment) => equipment.activity === activity.name));
+  const activitiesWithoutPolicy = state.activities.filter((activity) => !state.policies.some((policy) => policy.activity === activity.name || String(policy.coverage || "").toLowerCase().includes(String(activity.name).toLowerCase())));
+  if (activitiesWithoutRisk.length) gaps.push(`riesgos por actividad: ${activitiesWithoutRisk.map((item) => item.name).join(", ")}`);
+  if (activitiesWithoutEquipment.length) gaps.push(`equipos por actividad: ${activitiesWithoutEquipment.map((item) => item.name).join(", ")}`);
+  if (activitiesWithoutPolicy.length) gaps.push(`seguros por actividad: ${activitiesWithoutPolicy.map((item) => item.name).join(", ")}`);
+  return gaps;
+}
+
+function buildCompanyImplementationProfile() {
+  const org = state.company.legalName || state.orgName || "Organizacion por definir";
+  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || state.company.operatingArea || "Ubicacion por definir";
+  const activities = state.activities.map((activity) => {
+    const related = activityRelatedItems(activity.name);
+    const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12).map((risk) => risk.title);
+    return `- ${activity.name}: ${activity.place || "lugar por definir"}. Lider: ${activity.leader || "por definir"}. Riesgos: ${related.risks.length}; equipos: ${related.equipment.length}; guias/personas: ${related.people.length}; seguros: ${related.policies.length}; participantes/evidencias: ${related.participants.length}. ${highRisks.length ? `Riesgos altos: ${highRisks.join(", ")}.` : ""}`;
+  }).join("\n") || "- Actividades por definir.";
+  const gaps = companyProfileGaps();
+  return `PERFIL DE IMPLEMENTACION SGSTA\n\nOrganizacion: ${org}\nUbicacion/zona: ${location}\nAlcance: ${state.company.scope || "Pendiente de definir"}\nPartes interesadas: ${state.company.stakeholders || "Pendientes de definir"}\nContexto local: ${state.company.localContext || "Pendiente de documentar"}\nActividades declaradas: ${state.company.activityDescription || "Pendientes de describir"}\n\nActividades operativas:\n${activities}\n\nDatos faltantes para que el agente trabaje mejor:\n${gaps.length ? gaps.map((gap) => `- ${gap}`).join("\n") : "- No hay faltantes principales visibles."}\n\nUso del agente:\nEste perfil debe alimentar borradores, formularios, matriz de riesgos, plan de capacitacion, revision por direccion y paquetes de evidencia. La aprobacion final siempre es humana.`;
+}
+
+function renderCompanyImplementationProfile() {
+  const container = document.querySelector("#companyImplementationProfile");
+  if (!container) return;
+  const profile = state.company.profileSummary || buildCompanyImplementationProfile();
+  const gaps = companyProfileGaps();
+  container.innerHTML = `
+    <div class="company-profile-head">
+      <div>
+        <p class="eyebrow">Contexto del agente</p>
+        <h3>Perfil de implementacion</h3>
+      </div>
+      <span class="badge ${gaps.length ? "en_proceso" : "cumple"}">${gaps.length ? `${gaps.length} dato(s) faltan` : "completo"}</span>
+    </div>
+    <pre>${escapeHtml(profile)}</pre>
+    <div class="row-actions">
+      <button class="secondary-button" data-company-profile-action="evidence" type="button">Enviar a evidencias</button>
+      <button data-company-profile-action="forms" type="button">Usar en formularios</button>
+    </div>`;
+  container.querySelector("[data-company-profile-action='evidence']")?.addEventListener("click", () => {
+    addEvidenceRecord({
+      title: "Perfil de implementacion SGSTA",
+      code: "4.1",
+      source: "perfil agente",
+      status: "sugerida",
+      content: state.company.profileSummary || profile
+    });
+    addMessage("agent", "Asocie el perfil de implementacion como evidencia sugerida del contexto de la organizacion.");
+  });
+  container.querySelector("[data-company-profile-action='forms']")?.addEventListener("click", async () => {
+    await fillRequirementForms("4.1");
+    await fillRequirementForms("4.2");
+    await fillRequirementForms("4.3");
+    showView("formularios");
+  });
+}
+
+function generateCompanyImplementationProfile() {
+  state.company.profileSummary = buildCompanyImplementationProfile();
+  state.compliance["4.1"] = "en_proceso";
+  state.compliance["4.2"] = state.company.stakeholders ? "en_proceso" : "pendiente";
+  state.compliance["4.3"] = state.company.scope ? "en_proceso" : "pendiente";
+  recordAuditEvent({
+    title: "Perfil de implementacion actualizado",
+    detail: "El agente consolido empresa, ubicacion, actividades, riesgos y faltantes para alimentar el SGSTA.",
+    code: "4.1",
+    type: "perfil_empresa",
+    actor: "agente"
+  });
+  addMessage("agent", "Actualice el perfil de implementacion. Lo usare como contexto para formularios, documentos, riesgos y revision por direccion.");
+  saveState();
+  renderAll();
 }
 
 function primaryActivityName() {
@@ -6508,7 +6591,10 @@ document.querySelector("#companyForm").addEventListener("input", () => {
   saveState();
   renderMetrics();
   renderChapterProgress();
+  renderCompanyImplementationProfile();
 });
+
+document.querySelector("#generateCompanyProfile").addEventListener("click", generateCompanyImplementationProfile);
 
 document.querySelector("#chatForm").addEventListener("submit", (event) => {
   event.preventDefault();

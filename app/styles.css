@@ -931,6 +931,44 @@ textarea {
   margin: 0;
 }
 
+.company-profile-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.company-profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.company-profile-head h3,
+.company-profile-head .eyebrow {
+  margin: 0;
+}
+
+.company-profile-panel pre {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .step-row {
   display: grid;
   grid-template-columns: 42px minmax(220px, 1fr) 110px minmax(150px, auto);
