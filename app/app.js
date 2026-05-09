@@ -1133,6 +1133,29 @@ function activityOperationDecision(readiness) {
   };
 }
 
+function activityOperatingPackage(activityName) {
+  const stats = activityFormStats(activityName);
+  const forms = activityPackageTables.map((table) => {
+    const form = visibleCatalogForms(window.formCatalog || []).find((item) => item.table === table);
+    const response = formResponseForActivity(table, activityName);
+    const status = normalizedFormStatus(response?.status);
+    return {
+      table,
+      title: form?.title || table,
+      status,
+      ready: status === "aprobado"
+    };
+  });
+  const evidence = state.evidence.filter((item) => item.activity === activityName || item.linkedActivity === activityName);
+  return {
+    forms,
+    evidence,
+    approved: stats.approved,
+    total: stats.total,
+    ready: stats.approved === stats.total && evidence.some((item) => item.status === "registrada")
+  };
+}
+
 const activityPackageTables = [
   "contexto_actividades",
   "mapa_riesgos",
@@ -1881,6 +1904,7 @@ function renderActivities() {
   const selectedStats = activityFormStats(selectedActivity.name);
   const selectedReadiness = activityReadiness(selectedActivity.name);
   const selectedDecision = activityOperationDecision(selectedReadiness);
+  const selectedPackage = activityOperatingPackage(selectedActivity.name);
   container.innerHTML = `
     <div class="simple-table">
       ${state.activities.map((item, index) => {
@@ -1939,6 +1963,28 @@ function renderActivities() {
         <div class="row-actions">
           <button class="secondary-button" data-open-selected-gaps="${selectedActivity.name}" type="button">Ver brechas</button>
           <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
+        </div>
+      </div>
+      <div class="activity-package-status">
+        <div class="package-status-head">
+          <div>
+            <p class="eyebrow">Paquete para operar/ofertar</p>
+            <h3>${selectedPackage.approved}/${selectedPackage.total} formularios aprobados</h3>
+            <p class="muted">${selectedPackage.ready ? "Paquete documental listo. Mantener vigencias." : "El agente puede preparar borradores, pero falta revision/aprobacion humana."}</p>
+          </div>
+          <span class="badge ${selectedPackage.ready ? "cumple" : "en_proceso"}">${selectedPackage.ready ? "listo" : "en preparacion"}</span>
+        </div>
+        <div class="package-checklist">
+          ${selectedPackage.forms.map((item) => `
+            <div class="package-check ${item.ready ? "ready" : "pending"}">
+              <span>${item.ready ? "OK" : "Pendiente"}</span>
+              <strong>${item.title}</strong>
+              <small>${item.status}</small>
+            </div>`).join("")}
+        </div>
+        <div class="row-actions">
+          <button data-prepare-activity-package="${selectedActivity.name}" type="button">Preparar paquete</button>
+          <button class="secondary-button" data-open-activity-forms="${selectedActivity.name}" type="button">Ver formularios</button>
         </div>
       </div>
       <div class="report-summary">
@@ -2049,6 +2095,13 @@ function renderActivities() {
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
+  container.querySelector("[data-prepare-activity-package]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivityPackage));
+  container.querySelector("[data-open-activity-forms]")?.addEventListener("click", (event) => {
+    state.selectedFormActivity = event.currentTarget.dataset.openActivityForms;
+    state.formFilters.search = event.currentTarget.dataset.openActivityForms;
+    state.formFilters.status = "todos";
+    showView("formularios");
+  });
   container.querySelector("[data-open-selected-gaps]")?.addEventListener("click", () => showView("brechas_actividad"));
   container.querySelector("[data-create-selected-gap-actions]")?.addEventListener("click", (event) => {
     const activityName = event.currentTarget.dataset.createSelectedGapActions;

@@ -394,6 +394,54 @@ textarea {
   font-size: 12px;
 }
 
+.activity-package-status {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.package-status-head {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.package-status-head h3,
+.package-status-head p {
+  margin: 0;
+}
+
+.package-checklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.package-check {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.package-check.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.package-check span,
+.package-check small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .panel {
   padding: 18px;
   min-width: 0;
@@ -1750,7 +1798,8 @@ textarea {
   .audit-grid,
   .catalog-summary,
   .gap-guide-grid,
-  .queue-grid {
+  .queue-grid,
+  .package-checklist {
     grid-template-columns: 1fr;
   }
 
