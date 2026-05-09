@@ -608,6 +608,76 @@ textarea {
   gap: 12px;
 }
 
+.action-closure-board {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.closure-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.closure-board-head h3,
+.closure-board-head .eyebrow {
+  margin: 0;
+}
+
+.closure-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.closure-stage-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.closure-stage-grid span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.closure-stage-grid strong {
+  font-size: 22px;
+}
+
+.closure-next-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.closure-next-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.closure-next-card > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.closure-next-card p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .action-card-head {
   display: flex;
   justify-content: space-between;

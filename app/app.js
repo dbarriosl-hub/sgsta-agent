@@ -5026,11 +5026,107 @@ function renderActions() {
       <div class="report-card"><span>Eficaces</span><strong>${efficacy}</strong></div>
       <div class="report-card"><span>Pend. eficacia</span><strong>${pendingEfficacy}</strong></div>`;
   }
+  renderActionClosureBoard();
   renderActionWorkQueue();
   container.innerHTML = state.actions.length
     ? state.actions.map((item, index) => actionCardTemplate(item, index)).join("")
     : `<div class="muted">No hay acciones registradas.</div>`;
   bindActionControls(container);
+}
+
+function actionClosureStage(action) {
+  if (action.status === "cerrada") return { key: "closed", label: "Cerrada", priority: 0 };
+  if (!action.responsible || !action.dueDate) return { key: "assign", label: "Asignar", priority: 4 };
+  if (!action.followUp) return { key: "follow", label: "Seguimiento", priority: 3 };
+  if (!action.evidence) return { key: "evidence", label: "Evidencia", priority: 3 };
+  if (!action.efficacyVerification || action.efficacyStatus !== "eficaz") return { key: "efficacy", label: "Eficacia", priority: 2 };
+  return { key: "ready", label: "Lista cierre", priority: 1 };
+}
+
+function renderActionClosureBoard() {
+  const container = document.querySelector("#actionClosureBoard");
+  if (!container) return;
+  const open = state.actions
+    .map((action, index) => ({ action, index, stage: actionClosureStage(action) }))
+    .filter((item) => item.action.status !== "cerrada");
+  if (!open.length) {
+    container.innerHTML = "";
+    return;
+  }
+  const stageCounts = {
+    assign: open.filter((item) => item.stage.key === "assign").length,
+    follow: open.filter((item) => item.stage.key === "follow").length,
+    evidence: open.filter((item) => item.stage.key === "evidence").length,
+    efficacy: open.filter((item) => item.stage.key === "efficacy").length,
+    ready: open.filter((item) => item.stage.key === "ready").length
+  };
+  const nextItems = open
+    .filter((item) => item.stage.key !== "ready")
+    .sort((a, b) => b.stage.priority - a.stage.priority || actionPriorityScore(b.action) - actionPriorityScore(a.action))
+    .slice(0, 3);
+  container.innerHTML = `
+    <div class="closure-board-head">
+      <div>
+        <p class="eyebrow">Ruta de cierre 10.1-10.2</p>
+        <h3>Que falta para cerrar acciones</h3>
+      </div>
+      <span class="badge requisito">${open.length} abiertas</span>
+    </div>
+    <div class="closure-stage-grid">
+      <div><span>Asignar</span><strong>${stageCounts.assign}</strong></div>
+      <div><span>Seguimiento</span><strong>${stageCounts.follow}</strong></div>
+      <div><span>Evidencia real</span><strong>${stageCounts.evidence}</strong></div>
+      <div><span>Eficacia</span><strong>${stageCounts.efficacy}</strong></div>
+      <div><span>Listas cierre</span><strong>${stageCounts.ready}</strong></div>
+    </div>
+    ${nextItems.length ? `
+      <div class="closure-next-grid">
+        ${nextItems.map(({ action, index, stage }) => `
+          <article class="closure-next-card">
+            <div>
+              <span class="badge requisito">${action.code || "10.1"}</span>
+              <span class="badge ${action.priority === "alta" ? "no_cumple" : "en_proceso"}">${stage.label}</span>
+            </div>
+            <strong>${escapeHtml(action.title || "Accion sin titulo")}</strong>
+            <p>${simpleActionNextStep(action)}</p>
+            <div class="row-actions">
+              <button class="secondary-button" data-action-prepare-followup="${index}" type="button">Preparar seguimiento</button>
+              <button data-action-focus="${index}" type="button">Ver accion</button>
+            </div>
+          </article>`).join("")}
+      </div>` : `<p class="muted">Las acciones abiertas estan listas para cierre humano.</p>`}`;
+  container.querySelectorAll("[data-action-prepare-followup]").forEach((button) => {
+    button.addEventListener("click", () => prepareActionFollowUp(Number(button.dataset.actionPrepareFollowup)));
+  });
+  container.querySelectorAll("[data-action-focus]").forEach((button) => {
+    button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionFocus)));
+  });
+}
+
+function prepareActionFollowUp(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  assignActionDefaults(action);
+  if (!action.followUp) action.followUp = "Seguimiento iniciado por el agente. Validar avance real y adjuntar evidencia soporte.";
+  if (!action.efficacyVerification) action.efficacyVerification = "Pendiente de verificacion humana despues de implementar la accion.";
+  if (!action.efficacyStatus) action.efficacyStatus = "pendiente";
+  action.updatedAt = today();
+  recordAuditEvent({
+    title: "Seguimiento de accion preparado",
+    detail: `${action.title} quedo con responsable, fecha y seguimiento inicial. Falta evidencia real y aprobacion humana.`,
+    code: action.code,
+    type: "accion_gestion",
+    actor: "agente"
+  });
+  addMessage("agent", `Prepare seguimiento para "${action.title}". No adjunte evidencia ni cerre la accion; eso requiere validacion humana.`);
+  saveState();
+  renderAll();
+}
+
+function focusActionCard(index) {
+  showView("acciones");
+  const card = document.querySelector(`[data-action-card="${index}"]`);
+  card?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function actionPriorityScore(action) {
@@ -5103,8 +5199,7 @@ function renderActionWorkQueue() {
     button.addEventListener("click", () => {
       const action = state.actions[Number(button.dataset.queueFocus)];
       if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
-      showView("acciones");
-      document.querySelector("#actionsTable")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusActionCard(Number(button.dataset.queueFocus));
     });
   });
 }
@@ -5115,7 +5210,7 @@ function actionCardTemplate(item, index) {
   const canClose = actionReadyToClose(item);
   const statusClass = item.status === "cerrada" ? "cumple" : item.status === "pendiente_eficacia" ? "no_cumple" : "en_proceso";
   return `
-    <article class="action-management-card">
+    <article class="action-management-card" data-action-card="${index}">
       <div class="action-card-head">
         <div>
           <span class="badge requisito">${item.code || "10.1"}</span>
