@@ -1208,6 +1208,52 @@ function activityDepartureChecklist(activityName) {
   ];
 }
 
+function departureChecklistActionPayload(activityName, item) {
+  const codeByKey = {
+    guide: "7.2",
+    risk: "6.1.2",
+    equipment: "7.1",
+    insurance: "6.1.3",
+    participants: "7.4.3",
+    emergency: "8.2",
+    forms: "7.5"
+  };
+  return {
+    title: `Resolver antes de salir: ${item.label} - ${activityName}`,
+    code: codeByKey[item.key] || "8.1",
+    status: "abierta",
+    type: item.key === "risk" || item.key === "insurance" || item.key === "equipment" ? "preventiva" : "tarea",
+    origin: "lista antes de salir",
+    priority: ["risk", "equipment", "insurance", "guide"].includes(item.key) ? "alta" : "media",
+    responsible: state.ownerName || "Responsable SGSTA",
+    dueDate: "",
+    cause: item.detail,
+    immediateCorrection: "",
+    followUp: "",
+    evidence: "",
+    efficacyVerification: "",
+    efficacyStatus: "pendiente",
+    relatedActivity: activityName,
+    sourceDetail: `Antes de salir: ${item.label}`,
+    departureKey: item.key,
+    createdAt: today()
+  };
+}
+
+function createDepartureChecklistActions(activityName) {
+  let created = 0;
+  activityDepartureChecklist(activityName).filter((item) => !item.ok).forEach((item) => {
+    const exists = state.actions.some((action) => action.status !== "cerrada" && action.relatedActivity === activityName && action.departureKey === item.key);
+    if (!exists) {
+      state.actions.unshift(departureChecklistActionPayload(activityName, item));
+      created += 1;
+    }
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) desde la lista antes de salir de ${activityName}.` : `No cree acciones nuevas: la lista antes de salir de ${activityName} ya tenia acciones abiertas.`);
+  saveState();
+  renderAll();
+}
+
 const activityPackageTables = [
   "contexto_actividades",
   "mapa_riesgos",
@@ -2057,6 +2103,10 @@ function renderActivities() {
               <small>${item.detail}</small>
             </div>`).join("")}
         </div>
+        <div class="row-actions">
+          <button data-create-departure-actions="${selectedActivity.name}" type="button">Crear acciones de lo que falta</button>
+          <button class="secondary-button" data-open-departure-actions type="button">Ver acciones</button>
+        </div>
       </div>
       <div class="report-summary">
         <div class="report-card"><span>Riesgos</span><strong>${selectedRelated.risks.length}</strong></div>
@@ -2173,6 +2223,8 @@ function renderActivities() {
     state.formFilters.status = "todos";
     showView("formularios");
   });
+  container.querySelector("[data-create-departure-actions]")?.addEventListener("click", (event) => createDepartureChecklistActions(event.currentTarget.dataset.createDepartureActions));
+  container.querySelector("[data-open-departure-actions]")?.addEventListener("click", () => showView("acciones"));
   container.querySelector("[data-open-selected-gaps]")?.addEventListener("click", () => showView("brechas_actividad"));
   container.querySelector("[data-create-selected-gap-actions]")?.addEventListener("click", (event) => {
     const activityName = event.currentTarget.dataset.createSelectedGapActions;
