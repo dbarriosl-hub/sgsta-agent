@@ -511,6 +511,7 @@ function renderAll() {
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
   renderMetrics();
+  renderOperationReadinessSummary();
   renderTodayWork();
   renderRequirements();
   renderClosurePackages();
@@ -626,6 +627,44 @@ function renderTodayWork() {
   });
   container.querySelector("[data-today-action='diagnostic']")?.addEventListener("click", () => showView("diagnostico"));
   container.querySelector("[data-today-action='review']")?.addEventListener("click", () => showView("revision_humana"));
+}
+
+function renderOperationReadinessSummary() {
+  const container = document.querySelector("#operationReadinessSummary");
+  if (!container) return;
+  const readiness = state.activities.map((activity) => {
+    const status = activityReadiness(activity.name);
+    const decision = activityOperationDecision(status);
+    return { activity, status, decision };
+  });
+  const ready = readiness.filter((item) => item.decision.badge === "cumple").length;
+  const blocked = readiness.filter((item) => item.decision.badge === "no_cumple").length;
+  const review = readiness.filter((item) => item.decision.badge === "en_proceso").length;
+  const priority = readiness
+    .filter((item) => item.decision.badge !== "cumple")
+    .sort((a, b) => b.status.high - a.status.high || a.status.score - b.status.score)[0];
+  container.innerHTML = `
+    <div class="operation-readiness-grid">
+      <div class="operation-score-card ready"><span>Listas para ofertar</span><strong>${ready}</strong></div>
+      <div class="operation-score-card review"><span>Con revision</span><strong>${review}</strong></div>
+      <div class="operation-score-card blocked"><span>No ofertar todavia</span><strong>${blocked}</strong></div>
+      <div class="operation-priority-card">
+        <span class="badge ${priority ? priority.decision.badge : "cumple"}">${priority ? priority.decision.label : "Sin bloqueos"}</span>
+        <strong>${priority ? priority.activity.name : "Actividades en buen estado"}</strong>
+        <p>${priority ? priority.decision.summary : "Mantener vigencias, evidencias y revision periodica."}</p>
+        <div class="row-actions">
+          <button class="secondary-button" data-operation-open type="button">${priority ? "Ver actividad" : "Ver actividades"}</button>
+          ${priority ? `<button data-operation-actions type="button">Crear acciones</button>` : ""}
+        </div>
+      </div>
+    </div>`;
+  container.querySelector("[data-operation-open]")?.addEventListener("click", () => {
+    if (priority) state.selectedActivityName = priority.activity.name;
+    showView("actividades");
+  });
+  container.querySelector("[data-operation-actions]")?.addEventListener("click", () => {
+    if (priority) createDepartureChecklistActions(priority.activity.name);
+  });
 }
 
 function renderChapterProgress() {

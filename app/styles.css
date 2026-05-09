@@ -316,6 +316,56 @@ textarea {
   margin-bottom: 16px;
 }
 
+.operation-summary-panel {
+  margin-bottom: 16px;
+}
+
+.operation-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 0.5fr)) minmax(260px, 1.2fr);
+  gap: 10px;
+}
+
+.operation-score-card,
+.operation-priority-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.operation-score-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.operation-score-card strong {
+  font-size: 30px;
+}
+
+.operation-score-card.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.operation-score-card.review {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.operation-score-card.blocked {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.operation-priority-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
 .today-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 0.9fr));
@@ -1818,6 +1868,7 @@ textarea {
 
   nav,
   .metrics,
+  .operation-readiness-grid,
   .phva-grid,
   .plans-grid,
   .today-grid,
