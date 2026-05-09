@@ -3012,6 +3012,80 @@ function renderDocumentPreview() {
     <pre>${escapeHtml(content)}</pre>`;
 }
 
+function selectedDocument() {
+  return state.documents[state.selectedDocumentIndex] || state.documents[0] || null;
+}
+
+function documentFilename(doc) {
+  return `${(doc?.title || "documento_sgsta").toLowerCase().replaceAll(" ", "_").replaceAll("/", "-")}.txt`;
+}
+
+function downloadSelectedDocument() {
+  const doc = selectedDocument();
+  if (!doc) return;
+  const content = doc.content || "Documento sin borrador generado.";
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = documentFilename(doc);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Documento descargado",
+    detail: `${doc.title} fue descargado en formato TXT.`,
+    code: doc.code,
+    type: "documento",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function printSelectedDocument() {
+  const doc = selectedDocument();
+  if (!doc) return;
+  const content = doc.content || "Documento sin borrador generado.";
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    addMessage("agent", "No pude abrir la ventana de impresion. Revisa si el navegador bloqueo ventanas emergentes.");
+    return;
+  }
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(doc.title)}</title>
+        <style>
+          body { font-family: Segoe UI, Arial, sans-serif; margin: 32px; color: #17202a; }
+          h1 { font-size: 22px; margin-bottom: 8px; }
+          .meta { color: #52637a; margin-bottom: 20px; }
+          pre { white-space: pre-wrap; line-height: 1.5; font-family: Segoe UI, Arial, sans-serif; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(doc.title)}</h1>
+        <div class="meta">Requisito ${escapeHtml(doc.code || "")} - Estado ${escapeHtml(doc.status || "borrador")}</div>
+        <pre>${escapeHtml(content)}</pre>
+      </body>
+    </html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  recordAuditEvent({
+    title: "Documento enviado a impresion",
+    detail: `${doc.title} fue preparado para impresion.`,
+    code: doc.code,
+    type: "documento",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function renderIncidents() {
   const container = document.querySelector("#incidentsTable");
   container.innerHTML = state.incidents.length
@@ -6712,6 +6786,8 @@ document.querySelector("#addFormResponse").addEventListener("click", () => {
 document.querySelector("#addAction").addEventListener("click", () => createAction("Nueva accion de implementacion", "4.4", "tarea", "manual"));
 
 document.querySelector("#documentToEvidence").addEventListener("click", convertSelectedDocumentToEvidence);
+document.querySelector("#printDocument").addEventListener("click", printSelectedDocument);
+document.querySelector("#downloadDocument").addEventListener("click", downloadSelectedDocument);
 document.querySelector("#suggestEvidence").addEventListener("click", suggestNextEvidence);
 document.querySelector("#addEvidence").addEventListener("click", () => {
   const pending = requirements.find((item) => !state.evidence.some((evidence) => evidence.code === item.code)) || requirements[0];
