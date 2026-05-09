@@ -1156,6 +1156,58 @@ function activityOperatingPackage(activityName) {
   };
 }
 
+function activityDepartureChecklist(activityName) {
+  const related = activityRelatedItems(activityName);
+  const controls = activityControlStatus(activityName);
+  const stats = activityFormStats(activityName);
+  const hasEmergencyPlan = Boolean(formResponseForActivity("plan_emergencia", activityName));
+  const hasHighRiskOpen = related.risks.some((risk) => riskLevel(risk) >= 12);
+  return [
+    {
+      key: "guide",
+      label: "Guia competente asignado",
+      ok: controls.guide,
+      detail: controls.guide ? "Guia/persona competente asociado a la actividad." : "Falta guia competente o evidencia de competencia."
+    },
+    {
+      key: "risk",
+      label: "Riesgos revisados",
+      ok: controls.risks && !hasHighRiskOpen,
+      detail: !controls.risks ? "Falta matriz de riesgos de la actividad." : hasHighRiskOpen ? "Hay riesgo alto que requiere tratamiento." : "Riesgos registrados sin alerta alta."
+    },
+    {
+      key: "equipment",
+      label: "Equipos listos",
+      ok: controls.equipment,
+      detail: controls.equipment ? "Equipos operativos asociados." : "Falta equipo operativo, inspeccion o mantenimiento."
+    },
+    {
+      key: "insurance",
+      label: "Seguro vigente",
+      ok: controls.insurance,
+      detail: controls.insurance ? "Poliza vigente con soporte." : "Falta cobertura vigente o documento soporte."
+    },
+    {
+      key: "participants",
+      label: "Participantes informados",
+      ok: controls.participants,
+      detail: controls.participants ? "Informacion/consentimiento externo cubre antes, durante y despues." : "Falta evidencia ISO 21103 de informacion o consentimiento."
+    },
+    {
+      key: "emergency",
+      label: "Plan de emergencia",
+      ok: hasEmergencyPlan,
+      detail: hasEmergencyPlan ? "Plan de emergencia preparado para la actividad." : "Falta formulario/plan de emergencia de la actividad."
+    },
+    {
+      key: "forms",
+      label: "Paquete documental",
+      ok: stats.approved === stats.total,
+      detail: stats.approved === stats.total ? "Formularios operativos aprobados." : `${stats.pending + stats.draft} formulario(s) pendientes de aprobar o preparar.`
+    }
+  ];
+}
+
 const activityPackageTables = [
   "contexto_actividades",
   "mapa_riesgos",
@@ -1905,6 +1957,7 @@ function renderActivities() {
   const selectedReadiness = activityReadiness(selectedActivity.name);
   const selectedDecision = activityOperationDecision(selectedReadiness);
   const selectedPackage = activityOperatingPackage(selectedActivity.name);
+  const selectedChecklist = activityDepartureChecklist(selectedActivity.name);
   container.innerHTML = `
     <div class="simple-table">
       ${state.activities.map((item, index) => {
@@ -1985,6 +2038,24 @@ function renderActivities() {
         <div class="row-actions">
           <button data-prepare-activity-package="${selectedActivity.name}" type="button">Preparar paquete</button>
           <button class="secondary-button" data-open-activity-forms="${selectedActivity.name}" type="button">Ver formularios</button>
+        </div>
+      </div>
+      <div class="departure-checklist">
+        <div class="package-status-head">
+          <div>
+            <p class="eyebrow">Antes de salir</p>
+            <h3>Lista rapida de operacion</h3>
+            <p class="muted">Lectura practica para decidir si la actividad puede ejecutarse sin improvisar controles.</p>
+          </div>
+          <span class="badge ${selectedChecklist.every((item) => item.ok) ? "cumple" : "en_proceso"}">${selectedChecklist.filter((item) => item.ok).length}/${selectedChecklist.length}</span>
+        </div>
+        <div class="departure-grid">
+          ${selectedChecklist.map((item) => `
+            <div class="departure-item ${item.ok ? "ready" : "pending"}">
+              <span>${item.ok ? "OK" : "Falta"}</span>
+              <strong>${item.label}</strong>
+              <small>${item.detail}</small>
+            </div>`).join("")}
         </div>
       </div>
       <div class="report-summary">
