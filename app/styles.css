@@ -397,6 +397,97 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.demo-readiness-panel {
+  margin-bottom: 16px;
+}
+
+.demo-readiness-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+.demo-score {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+}
+
+.demo-score.ready {
+  background: #f0fdf4;
+  color: var(--ok);
+}
+
+.demo-score.review {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.demo-score.blocked {
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.demo-score strong {
+  font-size: 30px;
+}
+
+.demo-score span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.demo-readiness-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.demo-readiness-main h3,
+.demo-readiness-main p {
+  margin: 0;
+}
+
+.demo-readiness-main h3 {
+  margin-top: 8px;
+}
+
+.demo-readiness-main p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.demo-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.demo-check {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+}
+
+.demo-check.done {
+  background: #f0fdf4;
+}
+
 .activity-decision-mini {
   display: grid;
   gap: 5px;
@@ -2226,6 +2317,7 @@ textarea {
   nav,
   .metrics,
   .operation-readiness-grid,
+  .demo-readiness-card,
   .phva-grid,
   .plans-grid,
   .today-grid,
@@ -2253,6 +2345,10 @@ textarea {
   .package-checklist,
   .departure-grid {
     grid-template-columns: 1fr;
+  }
+
+  .demo-readiness-main {
+    display: grid;
   }
 
   .topbar {

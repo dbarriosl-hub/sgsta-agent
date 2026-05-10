@@ -511,6 +511,7 @@ function renderAll() {
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
   renderMetrics();
+  renderDemoReadiness();
   renderOperationReadinessSummary();
   renderTodayWork();
   renderRequirements();
@@ -560,6 +561,82 @@ function renderMetrics() {
   document.querySelector("#metricPeoplePending").textContent = peoplePending;
   document.querySelector("#metricTraining").textContent = trainingOpen;
   document.querySelector("#metricPoliciesDue").textContent = policiesDue;
+}
+
+function demoReadinessStatus() {
+  const progress = implementationProgress();
+  const profileGaps = companyProfileGaps();
+  const activityReadinessItems = state.activities.map((activity) => {
+    const status = activityReadiness(activity.name);
+    return { activity, status, decision: activityOperationDecision(status) };
+  });
+  const activitiesWithAnyControl = activityReadinessItems.filter((item) => item.status.gaps.length < 7).length;
+  const documentsWithContent = state.documents.filter((doc) => doc.content).length;
+  const evidencePackages = requirements.map(evidencePackageForRequirement);
+  const requirementsWithSupport = evidencePackages.filter((item) => item.score > 0).length;
+  const hasManagementReview = state.managementReviews.length > 0;
+  const hasActions = state.actions.length > 0;
+  const checks = [
+    { key: "empresa", label: "Perfil de empresa", done: profileGaps.length <= 2, action: "Completar perfil de empresa", view: "empresa" },
+    { key: "actividades", label: "Actividades cargadas", done: state.activities.length > 0 && activitiesWithAnyControl > 0, action: "Registrar actividades y controles", view: "actividades" },
+    { key: "evidencias", label: "Evidencias iniciales", done: requirementsWithSupport >= 6, action: "Preparar paquetes de evidencia", view: "evidencias" },
+    { key: "documentos", label: "Documentos generados", done: documentsWithContent >= 3, action: "Generar documentos base", view: "documentos" },
+    { key: "acciones", label: "Acciones trazables", done: hasActions, action: "Crear acciones del plan", view: "acciones" },
+    { key: "direccion", label: "Revision direccion", done: hasManagementReview, action: "Preparar revision 9.3", view: "revision" }
+  ];
+  const completed = checks.filter((item) => item.done).length;
+  const score = Math.round((completed / checks.length) * 100);
+  const blockedActivities = activityReadinessItems.filter((item) => item.decision.badge === "no_cumple").length;
+  const label = score >= 80 ? "Demo lista" : score >= 50 ? "Demo con explicacion" : "Preparar antes";
+  return { progress, checks, completed, total: checks.length, score, blockedActivities, label };
+}
+
+function renderDemoReadiness() {
+  const container = document.querySelector("#demoReadiness");
+  if (!container) return;
+  const demo = demoReadinessStatus();
+  const next = demo.checks.find((item) => !item.done) || demo.checks[0];
+  container.innerHTML = `
+    <div class="demo-readiness-card">
+      <div class="demo-score ${demo.score >= 80 ? "ready" : demo.score >= 50 ? "review" : "blocked"}">
+        <strong>${demo.score}%</strong>
+        <span>${demo.label}</span>
+      </div>
+      <div class="demo-readiness-main">
+        <div>
+          <span class="badge ${demo.score >= 80 ? "cumple" : demo.score >= 50 ? "en_proceso" : "no_cumple"}">${demo.completed}/${demo.total}</span>
+          <h3>${demo.score >= 80 ? "Se puede mostrar a un cliente piloto" : "Faltan piezas para una demo solida"}</h3>
+          <p>Implementacion PHVA: ${demo.progress.pct}%. Actividades bloqueadas: ${demo.blockedActivities}. Siguiente ajuste: ${next.action}.</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button" data-demo-open="${next.view}" type="button">Abrir pendiente</button>
+          <button data-demo-prepare type="button">Preparar demo</button>
+        </div>
+      </div>
+    </div>
+    <div class="demo-check-grid">
+      ${demo.checks.map((item) => `
+        <div class="demo-check ${item.done ? "done" : ""}">
+          <span class="badge ${item.done ? "cumple" : "pendiente"}">${item.done ? "ok" : "falta"}</span>
+          <strong>${item.label}</strong>
+        </div>`).join("")}
+    </div>`;
+  container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
+  container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
+}
+
+function prepareDemoPackage() {
+  generateCompanyImplementationProfile();
+  if (state.documents.filter((doc) => doc.content).length < 3) {
+    generateDocumentDraft();
+    generateDocumentDraft();
+    generateDocumentDraft();
+  }
+  if (!state.managementReviews.length) addManagementReview();
+  createImplementationWorkPlanActions();
+  addMessage("agent", "Prepare un paquete minimo de demo: perfil, documentos base, revision direccion y acciones del plan.");
+  saveState();
+  renderAll();
 }
 
 function todayWorkItems() {
