@@ -3868,6 +3868,7 @@ function renderPolicies() {
 function renderParticipantEvidence() {
   const container = document.querySelector("#participantsTable");
   const summary = document.querySelector("#participantsSummary");
+  renderParticipantJourneyMatrix();
   if (summary) {
     const coveredActivities = state.activities.filter((activity) => participantActivityInformationIsComplete(activity.name)).length;
     const complete = state.participantEvidence.filter(participantEvidenceIsComplete).length;
@@ -3950,6 +3951,148 @@ function renderParticipantEvidence() {
       renderAll();
     });
   });
+}
+
+function participantJourneyRows() {
+  return state.activities.map((activity) => {
+    const evidences = state.participantEvidence.filter((item) => itemActivityName(item) === activity.name);
+    const completeEvidences = evidences.filter(participantEvidenceIsComplete);
+    const coverage = participantActivityInformationCoverage(activity.name);
+    const missing = [];
+    if (!coverage.before) missing.push("antes");
+    if (!coverage.during) missing.push("durante");
+    if (!coverage.after) missing.push("despues");
+    const incomplete = evidences.filter((item) => !participantEvidenceIsComplete(item));
+    if (incomplete.length) missing.push("soportes incompletos");
+    const scoreParts = [
+      coverage.before,
+      coverage.during,
+      coverage.after,
+      evidences.length > 0,
+      evidences.length === completeEvidences.length && evidences.length > 0
+    ];
+    const score = Math.round((scoreParts.filter(Boolean).length / scoreParts.length) * 100);
+    return { activity, evidences, completeEvidences, coverage, incomplete, missing, score };
+  });
+}
+
+function participantJourneyText() {
+  return [
+    "Matriz de participantes ISO 21103 - SGSTA Agent",
+    "",
+    "Criterio:",
+    "La plataforma no guarda datos sensibles del participante en el MVP. Conserva evidencia externa/enlace y verifica informacion comunicada antes, durante y despues de la actividad.",
+    "",
+    ...participantJourneyRows().flatMap((row) => [
+      `${row.activity.name} (${row.score}%):`,
+      `- Antes: ${row.coverage.before ? "cubierto" : "pendiente"}`,
+      `- Durante: ${row.coverage.during ? "cubierto" : "pendiente"}`,
+      `- Despues: ${row.coverage.after ? "cubierto" : "pendiente"}`,
+      `- Evidencias completas: ${row.completeEvidences.length}/${row.evidences.length}`,
+      `- Brechas: ${row.missing.join(", ") || "sin brechas visibles"}`,
+      ""
+    ])
+  ].join("\n");
+}
+
+function downloadParticipantJourneyMatrix() {
+  const blob = new Blob([participantJourneyText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "matriz_participantes_iso21103.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Matriz de participantes descargada",
+    detail: "Se descargo la matriz ISO 21103 de participantes por actividad.",
+    code: "7.4.3",
+    type: "participantes",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createParticipantJourneyActions() {
+  let created = 0;
+  participantJourneyRows().forEach((row) => {
+    if (!row.missing.length) return;
+    const title = `Participantes ISO 21103: completar ${row.activity.name}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: "7.4.3",
+      status: "abierta",
+      type: "preventiva",
+      origin: "participantes",
+      priority: row.missing.includes("antes") ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: `La actividad ${row.activity.name} presenta brechas ISO 21103: ${row.missing.join(", ")}. Mantener datos sensibles fuera de la plataforma y enlazar evidencia externa.`,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      relatedActivity: row.activity.name,
+      sourceDetail: "Matriz participantes ISO 21103",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  state.compliance["7.4.3"] = "en_proceso";
+  recordAuditEvent({
+    title: "Acciones ISO 21103 creadas",
+    detail: `Se crearon ${created} accion(es) desde la matriz de participantes.`,
+    code: "7.4.3",
+    type: "participantes",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) preventivas desde la matriz de participantes ISO 21103.` : "La matriz ISO 21103 no encontro nuevas acciones o ya estaban abiertas.");
+  saveState();
+  renderAll();
+}
+
+function renderParticipantJourneyMatrix() {
+  const container = document.querySelector("#participantJourneyMatrix");
+  if (!container) return;
+  const rows = participantJourneyRows();
+  const average = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0;
+  const blocked = rows.filter((row) => row.missing.length).length;
+  container.innerHTML = `
+    <article class="participant-matrix-card">
+      <div class="competency-head">
+        <div>
+          <p class="eyebrow">Matriz ISO 21103</p>
+          <h3>Informacion del participante sin datos sensibles</h3>
+          <p>Verifica evidencia externa antes, durante y despues de la actividad.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${average}%</strong>
+          <span>${blocked} con brecha</span>
+        </div>
+      </div>
+      <div class="competency-grid">
+        ${rows.map((row) => `
+          <article class="competency-row ${row.missing.length ? "pending" : "ready"}">
+            <div>
+              <span class="badge requisito">7.4.3</span>
+              <span class="badge ${row.missing.length ? "no_cumple" : "cumple"}">${row.score}%</span>
+            </div>
+            <strong>${row.activity.name}</strong>
+            <p>Antes ${row.coverage.before ? "OK" : "falta"} - Durante ${row.coverage.during ? "OK" : "falta"} - Despues ${row.coverage.after ? "OK" : "falta"}</p>
+            <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Trayecto del participante cubierto."}</small>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-participant-matrix-download type="button">Descargar matriz</button>
+        <button data-participant-matrix-actions type="button">Crear acciones</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-participant-matrix-download]")?.addEventListener("click", downloadParticipantJourneyMatrix);
+  container.querySelector("[data-participant-matrix-actions]")?.addEventListener("click", createParticipantJourneyActions);
 }
 
 function detectParticipantGaps() {
