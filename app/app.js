@@ -620,9 +620,42 @@ function renderDemoReadiness() {
           <span class="badge ${item.done ? "cumple" : "pendiente"}">${item.done ? "ok" : "falta"}</span>
           <strong>${item.label}</strong>
         </div>`).join("")}
-    </div>`;
+    </div>
+    ${renderDemoScript(demo)}`;
   container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
+  container.querySelectorAll("[data-demo-step]").forEach((button) => {
+    button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
+  });
+}
+
+function renderDemoScript(demo) {
+  const steps = [
+    { view: "empresa", title: "1. Perfil real", detail: "Mostrar ubicacion, alcance, actividades y faltantes que usa el agente." },
+    { view: "brechas_actividad", title: "2. Brechas por actividad", detail: "Ensenar que rafting, senderismo o cuatrimotos se revisan por separado." },
+    { view: "evidencias", title: "3. Paquetes de evidencia", detail: "Mostrar como formularios, documentos y acciones cuentan para cada requisito." },
+    { view: "documentos", title: "4. Documentos generados", detail: "Abrir alcance, politica, procedimiento o emergencia y descargar/imprimir." },
+    { view: "revision", title: "5. Direccion decide", detail: "Mostrar revision 9.3 con decisiones: operar, no ofertar, recursos y acciones." },
+    { view: "acciones", title: "6. Mejora controlada", detail: "Cerrar acciones solo con seguimiento, evidencia y eficacia." }
+  ];
+  return `
+    <div class="demo-script">
+      <div class="demo-script-head">
+        <div>
+          <p class="eyebrow">Guion de demo</p>
+          <h3>Como mostrar valor en 10 minutos</h3>
+        </div>
+        <span class="badge ${demo.score >= 80 ? "cumple" : "en_proceso"}">${demo.label}</span>
+      </div>
+      <div class="demo-script-grid">
+        ${steps.map((step) => `
+          <article class="demo-script-step">
+            <strong>${step.title}</strong>
+            <p>${step.detail}</p>
+            <button class="secondary-button" data-demo-step="${step.view}" type="button">Abrir</button>
+          </article>`).join("")}
+      </div>
+    </div>`;
 }
 
 function prepareDemoPackage() {
