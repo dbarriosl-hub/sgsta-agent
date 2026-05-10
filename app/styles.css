@@ -397,6 +397,22 @@ textarea {
   gap: 8px;
 }
 
+.system-health-next ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.system-health-next li {
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  padding-left: 8px;
+}
+
 .operation-summary-panel {
   margin-bottom: 16px;
 }

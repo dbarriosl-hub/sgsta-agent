@@ -833,6 +833,7 @@ function renderSystemHealthSummary() {
   const container = document.querySelector("#systemHealthSummary");
   if (!container) return;
   const health = systemHealthStatus();
+  const weekPlan = systemHealthWeekPlan(health).slice(0, 3);
   container.innerHTML = `
     <div class="system-health-card ${health.tone}">
       <div>
@@ -854,14 +855,126 @@ function renderSystemHealthSummary() {
       <div class="system-health-next">
         <span>Siguiente paso</span>
         <strong>${escapeHtml(health.next)}</strong>
+        <ul>
+          ${weekPlan.map((item) => `<li>${escapeHtml(item.title)}</li>`).join("")}
+        </ul>
         <div class="row-actions">
           <button data-health-agent type="button">Usar agente</button>
           <button class="secondary-button" data-health-direction type="button">Ver direccion</button>
+          <button class="secondary-button" data-health-plan type="button">Descargar plan 7 dias</button>
         </div>
       </div>
     </div>`;
   container.querySelector("[data-health-agent]")?.addEventListener("click", () => showView("agente"));
   container.querySelector("[data-health-direction]")?.addEventListener("click", () => showView(health.directionNeeded ? "revision" : "monitor"));
+  container.querySelector("[data-health-plan]")?.addEventListener("click", downloadSystemHealthWeekPlan);
+}
+
+function systemHealthWeekPlan(health = systemHealthStatus()) {
+  const activities = state.activities
+    .map((activity) => ({ activity, readiness: activityReadiness(activity.name) }))
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score);
+  const alerts = buildSystemAlerts().sort((a, b) => priorityWeight(b.severity) - priorityWeight(a.severity));
+  const reviewItems = buildReviewItems();
+  const plan = [];
+  if (activities[0]) {
+    plan.push({
+      day: "Dia 1",
+      title: `Cerrar brechas criticas de ${activities[0].activity.name}`,
+      detail: activities[0].readiness.gaps.slice(0, 3).map((gap) => `${gap.code} ${gap.label}: ${gap.detail}`).join(" | "),
+      code: "8.1"
+    });
+  }
+  if (alerts[0]) {
+    plan.push({
+      day: "Dia 2",
+      title: `Convertir alerta en accion: ${alerts[0].title}`,
+      detail: alerts[0].detail,
+      code: alerts[0].code
+    });
+  }
+  if (reviewItems[0]) {
+    plan.push({
+      day: "Dia 3",
+      title: `Resolver aprobacion humana: ${reviewItems[0].title}`,
+      detail: reviewItems[0].detail,
+      code: reviewItems[0].code
+    });
+  }
+  if (state.trainingNeeds.some((item) => item.status !== "cerrada" && item.status !== "realizada")) {
+    plan.push({
+      day: "Dia 4",
+      title: "Cerrar plan de capacitacion y competencia",
+      detail: "Validar necesidades abiertas, asistencia, evaluacion, certificados y vencimientos.",
+      code: "7.2"
+    });
+  }
+  if (!state.managementReviews.length || health.directionNeeded) {
+    plan.push({
+      day: "Dia 5",
+      title: "Preparar revision por la direccion",
+      detail: "Consolidar actividades bloqueadas, recursos requeridos, riesgos, acciones y decisiones.",
+      code: "9.3"
+    });
+  }
+  plan.push({
+    day: "Dia 6",
+    title: "Actualizar bitacora y evidencias",
+    detail: "Descargar bitacora, asociar soportes reales y verificar que formularios aprobados cuenten como evidencia.",
+    code: "7.5"
+  });
+  plan.push({
+    day: "Dia 7",
+    title: "Revisar semaforo SGSTA nuevamente",
+    detail: `Meta: pasar de '${health.label}' a un estado menos critico o sostener operacion con vigilancia.`,
+    code: "10.1"
+  });
+  return plan.slice(0, 7);
+}
+
+function systemHealthWeekPlanText() {
+  const health = systemHealthStatus();
+  const plan = systemHealthWeekPlan(health);
+  return [
+    "PLAN DE 7 DIAS DESDE SEMAFORO SGSTA",
+    "",
+    `Organizacion: ${state.organizationName || state.orgName || "Mi empresa"}`,
+    `Sistema: ${activeSystem().name}`,
+    `Fecha: ${today()}`,
+    `Estado actual: ${health.label}`,
+    `Cumplimiento estimado: ${health.compliance}%`,
+    "",
+    "Lectura del agente",
+    health.summary,
+    "",
+    "Plan semanal",
+    ...plan.map((item) => `${item.day} | Requisito ${item.code}\n- ${item.title}\n- ${item.detail}`),
+    "",
+    "Regla",
+    "El agente prepara y prioriza. La organizacion aprueba documentos, autorizaciones de operacion y cierre de acciones criticas."
+  ].join("\n");
+}
+
+function downloadSystemHealthWeekPlan() {
+  const blob = new Blob([systemHealthWeekPlanText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "plan_7_dias_semaforo_sgsta.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Plan 7 dias descargado",
+    detail: "Se descargo el plan semanal generado desde el semaforo SGSTA.",
+    code: "10.1",
+    type: "plan_semaforo",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 function renderOperationReadinessSummary() {
