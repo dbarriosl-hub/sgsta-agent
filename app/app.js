@@ -6457,6 +6457,64 @@ function renderAuditLog() {
     : `<div class="muted">La bitacora se llenara con acciones del agente, revisiones humanas y evidencias.</div>`;
 }
 
+function auditLogReportText() {
+  const events = state.auditLog || [];
+  const agentRuns = events.filter((event) => event.type === "ejecucion_agente");
+  const humanEvents = events.filter((event) => event.actor === "humano");
+  const byRequirement = events.reduce((acc, event) => {
+    const code = event.code || "N/A";
+    acc[code] = (acc[code] || 0) + 1;
+    return acc;
+  }, {});
+  return [
+    "BITACORA AUDITABLE SGSTA AGENT",
+    "",
+    `Organizacion: ${state.organizationName || state.orgName || "Mi empresa"}`,
+    `Sistema: ${activeSystem().name}`,
+    `Fecha de descarga: ${today()}`,
+    "",
+    "Resumen",
+    `- Eventos registrados: ${events.length}`,
+    `- Ejecuciones del agente: ${agentRuns.length}`,
+    `- Eventos humanos: ${humanEvents.length}`,
+    `- Uso acumulado del agente: ${state.planUsage.agentRuns}`,
+    "",
+    "Eventos por requisito",
+    ...Object.entries(byRequirement).map(([code, count]) => `- ${code}: ${count}`),
+    "",
+    "Detalle cronologico",
+    ...(events.length ? events.map((event, index) => [
+      `${index + 1}. ${event.date} | ${event.actor} | ${event.type} | Requisito ${event.code || "N/A"}`,
+      `   ${event.title}`,
+      `   ${event.detail}`
+    ].join("\n")) : ["- Sin eventos registrados."]),
+    "",
+    "Regla de gobierno",
+    "El agente puede preparar borradores, generar acciones y priorizar trabajos. La aprobacion de documentos, cierre de acciones criticas y validacion de cumplimiento requieren decision humana."
+  ].join("\n");
+}
+
+function downloadAuditLogReport() {
+  const blob = new Blob([auditLogReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "bitacora_auditable_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Bitacora auditable descargada",
+    detail: "Se descargo el reporte de trazabilidad del agente y revision humana.",
+    code: "7.5",
+    type: "bitacora",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function recordAuditEvent({ title, detail, code = "", type = "evento", actor = "agente" }) {
   state.auditLog.unshift({
     title,
@@ -8645,6 +8703,7 @@ document.querySelector("#printReport").addEventListener("click", printExecutiveR
 document.querySelector("#downloadReport").addEventListener("click", downloadExecutiveReport);
 document.querySelector("#runImplementationReview").addEventListener("click", runImplementationReview);
 document.querySelector("#runAgentMonitor").addEventListener("click", runAgentMonitor);
+document.querySelector("#downloadAuditLog").addEventListener("click", downloadAuditLogReport);
 document.querySelector("#refreshReviewInbox").addEventListener("click", () => {
   renderReviewInbox();
   addMessage("agent", "Actualice la bandeja de revision humana con los pendientes actuales.");
