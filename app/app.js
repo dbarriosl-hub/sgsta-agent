@@ -5295,6 +5295,7 @@ function renderSubscriptionPlans() {
   const current = subscriptionPlans[state.currentPlan] || subscriptionPlans.profesional;
   const usage = currentPlanUsage();
   renderCommercialSummary();
+  renderPilotSalesPackage();
   const planUsage = document.querySelector("#planUsage");
   if (planUsage) {
     planUsage.innerHTML = Object.entries(usage).map(([key, item]) => `
@@ -5502,6 +5503,182 @@ function renderCommercialSummary() {
     </article>`;
   container.querySelector("[data-commercial-open-demo]")?.addEventListener("click", () => showView("panel"));
   container.querySelector("[data-commercial-download]")?.addEventListener("click", downloadCommercialSummary);
+}
+
+function pilotSalesPlan() {
+  const demo = demoReadinessStatus();
+  const progress = implementationProgress();
+  const companyReady = companyProfileGaps().length <= 2;
+  const hasActivities = state.activities.length > 0;
+  const hasEvidence = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length >= 6;
+  const hasDocuments = state.documents.filter((doc) => doc.content).length >= 3;
+  const hasReview = state.managementReviews.length > 0;
+  const steps = [
+    {
+      id: "perfil_cliente",
+      label: "Perfil del cliente piloto",
+      detail: "Empresa, ubicacion, alcance, actividades y responsables cargados.",
+      done: companyReady && hasActivities,
+      action: "Completar perfil de cliente piloto",
+      code: "4.1"
+    },
+    {
+      id: "demo_operativa",
+      label: "Demo operativa",
+      detail: "Mostrar brechas por actividad, evidencias, documentos y revision por direccion.",
+      done: demo.score >= 50,
+      action: "Preparar demo operativa de SGSTA Agent",
+      code: "4.4"
+    },
+    {
+      id: "evidencia_minima",
+      label: "Evidencia minima",
+      detail: "Tener documentos y paquetes de evidencia suficientes para explicar cumplimiento.",
+      done: hasEvidence && hasDocuments,
+      action: "Preparar evidencia minima para piloto",
+      code: "7.5"
+    },
+    {
+      id: "gobierno_humano",
+      label: "Aprobacion humana",
+      detail: "Definir quien aprueba documentos, acciones criticas y cierre de cumplimiento.",
+      done: hasReview,
+      action: "Definir aprobaciones humanas del piloto",
+      code: "9.3"
+    },
+    {
+      id: "suscripcion",
+      label: "Oferta de suscripcion",
+      detail: "Definir plan, limites, alcance de soporte y siguiente reunion.",
+      done: Boolean(state.currentPlan),
+      action: "Definir propuesta de suscripcion para cliente piloto",
+      code: "4.4"
+    }
+  ];
+  const completed = steps.filter((step) => step.done).length;
+  return {
+    progress,
+    demo,
+    steps,
+    completed,
+    total: steps.length,
+    pct: Math.round((completed / steps.length) * 100),
+    next: steps.find((step) => !step.done) || steps[steps.length - 1]
+  };
+}
+
+function pilotSalesPlanText() {
+  const plan = pilotSalesPlan();
+  return [
+    "Plan piloto comercial - SGSTA Agent",
+    "",
+    `Estado: ${plan.completed}/${plan.total} pasos (${plan.pct}%).`,
+    `Avance PHVA del sistema: ${plan.progress.pct}%.`,
+    `Demo: ${plan.demo.score}% - ${plan.demo.label}.`,
+    "",
+    "Objetivo:",
+    "Conseguir una primera empresa piloto que pruebe la plataforma con actividades reales de turismo de aventura y valide el valor del agente.",
+    "",
+    "Pasos:",
+    ...plan.steps.map((step) => `- ${step.done ? "[listo]" : "[pendiente]"} ${step.label}: ${step.detail}`),
+    "",
+    "Siguiente paso recomendado:",
+    `${plan.next.action} (requisito ${plan.next.code}).`,
+    "",
+    "Condicion importante:",
+    "El piloto debe usar datos reales de actividades, pero participantes/clientes se manejan con evidencia externa y datos minimos no sensibles."
+  ].join("\n");
+}
+
+function downloadPilotSalesPlan() {
+  const blob = new Blob([pilotSalesPlanText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "plan_piloto_comercial_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Plan piloto descargado",
+    detail: "Se descargo el plan piloto comercial de SGSTA Agent.",
+    type: "suscripcion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createPilotSalesActions() {
+  const plan = pilotSalesPlan();
+  let created = 0;
+  plan.steps.filter((step) => !step.done).forEach((step) => {
+    const title = `Piloto comercial: ${step.action}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: step.code,
+      status: "abierta",
+      type: "tarea",
+      origin: "suscripcion",
+      priority: step.id === "perfil_cliente" || step.id === "demo_operativa" ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: step.detail,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Acciones de piloto creadas",
+    detail: `Se crearon ${created} accion(es) para preparar el piloto comercial.`,
+    code: "4.4",
+    type: "suscripcion",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) para preparar el piloto comercial.` : "El piloto comercial ya tenia acciones abiertas para sus pendientes.");
+  saveState();
+  renderAll();
+}
+
+function renderPilotSalesPackage() {
+  const container = document.querySelector("#pilotSalesPackage");
+  if (!container) return;
+  const plan = pilotSalesPlan();
+  container.innerHTML = `
+    <article class="pilot-card">
+      <div class="pilot-head">
+        <div>
+          <p class="eyebrow">Primer cliente piloto</p>
+          <h3>Paquete para validar la suscripcion</h3>
+        </div>
+        <div class="pilot-score">
+          <strong>${plan.pct}%</strong>
+          <span>${plan.completed}/${plan.total} listo</span>
+        </div>
+      </div>
+      <div class="pilot-steps">
+        ${plan.steps.map((step) => `
+          <div class="pilot-step ${step.done ? "done" : ""}">
+            <span class="badge ${step.done ? "cumple" : "pendiente"}">${step.done ? "listo" : "pendiente"}</span>
+            <div>
+              <strong>${step.label}</strong>
+              <p>${step.detail}</p>
+            </div>
+          </div>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-pilot-download type="button">Descargar plan piloto</button>
+        <button data-pilot-actions type="button">Crear acciones piloto</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-pilot-download]")?.addEventListener("click", downloadPilotSalesPlan);
+  container.querySelector("[data-pilot-actions]")?.addEventListener("click", createPilotSalesActions);
 }
 
 function planAllows(feature) {

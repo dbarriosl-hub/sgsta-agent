@@ -1457,6 +1457,10 @@ textarea {
   margin-bottom: 16px;
 }
 
+.pilot-package {
+  margin-bottom: 16px;
+}
+
 .commercial-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1516,6 +1520,70 @@ textarea {
 .commercial-side p {
   color: var(--muted);
   line-height: 1.4;
+}
+
+.pilot-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.pilot-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.pilot-head h3,
+.pilot-head p,
+.pilot-step p {
+  margin: 0;
+}
+
+.pilot-score {
+  min-width: 96px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f0fdfa;
+  padding: 10px;
+  text-align: center;
+  display: grid;
+  gap: 2px;
+}
+
+.pilot-score strong {
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.pilot-score span,
+.pilot-step p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pilot-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.pilot-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.pilot-step.done {
+  border-color: #99f6e4;
+  background: #f0fdfa;
 }
 
 .system-card {
@@ -2465,6 +2533,7 @@ textarea {
   .activity-form-tools,
   .commercial-card,
   .commercial-proof,
+  .pilot-steps,
   .plan-usage,
   .systems-matrix,
   .report-summary,
