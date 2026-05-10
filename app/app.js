@@ -3653,9 +3653,152 @@ function detectPolicyGaps() {
   renderAll();
 }
 
+function policyCoverageRows() {
+  return state.activities.map((activity) => {
+    const policies = state.policies.filter((policy) => itemActivityName(policy) === activity.name);
+    const complete = policies.filter(policyIsComplete);
+    const pending = policies.filter((policy) => !policyIsComplete(policy));
+    const highRisks = state.risks.filter((risk) => itemActivityName(risk) === activity.name && riskLevel(risk) >= 12);
+    const missing = [];
+    if (!policies.length) missing.push("poliza por actividad");
+    if (policies.length && !complete.length) missing.push("cobertura completa");
+    if (pending.some((policy) => policy.status === "vencida")) missing.push("poliza vencida");
+    if (pending.some((policy) => !policy.document && !policy.evidence)) missing.push("documento soporte");
+    if (highRisks.length && !complete.length) missing.push("validar cobertura frente a riesgo alto");
+    const scoreParts = [
+      policies.length > 0,
+      complete.length > 0,
+      pending.every((policy) => policy.status !== "vencida"),
+      policies.some((policy) => policy.document || policy.evidence),
+      !highRisks.length || complete.length > 0
+    ];
+    const score = Math.round((scoreParts.filter(Boolean).length / scoreParts.length) * 100);
+    return { activity, policies, complete, pending, highRisks, missing, score };
+  });
+}
+
+function policyCoverageMatrixText() {
+  return [
+    "Matriz de seguros por actividad - SGSTA Agent",
+    "",
+    "Criterio:",
+    "Cada actividad debe tener poliza vigente, cobertura clara, vigencia, documento soporte y relacion con riesgos antes de ofertar u operar.",
+    "",
+    ...policyCoverageRows().flatMap((row) => [
+      `${row.activity.name} (${row.score}%):`,
+      `- Polizas: ${row.policies.map((policy) => `${policy.number || "sin numero"} (${policy.status || "pendiente"})`).join(", ") || "ninguna"}`,
+      `- Coberturas completas: ${row.complete.length}/${row.policies.length}`,
+      `- Riesgos altos asociados: ${row.highRisks.length}`,
+      `- Brechas: ${row.missing.join(", ") || "sin brechas visibles"}`,
+      ""
+    ])
+  ].join("\n");
+}
+
+function downloadPolicyCoverageMatrix() {
+  const blob = new Blob([policyCoverageMatrixText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "matriz_seguros_por_actividad.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Matriz de seguros descargada",
+    detail: "Se descargo la matriz de cobertura por actividad.",
+    code: "6.1.3",
+    type: "seguro",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createPolicyCoverageActions() {
+  let created = 0;
+  policyCoverageRows().forEach((row) => {
+    if (!row.missing.length) return;
+    const title = `Seguros por actividad: validar cobertura de ${row.activity.name}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: "6.1.3",
+      status: "abierta",
+      type: "preventiva",
+      origin: "seguro",
+      priority: row.missing.includes("poliza vencida") || row.highRisks.length ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: `La actividad ${row.activity.name} presenta brechas de seguro: ${row.missing.join(", ")}.`,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      relatedActivity: row.activity.name,
+      sourceDetail: "Matriz de seguros por actividad",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  state.compliance["6.1.3"] = "en_proceso";
+  recordAuditEvent({
+    title: "Acciones de seguros por actividad creadas",
+    detail: `Se crearon ${created} accion(es) desde la matriz de seguros.`,
+    code: "6.1.3",
+    type: "seguro",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) preventivas desde la matriz de seguros por actividad.` : "La matriz de seguros no encontro nuevas acciones o ya estaban abiertas.");
+  saveState();
+  renderAll();
+}
+
+function renderPolicyCoverageMatrix() {
+  const container = document.querySelector("#policyCoverageMatrix");
+  if (!container) return;
+  const rows = policyCoverageRows();
+  const average = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0;
+  const blocked = rows.filter((row) => row.missing.length).length;
+  container.innerHTML = `
+    <article class="policy-matrix-card">
+      <div class="competency-head">
+        <div>
+          <p class="eyebrow">Matriz por actividad</p>
+          <h3>Seguro vigente antes de ofertar</h3>
+          <p>Relaciona polizas, vigencia, cobertura, soporte documental y riesgos altos por actividad.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${average}%</strong>
+          <span>${blocked} con brecha</span>
+        </div>
+      </div>
+      <div class="competency-grid">
+        ${rows.map((row) => `
+          <article class="competency-row ${row.missing.length ? "pending" : "ready"}">
+            <div>
+              <span class="badge requisito">6.1.3</span>
+              <span class="badge ${row.missing.length ? "no_cumple" : "cumple"}">${row.score}%</span>
+            </div>
+            <strong>${row.activity.name}</strong>
+            <p>Coberturas completas: ${row.complete.length}/${row.policies.length}. Riesgos altos: ${row.highRisks.length}.</p>
+            <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Cobertura sin brechas visibles."}</small>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-policy-matrix-download type="button">Descargar matriz</button>
+        <button data-policy-matrix-actions type="button">Crear acciones</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-policy-matrix-download]")?.addEventListener("click", downloadPolicyCoverageMatrix);
+  container.querySelector("[data-policy-matrix-actions]")?.addEventListener("click", createPolicyCoverageActions);
+}
+
 function renderPolicies() {
   const container = document.querySelector("#policiesTable");
   const summary = document.querySelector("#policiesSummary");
+  renderPolicyCoverageMatrix();
   if (summary) {
     const coveredActivities = state.activities.filter((activity) => state.policies.some((policy) => itemActivityName(policy) === activity.name && policyIsComplete(policy))).length;
     const complete = state.policies.filter(policyIsComplete).length;
