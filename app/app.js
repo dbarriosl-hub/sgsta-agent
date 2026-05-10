@@ -626,15 +626,27 @@ function renderDemoReadiness() {
 }
 
 function prepareDemoPackage() {
-  generateCompanyImplementationProfile();
+  const beforeDocs = state.documents.filter((doc) => doc.content).length;
+  const beforeReviews = state.managementReviews.length;
+  const profile = generateCompanyImplementationProfile({ silent: true });
   if (state.documents.filter((doc) => doc.content).length < 3) {
-    generateDocumentDraft();
-    generateDocumentDraft();
-    generateDocumentDraft();
+    generateDocumentDraft({ silent: true });
+    generateDocumentDraft({ silent: true });
+    generateDocumentDraft({ silent: true });
   }
-  if (!state.managementReviews.length) addManagementReview();
-  createImplementationWorkPlanActions();
-  addMessage("agent", "Prepare un paquete minimo de demo: perfil, documentos base, revision direccion y acciones del plan.");
+  if (!state.managementReviews.length) addManagementReview({ silent: true });
+  const createdActions = createImplementationWorkPlanActions({ silent: true });
+  const afterDocs = state.documents.filter((doc) => doc.content).length;
+  const createdDocs = Math.max(0, afterDocs - beforeDocs);
+  const createdReview = state.managementReviews.length > beforeReviews;
+  recordAuditEvent({
+    title: "Paquete de demo preparado",
+    detail: `Perfil actualizado: ${profile ? "si" : "no"}. Documentos nuevos: ${createdDocs}. Revision direccion creada: ${createdReview ? "si" : "no"}. Acciones nuevas: ${createdActions}.`,
+    code: "4.4",
+    type: "demo",
+    actor: "agente"
+  });
+  addMessage("agent", `Prepare paquete minimo de demo: perfil actualizado, ${createdDocs} documento(s) generado(s), ${createdReview ? "revision 9.3 creada" : "revision 9.3 ya existente"} y ${createdActions} accion(es) nuevas del plan.`);
   saveState();
   renderAll();
 }
@@ -1331,7 +1343,7 @@ function renderCompanyImplementationProfile() {
   });
 }
 
-function generateCompanyImplementationProfile() {
+function generateCompanyImplementationProfile(options = {}) {
   state.company.profileSummary = buildCompanyImplementationProfile();
   state.compliance["4.1"] = "en_proceso";
   state.compliance["4.2"] = state.company.stakeholders ? "en_proceso" : "pendiente";
@@ -1343,9 +1355,12 @@ function generateCompanyImplementationProfile() {
     type: "perfil_empresa",
     actor: "agente"
   });
-  addMessage("agent", "Actualice el perfil de implementacion. Lo usare como contexto para formularios, documentos, riesgos y revision por direccion.");
-  saveState();
-  renderAll();
+  if (!options.silent) {
+    addMessage("agent", "Actualice el perfil de implementacion. Lo usare como contexto para formularios, documentos, riesgos y revision por direccion.");
+    saveState();
+    renderAll();
+  }
+  return state.company.profileSummary;
 }
 
 function primaryActivityName() {
@@ -6688,7 +6703,7 @@ function documentDraftTemplates() {
   ];
 }
 
-function generateDocumentDraft() {
+function generateDocumentDraft(options = {}) {
   const templates = documentDraftTemplates();
   const next = templates.find((template) => !state.documents.some((doc) => doc.title === template.title && doc.content)) || templates[0];
   const existingIndex = state.documents.findIndex((doc) => doc.title === next.title);
@@ -6700,9 +6715,12 @@ function generateDocumentDraft() {
     state.selectedDocumentIndex = 0;
   }
   state.compliance[next.code] = "en_proceso";
-  addMessage("agent", `Genere un borrador de documento: ${next.title}. Queda pendiente de revision y aprobacion humana.`);
-  saveState();
-  renderAll();
+  if (!options.silent) {
+    addMessage("agent", `Genere un borrador de documento: ${next.title}. Queda pendiente de revision y aprobacion humana.`);
+    saveState();
+    renderAll();
+  }
+  return next;
 }
 
 function addIncident() {
@@ -6718,10 +6736,31 @@ function addAudit() {
   createAction("Preparar lista de verificacion de auditoria", "9.2", "tarea", "auditoria");
 }
 
-function addManagementReview() {
+function addManagementReview(options = {}) {
   state.managementReviews.unshift(buildManagementReviewDraft());
   state.compliance["9.3"] = "en_proceso";
-  createAction("Aprobar salidas de revision por la direccion", "9.3", "mejora", "revision direccion");
+  if (options.silent) {
+    if (!state.actions.some((action) => action.title === "Aprobar salidas de revision por la direccion" && action.status !== "cerrada")) {
+      state.actions.unshift({
+        title: "Aprobar salidas de revision por la direccion",
+        code: "9.3",
+        status: "abierta",
+        type: "mejora",
+        origin: "revision direccion",
+        priority: "media",
+        responsible: state.ownerName || "Responsable SGSTA",
+        dueDate: "",
+        cause: "Revision por la direccion preparada por el agente.",
+        immediateCorrection: "",
+        followUp: "",
+        efficacyVerification: "",
+        efficacyStatus: "pendiente",
+        createdAt: today()
+      });
+    }
+  } else {
+    createAction("Aprobar salidas de revision por la direccion", "9.3", "mejora", "revision direccion");
+  }
 }
 
 function addFormResponse() {
@@ -6750,7 +6789,7 @@ function handleImplementationStep(step) {
   renderAll();
 }
 
-function createImplementationWorkPlanActions() {
+function createImplementationWorkPlanActions(options = {}) {
   const pending = implementationSteps.filter((step) => !step.check(state)).slice(0, 6);
   let created = 0;
   pending.forEach((step) => {
@@ -6781,9 +6820,12 @@ function createImplementationWorkPlanActions() {
     type: "implementacion",
     actor: "agente"
   });
-  addMessage("agent", created ? `Cree ${created} accion(es) desde el plan de 30 dias.` : "El plan de 30 dias ya tenia acciones abiertas para los primeros pendientes.");
-  saveState();
-  renderAll();
+  if (!options.silent) {
+    addMessage("agent", created ? `Cree ${created} accion(es) desde el plan de 30 dias.` : "El plan de 30 dias ya tenia acciones abiertas para los primeros pendientes.");
+    saveState();
+    renderAll();
+  }
+  return created;
 }
 
 function runImplementationReview() {
