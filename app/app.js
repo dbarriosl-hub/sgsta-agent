@@ -1169,10 +1169,64 @@ function renderPhvaMaturity() {
       <div class="row-actions">
         <button data-phva-weak-action type="button">Crear accion fase debil</button>
         <button class="secondary-button" data-phva-open-weak type="button">Abrir fase</button>
+        <button class="secondary-button" data-phva-download type="button">Descargar madurez</button>
       </div>
     </article>`;
   container.querySelector("[data-phva-weak-action]")?.addEventListener("click", () => createPhvaWeakPhaseAction(weakest));
   container.querySelector("[data-phva-open-weak]")?.addEventListener("click", () => showView(weakest.id === "planear" ? "implementacion" : weakest.id === "hacer" ? "actividades" : weakest.id === "verificar" ? "revision" : "acciones"));
+  container.querySelector("[data-phva-download]")?.addEventListener("click", downloadPhvaMaturityReport);
+}
+
+function phvaMaturityReportText() {
+  const rows = phvaMaturityRows();
+  const weakest = [...rows].sort((a, b) => a.pct - b.pct || b.openActions - a.openActions)[0];
+  const average = Math.round(rows.reduce((sum, row) => sum + row.pct, 0) / rows.length);
+  return [
+    "REPORTE DE MADUREZ PHVA - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.organizationName || state.orgName || "Mi empresa"}`,
+    `Sistema: ${activeSystem().name}`,
+    `Fecha: ${today()}`,
+    `Balance general: ${average}%`,
+    "",
+    "Lectura del agente",
+    `La fase mas debil es ${weakest.label} con ${weakest.pct}%. ${weakest.focus}`,
+    "",
+    "Detalle PHVA",
+    ...rows.map((row) => [
+      `${row.label} (${row.pct}% - ${row.status})`,
+      `- Acciones abiertas: ${row.openActions}`,
+      `- Evidencias pendientes: ${row.pendingEvidence}`,
+      `- Requisitos/capitulos: ${row.codes.join(", ")}`
+    ].join("\n")),
+    "",
+    "Recomendacion",
+    `Crear o ejecutar acciones para fortalecer ${weakest.label}, cerrar evidencias pendientes y revisar eficacia antes de declarar cumplimiento.`,
+    "",
+    "Regla",
+    "El agente puede diagnosticar y crear acciones de mejora. La direccion o responsable SGSTA debe aprobar cierres y cumplimiento."
+  ].join("\n");
+}
+
+function downloadPhvaMaturityReport() {
+  const blob = new Blob([phvaMaturityReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "reporte_madurez_phva_sgsta.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Reporte PHVA descargado",
+    detail: "Se descargo el reporte de madurez PHVA del sistema.",
+    code: "4.4",
+    type: "madurez_phva",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 function createPhvaWeakPhaseAction(stage) {
