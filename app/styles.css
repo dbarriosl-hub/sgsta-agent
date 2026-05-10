@@ -366,6 +366,58 @@ textarea {
   margin: 0;
 }
 
+.operation-activity-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.operation-activity-card {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.55fr) auto;
+  padding: 12px;
+}
+
+.operation-activity-card.no_cumple {
+  border-color: #fecaca;
+}
+
+.operation-activity-card.en_proceso {
+  border-color: #fde68a;
+}
+
+.operation-activity-card h3,
+.operation-activity-card p {
+  margin: 0;
+}
+
+.operation-activity-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+.operation-card-metrics {
+  display: grid;
+  gap: 6px;
+}
+
+.operation-card-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.operation-card-metrics strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
 .today-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 0.95fr));
@@ -2710,6 +2762,7 @@ textarea {
   nav,
   .metrics,
   .operation-readiness-grid,
+  .operation-activity-card,
   .demo-readiness-card,
   .phva-grid,
   .plans-grid,

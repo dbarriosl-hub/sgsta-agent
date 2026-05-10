@@ -771,7 +771,9 @@ function renderOperationReadinessSummary() {
   const readiness = state.activities.map((activity) => {
     const status = activityReadiness(activity.name);
     const decision = activityOperationDecision(status);
-    return { activity, status, decision };
+    const checklist = activityDepartureChecklist(activity.name);
+    const nextGap = status.gaps[0];
+    return { activity, status, decision, checklist, nextGap };
   });
   const ready = readiness.filter((item) => item.decision.badge === "cumple").length;
   const blocked = readiness.filter((item) => item.decision.badge === "no_cumple").length;
@@ -793,6 +795,26 @@ function renderOperationReadinessSummary() {
           ${priority ? `<button data-operation-actions type="button">Crear acciones</button>` : ""}
         </div>
       </div>
+    </div>
+    <div class="operation-activity-list">
+      ${readiness.length ? readiness.map((item) => `
+        <article class="operation-activity-card ${item.decision.badge}">
+          <div>
+            <span class="badge ${item.decision.badge}">${item.decision.label}</span>
+            <h3>${item.activity.name}</h3>
+            <p>${item.nextGap ? `${item.nextGap.label}: ${item.nextGap.detail}` : "Controles minimos completos. Mantener evidencias y vigencias."}</p>
+          </div>
+          <div class="operation-card-metrics">
+            <span><strong>${item.status.score}%</strong> preparacion</span>
+            <span><strong>${item.checklist.filter((check) => check.ok).length}/${item.checklist.length}</strong> antes de salir</span>
+            <span><strong>${item.status.high}</strong> criticas</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-operation-card-open="${item.activity.name}" type="button">Ver ficha</button>
+            <button class="secondary-button" data-operation-card-export="${item.activity.name}" type="button">Ficha operativa</button>
+            ${item.status.gaps.length ? `<button data-operation-card-actions="${item.activity.name}" type="button">Crear acciones</button>` : ""}
+          </div>
+        </article>`).join("") : `<div class="muted">No hay actividades registradas. Crea la primera actividad para que el agente pueda verificar riesgos, guias, equipos, seguros y participantes.</div>`}
     </div>`;
   container.querySelector("[data-operation-open]")?.addEventListener("click", () => {
     if (priority) state.selectedActivityName = priority.activity.name;
@@ -800,6 +822,18 @@ function renderOperationReadinessSummary() {
   });
   container.querySelector("[data-operation-actions]")?.addEventListener("click", () => {
     if (priority) createDepartureChecklistActions(priority.activity.name);
+  });
+  container.querySelectorAll("[data-operation-card-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedActivityName = button.dataset.operationCardOpen;
+      showView("actividades");
+    });
+  });
+  container.querySelectorAll("[data-operation-card-export]").forEach((button) => {
+    button.addEventListener("click", () => downloadActivityOperationalPackage(button.dataset.operationCardExport));
+  });
+  container.querySelectorAll("[data-operation-card-actions]").forEach((button) => {
+    button.addEventListener("click", () => createDepartureChecklistActions(button.dataset.operationCardActions));
   });
 }
 
