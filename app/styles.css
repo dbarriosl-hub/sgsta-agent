@@ -1096,6 +1096,73 @@ textarea {
   padding: 14px;
 }
 
+.company-intake-guide {
+  margin-bottom: 16px;
+}
+
+.company-intake-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.company-intake-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.company-intake-head h3,
+.company-intake-head p,
+.company-intake-next p {
+  margin: 0;
+}
+
+.company-intake-head p,
+.company-intake-next p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.company-intake-next {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.company-intake-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.intake-chip {
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  color: var(--ink);
+  justify-content: start;
+  min-height: 44px;
+}
+
+.intake-chip span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intake-chip.done {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
 .company-profile-head {
   display: flex;
   align-items: center;
@@ -2527,6 +2594,7 @@ textarea {
   .forms-layout,
   .org-form,
   .form-grid,
+  .company-intake-grid,
   .action-form-grid,
   .activity-operational-status,
   .form-filters,

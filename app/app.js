@@ -542,6 +542,7 @@ function renderAll() {
   renderAuditLog();
   renderSubscriptionPlans();
   renderForms();
+  renderCompanyIntakeGuide();
   renderCompanyImplementationProfile();
 }
 
@@ -1332,6 +1333,184 @@ function companyProfileGaps() {
   if (activitiesWithoutEquipment.length) gaps.push(`equipos por actividad: ${activitiesWithoutEquipment.map((item) => item.name).join(", ")}`);
   if (activitiesWithoutPolicy.length) gaps.push(`seguros por actividad: ${activitiesWithoutPolicy.map((item) => item.name).join(", ")}`);
   return gaps;
+}
+
+function companyIntakeItems() {
+  return [
+    {
+      id: "identidad",
+      label: "Identidad",
+      question: "Como se llama legalmente la empresa y quien responde por el SGSTA?",
+      done: Boolean(state.company.legalName && state.ownerName),
+      action: "Completar nombre legal y responsable SGSTA",
+      view: "empresa",
+      code: "4.1"
+    },
+    {
+      id: "ubicacion",
+      label: "Ubicacion",
+      question: "En que municipio, zona o ruta opera y que condiciones locales afectan la seguridad?",
+      done: Boolean((state.company.city || state.company.operatingArea) && state.company.localContext),
+      action: "Completar ubicacion, zona de operacion y contexto local",
+      view: "empresa",
+      code: "4.1"
+    },
+    {
+      id: "actividades",
+      label: "Actividades",
+      question: "Que actividades vende realmente: senderismo, rafting, cuatrimotos u otras?",
+      done: state.activities.length > 0,
+      action: "Registrar actividades reales del cliente",
+      view: "actividades",
+      code: "8.1"
+    },
+    {
+      id: "alcance",
+      label: "Alcance",
+      question: "Que actividades, sedes, rutas y servicios quedan dentro del sistema de gestion?",
+      done: Boolean(state.company.scope),
+      action: "Definir alcance del SGSTA",
+      view: "empresa",
+      code: "4.3"
+    },
+    {
+      id: "partes",
+      label: "Interesados",
+      question: "Quienes se afectan o participan: clientes, guias, proveedores, autoridades y comunidad?",
+      done: Boolean(state.company.stakeholders),
+      action: "Definir partes interesadas",
+      view: "empresa",
+      code: "4.2"
+    },
+    {
+      id: "controles",
+      label: "Controles",
+      question: "Cada actividad tiene riesgos, guia, equipo, seguro y condiciones para participantes?",
+      done: state.activities.length > 0 && companyProfileGaps().filter((gap) => gap.includes("por actividad")).length === 0,
+      action: "Completar controles por actividad",
+      view: "brechas_actividad",
+      code: "8.1"
+    }
+  ];
+}
+
+function companyIntakeText() {
+  const items = companyIntakeItems();
+  const completed = items.filter((item) => item.done).length;
+  return [
+    "Guia de entrevista inicial - SGSTA Agent",
+    "",
+    `Empresa: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    `Estado: ${completed}/${items.length} bloques completos.`,
+    "",
+    "Preguntas para levantar informacion:",
+    ...items.map((item) => `- ${item.done ? "[listo]" : "[preguntar]"} ${item.label}: ${item.question}`),
+    "",
+    "Notas para el consultor/agente:",
+    "Usar respuestas simples, con lenguaje del operador. Luego el agente convierte la informacion en alcance, contexto, riesgos, actividades, evidencias y acciones PHVA."
+  ].join("\n");
+}
+
+function downloadCompanyIntakeGuide() {
+  const blob = new Blob([companyIntakeText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "guia_entrevista_inicial_sgsta.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Guia de entrevista descargada",
+    detail: "Se descargo la guia de levantamiento inicial de empresa.",
+    code: "4.1",
+    type: "perfil_empresa",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createCompanyIntakeActions() {
+  const pending = companyIntakeItems().filter((item) => !item.done);
+  let created = 0;
+  pending.forEach((item) => {
+    const title = `Entrevista inicial: ${item.action}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: item.code,
+      status: "abierta",
+      type: "tarea",
+      origin: "perfil empresa",
+      priority: item.id === "identidad" || item.id === "actividades" ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: item.question,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Acciones de entrevista creadas",
+    detail: `Se crearon ${created} accion(es) para completar la informacion inicial de empresa.`,
+    code: "4.1",
+    type: "perfil_empresa",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) para completar la entrevista inicial.` : "La entrevista inicial ya tenia acciones abiertas para sus pendientes.");
+  saveState();
+  renderAll();
+}
+
+function renderCompanyIntakeGuide() {
+  const container = document.querySelector("#companyIntakeGuide");
+  if (!container) return;
+  const items = companyIntakeItems();
+  const completed = items.filter((item) => item.done).length;
+  const pct = Math.round((completed / items.length) * 100);
+  const next = items.find((item) => !item.done) || items[items.length - 1];
+  container.innerHTML = `
+    <article class="company-intake-card">
+      <div class="company-intake-head">
+        <div>
+          <p class="eyebrow">Entrevista inicial</p>
+          <h3>Levantar datos sin volverlo tramite</h3>
+          <p>El agente necesita esta base para generar documentos, formularios, riesgos y evidencias con contexto real.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${pct}%</strong>
+          <span>${completed}/${items.length} listo</span>
+        </div>
+      </div>
+      <div class="company-intake-next">
+        <span class="badge ${next.done ? "cumple" : "pendiente"}">${next.done ? "listo" : "siguiente"}</span>
+        <strong>${next.label}</strong>
+        <p>${next.question}</p>
+      </div>
+      <div class="company-intake-grid">
+        ${items.map((item) => `
+          <button class="intake-chip ${item.done ? "done" : ""}" data-intake-open="${item.view}" type="button">
+            <span>${item.done ? "ok" : "falta"}</span>
+            ${item.label}
+          </button>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-intake-download type="button">Descargar entrevista</button>
+        <button data-intake-actions type="button">Crear acciones</button>
+      </div>
+    </article>`;
+  container.querySelectorAll("[data-intake-open]").forEach((button) => {
+    button.addEventListener("click", () => showView(button.dataset.intakeOpen));
+  });
+  container.querySelector("[data-intake-download]")?.addEventListener("click", downloadCompanyIntakeGuide);
+  container.querySelector("[data-intake-actions]")?.addEventListener("click", createCompanyIntakeActions);
 }
 
 function buildCompanyImplementationProfile() {
