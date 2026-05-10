@@ -7296,6 +7296,7 @@ function renderActionClosureBoard() {
             <strong>${escapeHtml(action.title || "Accion sin titulo")}</strong>
             <p>${simpleActionNextStep(action)}</p>
             <div class="row-actions">
+              <button class="secondary-button" data-action-advance-closure="${index}" type="button">Avanzar cierre</button>
               <button class="secondary-button" data-action-prepare-followup="${index}" type="button">Preparar seguimiento</button>
               <button data-action-focus="${index}" type="button">Ver accion</button>
             </div>
@@ -7304,9 +7305,44 @@ function renderActionClosureBoard() {
   container.querySelectorAll("[data-action-prepare-followup]").forEach((button) => {
     button.addEventListener("click", () => prepareActionFollowUp(Number(button.dataset.actionPrepareFollowup)));
   });
+  container.querySelectorAll("[data-action-advance-closure]").forEach((button) => {
+    button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionAdvanceClosure)));
+  });
   container.querySelectorAll("[data-action-focus]").forEach((button) => {
     button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionFocus)));
   });
+}
+
+function advanceActionClosure(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  assignActionDefaults(action);
+  let step = "asignacion";
+  if (!action.followUp) {
+    action.followUp = "Seguimiento sugerido por el agente: validar avance, responsable, fecha y obstaculos antes del cierre.";
+    step = "seguimiento";
+  } else if (!action.evidence) {
+    action.evidence = "Pendiente adjuntar enlace, archivo o referencia real de evidencia.";
+    step = "evidencia";
+  } else if (!action.efficacyVerification) {
+    action.efficacyVerification = "Pendiente verificar eficacia con evidencia posterior a la implementacion.";
+    step = "verificacion de eficacia";
+  } else if (action.efficacyStatus !== "eficaz") {
+    action.efficacyStatus = "pendiente";
+    action.status = "pendiente_eficacia";
+    step = "eficacia pendiente";
+  }
+  action.updatedAt = today();
+  recordAuditEvent({
+    title: "Cierre de accion avanzado",
+    detail: `${action.title}: el agente completo el paso ${step}. No cerro la accion automaticamente.`,
+    code: action.code,
+    type: "accion_gestion",
+    actor: "agente"
+  });
+  addMessage("agent", `Avance el cierre de "${action.title}" hasta ${step}. Falta validacion humana para cerrar.`);
+  saveState();
+  renderAll();
 }
 
 function prepareActionFollowUp(index) {
@@ -7556,6 +7592,7 @@ function actionCardTemplate(item, index) {
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-action-assign="${index}" type="button">Asignar</button>
+          <button class="secondary-button" data-action-advance="${index}" type="button">Avanzar cierre</button>
           <button data-close-action="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
         </div>
       </div>
@@ -7680,6 +7717,9 @@ function bindActionControls(container) {
       saveState();
       renderAll();
     });
+  });
+  container.querySelectorAll("[data-action-advance]").forEach((button) => {
+    button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionAdvance)));
   });
   container.querySelectorAll("[data-close-action]").forEach((button) => {
     button.addEventListener("click", () => {
