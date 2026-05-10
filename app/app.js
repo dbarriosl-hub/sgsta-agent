@@ -1777,6 +1777,90 @@ function activityDepartureChecklist(activityName) {
   ];
 }
 
+function activityOperationalPackageText(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName) || { name: activityName };
+  const related = activityRelatedItems(activityName);
+  const readiness = activityReadiness(activityName);
+  const decision = activityOperationDecision(readiness);
+  const checklist = activityDepartureChecklist(activityName);
+  const packageData = activityOperatingPackage(activityName);
+  const openActions = state.actions.filter((item) => item.status !== "cerrada" && item.relatedActivity === activityName);
+  return [
+    `FICHA OPERATIVA DE ACTIVIDAD - ${activity.name}`,
+    "",
+    `Organizacion: ${state.organizationName || "Mi empresa"}`,
+    `Sistema: ISO 21101 Turismo aventura`,
+    `Fecha: ${today()}`,
+    `Responsable SGSTA: ${state.ownerName || "Responsable SGSTA"}`,
+    "",
+    "1. Datos de la actividad",
+    `Lugar/ruta: ${activity.place || "por definir"}`,
+    `Guia responsable: ${activity.leader || "por definir"}`,
+    `Estado: ${activity.status || "revision"}`,
+    `Condiciones de operacion: ${activity.conditions || "por definir"}`,
+    `Condiciones de participacion: ${activity.participantRequirements || "por definir"}`,
+    "",
+    "2. Decision operativa",
+    `Resultado: ${decision.label}`,
+    `Preparacion: ${readiness.score}%`,
+    `Brechas: ${readiness.gaps.length}; criticas: ${readiness.high}`,
+    `Criterio: ${decision.summary}`,
+    "",
+    "3. Lista antes de salir",
+    ...checklist.map((item) => `- ${item.ok ? "OK" : "FALTA"} | ${item.label} | Requisito ${departureRequirementByKey(item.key)} | ${item.detail}`),
+    "",
+    "4. Paquete documental",
+    ...packageData.forms.map((item) => `- ${item.ready ? "OK" : "PENDIENTE"} | ${item.title} | Estado: ${item.status}`),
+    "",
+    "5. Soportes por actividad",
+    `Riesgos: ${related.risks.map((item) => item.title).join(", ") || "sin riesgos especificos"}`,
+    `Equipos: ${related.equipment.map((item) => `${item.name} (${item.status})`).join(", ") || "sin equipos asociados"}`,
+    `Guias/personal: ${related.people.map((item) => `${item.name} (${item.competence})`).join(", ") || "sin personal asociado"}`,
+    `Seguros: ${related.policies.map((item) => `${item.number || item.insurer} (${item.status})`).join(", ") || "sin poliza asociada"}`,
+    `Participantes/evidencias externas: ${related.participants.length || 0}`,
+    "",
+    "6. Acciones abiertas",
+    ...(openActions.length ? openActions.map((item) => `- ${item.priority || "media"} | ${item.code || "sin requisito"} | ${item.title}`) : ["- Sin acciones abiertas asociadas a esta actividad."]),
+    "",
+    "7. Regla del agente",
+    "El agente puede preparar borradores, detectar brechas y crear acciones. La aprobacion final, la autorizacion para operar y el cierre de acciones criticas son humanos."
+  ].join("\n");
+}
+
+function departureRequirementByKey(key) {
+  return {
+    guide: "7.2",
+    risk: "6.1.2",
+    equipment: "7.1/8.1",
+    insurance: "6.1.3",
+    participants: "7.4.3 / ISO 21103",
+    emergency: "8.2",
+    forms: "7.5"
+  }[key] || "8.1";
+}
+
+function downloadActivityOperationalPackage(activityName) {
+  const blob = new Blob([activityOperationalPackageText(activityName)], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeName = String(activityName || "actividad").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  link.href = url;
+  link.download = `ficha_operativa_${safeName || "actividad"}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Ficha operativa descargada",
+    detail: `Se descargo la ficha operativa de ${activityName}.`,
+    code: "8.1",
+    type: "actividad",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function departureChecklistActionPayload(activityName, item) {
   const codeByKey = {
     guide: "7.2",
@@ -2816,6 +2900,7 @@ function renderActivities() {
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-open-selected-gaps="${selectedActivity.name}" type="button">Ver brechas</button>
+          <button class="secondary-button" data-download-operational-package="${selectedActivity.name}" type="button">Descargar ficha operativa</button>
           <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
         </div>
       </div>
@@ -2982,6 +3067,9 @@ function renderActivities() {
   container.querySelector("[data-create-departure-actions]")?.addEventListener("click", (event) => createDepartureChecklistActions(event.currentTarget.dataset.createDepartureActions));
   container.querySelector("[data-open-departure-actions]")?.addEventListener("click", () => showView("acciones"));
   container.querySelector("[data-open-selected-gaps]")?.addEventListener("click", () => showView("brechas_actividad"));
+  container.querySelector("[data-download-operational-package]")?.addEventListener("click", (event) => {
+    downloadActivityOperationalPackage(event.currentTarget.dataset.downloadOperationalPackage);
+  });
   container.querySelector("[data-activity-intake-download]")?.addEventListener("click", (event) => {
     downloadActivityIntakeGuide(event.currentTarget.dataset.activityIntakeDownload);
   });
