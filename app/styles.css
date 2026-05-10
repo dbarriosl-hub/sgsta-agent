@@ -610,6 +610,39 @@ textarea {
   padding: 14px;
 }
 
+.activity-intake-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.activity-intake-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.activity-intake-head h3,
+.activity-intake-head p {
+  margin: 0;
+}
+
+.activity-intake-head p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.activity-intake-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
 .package-status-head {
   align-items: start;
   display: flex;
@@ -2597,6 +2630,7 @@ textarea {
   .company-intake-grid,
   .action-form-grid,
   .activity-operational-status,
+  .activity-intake-grid,
   .form-filters,
   .activity-form-tools,
   .commercial-card,

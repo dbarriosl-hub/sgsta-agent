@@ -2557,6 +2557,192 @@ function updateActivityParticipantField(field) {
   renderAll();
 }
 
+function activityIntakeItems(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName) || {};
+  const related = activityRelatedItems(activityName);
+  return [
+    {
+      id: "ruta",
+      label: "Ruta/lugar",
+      question: "Donde inicia, por donde pasa, donde termina y que restricciones tiene la ruta?",
+      done: Boolean(activity.place && activity.place !== "Lugar por definir"),
+      action: `Definir ruta y lugar de ${activityName}`,
+      code: "8.1"
+    },
+    {
+      id: "condiciones",
+      label: "Condiciones",
+      question: "Que clima, terreno, caudal, trafico, altura, duracion o dificultad cambia la seguridad?",
+      done: Boolean(activity.conditions && !String(activity.conditions).toLowerCase().includes("por definir")),
+      action: `Documentar condiciones de operacion de ${activityName}`,
+      code: "8.1"
+    },
+    {
+      id: "participantes",
+      label: "Participantes",
+      question: "Quien puede participar, que debe saber antes y que consentimiento/evidencia externa queda?",
+      done: Boolean(activity.participantRequirements && participantActivityInformationIsComplete(activityName)),
+      action: `Completar condiciones y evidencias de participantes para ${activityName}`,
+      code: "7.4.3"
+    },
+    {
+      id: "riesgos",
+      label: "Riesgos",
+      question: "Que puede salir mal en esta actividad y que control evita o reduce el dano?",
+      done: related.risks.length > 0,
+      action: `Levantar riesgos especificos de ${activityName}`,
+      code: "6.1.2"
+    },
+    {
+      id: "guia",
+      label: "Guia",
+      question: "Quien lidera la actividad y que competencia/certificado vigente demuestra?",
+      done: related.people.some((person) => person.competence === "cumple"),
+      action: `Asignar guia competente para ${activityName}`,
+      code: "7.2"
+    },
+    {
+      id: "equipos",
+      label: "Equipos",
+      question: "Que equipos se usan, quien los revisa y que mantenimiento/evidencia tienen?",
+      done: related.equipment.length > 0 && related.equipment.every((item) => item.status === "operativo"),
+      action: `Completar equipos e inspecciones de ${activityName}`,
+      code: "7.1"
+    },
+    {
+      id: "seguro",
+      label: "Seguro",
+      question: "La poliza cubre esta actividad, lugar, participantes y fecha de operacion?",
+      done: related.policies.some(policyIsComplete),
+      action: `Validar seguro de ${activityName}`,
+      code: "6.1.3"
+    },
+    {
+      id: "emergencia",
+      label: "Emergencia",
+      question: "Que se hace si hay lesion, cambio de clima, perdida, falla de equipo o comunicacion?",
+      done: activityOperatingPackage(activityName).forms.some((item) => item.code === "8.2" && item.ready),
+      action: `Preparar plan de emergencia de ${activityName}`,
+      code: "8.2"
+    }
+  ];
+}
+
+function activityIntakeText(activityName) {
+  const items = activityIntakeItems(activityName);
+  const activity = state.activities.find((item) => item.name === activityName) || {};
+  const completed = items.filter((item) => item.done).length;
+  return [
+    `Guia de entrevista de actividad - ${activityName}`,
+    "",
+    `Lugar/ruta: ${activity.place || "Por definir"}`,
+    `Guia responsable: ${activity.leader || "Por definir"}`,
+    `Estado: ${completed}/${items.length} bloques completos.`,
+    "",
+    "Preguntas para levantar la actividad:",
+    ...items.map((item) => `- ${item.done ? "[listo]" : "[preguntar]"} ${item.label}: ${item.question}`),
+    "",
+    "Uso del agente:",
+    "Con estas respuestas el agente alimenta riesgos, controles operacionales, equipos, personal, seguros, emergencias, participantes, formularios y acciones de mejora."
+  ].join("\n");
+}
+
+function downloadActivityIntakeGuide(activityName) {
+  const blob = new Blob([activityIntakeText(activityName)], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `guia_actividad_${activityName.toLowerCase().replaceAll(" ", "_")}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Guia de actividad descargada",
+    detail: `Se descargo la guia de entrevista para ${activityName}.`,
+    code: "8.1",
+    type: "actividad",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createActivityIntakeActions(activityName) {
+  const pending = activityIntakeItems(activityName).filter((item) => !item.done);
+  let created = 0;
+  pending.forEach((item) => {
+    const title = `Entrevista actividad: ${item.action}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: item.code,
+      status: "abierta",
+      type: item.code === "6.1.2" || item.code === "8.2" ? "preventiva" : "tarea",
+      origin: "actividad",
+      priority: ["riesgos", "guia", "equipos", "seguro", "emergencia"].includes(item.id) ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: item.question,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      relatedActivity: activityName,
+      sourceDetail: "Entrevista de actividad",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Acciones de entrevista de actividad creadas",
+    detail: `Se crearon ${created} accion(es) para completar ${activityName}.`,
+    code: "8.1",
+    type: "actividad",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) para completar la entrevista de ${activityName}.` : `La entrevista de ${activityName} ya tenia acciones abiertas para sus pendientes.`);
+  saveState();
+  renderAll();
+}
+
+function renderActivityIntakeGuide(activity) {
+  const items = activityIntakeItems(activity.name);
+  const completed = items.filter((item) => item.done).length;
+  const pct = Math.round((completed / items.length) * 100);
+  const next = items.find((item) => !item.done) || items[items.length - 1];
+  return `
+    <div class="activity-intake-card">
+      <div class="activity-intake-head">
+        <div>
+          <p class="eyebrow">Entrevista de actividad</p>
+          <h3>Levantar ${activity.name} con preguntas de campo</h3>
+          <p>La informacion se cruza con riesgos, guias, equipos, seguros, participantes, emergencia y formularios.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${pct}%</strong>
+          <span>${completed}/${items.length} listo</span>
+        </div>
+      </div>
+      <div class="company-intake-next">
+        <span class="badge ${next.done ? "cumple" : "pendiente"}">${next.done ? "listo" : "siguiente"}</span>
+        <strong>${next.label}</strong>
+        <p>${next.question}</p>
+      </div>
+      <div class="activity-intake-grid">
+        ${items.map((item) => `
+          <span class="intake-chip ${item.done ? "done" : ""}">
+            <span>${item.done ? "ok" : "falta"}</span>
+            ${item.label}
+          </span>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-activity-intake-download="${activity.name}" type="button">Descargar entrevista</button>
+        <button data-activity-intake-actions="${activity.name}" type="button">Crear acciones</button>
+      </div>
+    </div>`;
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -2633,6 +2819,7 @@ function renderActivities() {
           <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
         </div>
       </div>
+      ${renderActivityIntakeGuide(selectedActivity)}
       <div class="activity-package-status">
         <div class="package-status-head">
           <div>
@@ -2795,6 +2982,12 @@ function renderActivities() {
   container.querySelector("[data-create-departure-actions]")?.addEventListener("click", (event) => createDepartureChecklistActions(event.currentTarget.dataset.createDepartureActions));
   container.querySelector("[data-open-departure-actions]")?.addEventListener("click", () => showView("acciones"));
   container.querySelector("[data-open-selected-gaps]")?.addEventListener("click", () => showView("brechas_actividad"));
+  container.querySelector("[data-activity-intake-download]")?.addEventListener("click", (event) => {
+    downloadActivityIntakeGuide(event.currentTarget.dataset.activityIntakeDownload);
+  });
+  container.querySelector("[data-activity-intake-actions]")?.addEventListener("click", (event) => {
+    createActivityIntakeActions(event.currentTarget.dataset.activityIntakeActions);
+  });
   container.querySelector("[data-create-selected-gap-actions]")?.addEventListener("click", (event) => {
     const activityName = event.currentTarget.dataset.createSelectedGapActions;
     let created = 0;
