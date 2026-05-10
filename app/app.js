@@ -511,6 +511,7 @@ function renderAll() {
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
   renderMetrics();
+  renderSystemHealthSummary();
   renderDemoReadiness();
   renderOperationReadinessSummary();
   renderTodayWork();
@@ -764,6 +765,103 @@ function renderTodayWork() {
     addManagementReview();
     showView("revision");
   });
+}
+
+function systemHealthStatus() {
+  const totalScore = requirements.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
+  const compliance = Math.round((totalScore / requirements.length) * 100);
+  const activityStatuses = state.activities.map((activity) => {
+    const readiness = activityReadiness(activity.name);
+    return { activity, readiness, decision: activityOperationDecision(readiness) };
+  });
+  const blocked = activityStatuses.filter((item) => item.decision.badge === "no_cumple");
+  const review = activityStatuses.filter((item) => item.decision.badge === "en_proceso");
+  const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12);
+  const openActions = state.actions.filter((item) => item.status !== "cerrada");
+  const humanPending = buildReviewItems();
+  const criticalAlerts = buildSystemAlerts().filter((item) => item.severity === "alta");
+  const directionNeeded = blocked.length || criticalAlerts.length || !state.managementReviews.length;
+  if (blocked.length || criticalAlerts.length) {
+    return {
+      label: "No ofertar todavia",
+      badge: "no_cumple",
+      tone: "blocked",
+      summary: "Hay brechas criticas. El agente puede crear acciones y preparar soportes, pero la autorizacion debe ser humana.",
+      next: blocked[0] ? `Cerrar brechas de ${blocked[0].activity.name}` : criticalAlerts[0]?.title || "Revisar alertas criticas",
+      compliance,
+      blocked: blocked.length,
+      review: review.length,
+      highRisks: highRisks.length,
+      openActions: openActions.length,
+      humanPending: humanPending.length,
+      directionNeeded
+    };
+  }
+  if (review.length || humanPending.length || compliance < 70) {
+    return {
+      label: "Preparar antes de operar",
+      badge: "en_proceso",
+      tone: "review",
+      summary: "El sistema avanza, pero quedan aprobaciones, evidencias o formularios por cerrar antes de confiar en la operacion.",
+      next: review[0] ? `Completar soportes de ${review[0].activity.name}` : humanPending[0]?.title || "Revisar evidencias pendientes",
+      compliance,
+      blocked: blocked.length,
+      review: review.length,
+      highRisks: highRisks.length,
+      openActions: openActions.length,
+      humanPending: humanPending.length,
+      directionNeeded
+    };
+  }
+  return {
+    label: "Operar con vigilancia",
+    badge: "cumple",
+    tone: "ready",
+    summary: "No hay bloqueos criticos visibles. Mantener seguimiento del agente, vigencias y revision periodica.",
+    next: "Mantener vigilancia y actualizar evidencias",
+    compliance,
+    blocked: blocked.length,
+    review: review.length,
+    highRisks: highRisks.length,
+    openActions: openActions.length,
+    humanPending: humanPending.length,
+    directionNeeded
+  };
+}
+
+function renderSystemHealthSummary() {
+  const container = document.querySelector("#systemHealthSummary");
+  if (!container) return;
+  const health = systemHealthStatus();
+  container.innerHTML = `
+    <div class="system-health-card ${health.tone}">
+      <div>
+        <p class="eyebrow">Semaforo SGSTA</p>
+        <h2>${health.label}</h2>
+        <p>${health.summary}</p>
+      </div>
+      <div class="system-health-decision">
+        <span class="badge ${health.badge}">${health.directionNeeded ? "direccion" : "operacion"}</span>
+        <strong>${health.compliance}%</strong>
+        <span>cumplimiento estimado</span>
+      </div>
+      <div class="system-health-grid">
+        <span><strong>${health.blocked}</strong> bloqueadas</span>
+        <span><strong>${health.review}</strong> en revision</span>
+        <span><strong>${health.highRisks}</strong> riesgos altos</span>
+        <span><strong>${health.humanPending}</strong> aprobaciones</span>
+      </div>
+      <div class="system-health-next">
+        <span>Siguiente paso</span>
+        <strong>${escapeHtml(health.next)}</strong>
+        <div class="row-actions">
+          <button data-health-agent type="button">Usar agente</button>
+          <button class="secondary-button" data-health-direction type="button">Ver direccion</button>
+        </div>
+      </div>
+    </div>`;
+  container.querySelector("[data-health-agent]")?.addEventListener("click", () => showView("agente"));
+  container.querySelector("[data-health-direction]")?.addEventListener("click", () => showView(health.directionNeeded ? "revision" : "monitor"));
 }
 
 function renderOperationReadinessSummary() {

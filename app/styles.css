@@ -316,6 +316,87 @@ textarea {
   margin-bottom: 16px;
 }
 
+.system-health-panel {
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.system-health-card {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.28fr) minmax(220px, 0.45fr) minmax(220px, 0.45fr);
+  padding: 14px;
+}
+
+.system-health-card.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.system-health-card.review {
+  background: #fffdf3;
+  border-color: #fde68a;
+}
+
+.system-health-card.blocked {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.system-health-card h2,
+.system-health-card p {
+  margin: 0;
+}
+
+.system-health-card p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.system-health-decision {
+  display: grid;
+  gap: 5px;
+}
+
+.system-health-decision strong {
+  font-size: 34px;
+}
+
+.system-health-decision span:last-child,
+.system-health-next span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.system-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.system-health-grid span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.system-health-grid strong {
+  color: var(--text);
+  font-size: 20px;
+}
+
+.system-health-next {
+  display: grid;
+  gap: 8px;
+}
+
 .operation-summary-panel {
   margin-bottom: 16px;
 }
@@ -2852,6 +2933,8 @@ textarea {
 
   nav,
   .metrics,
+  .system-health-card,
+  .system-health-grid,
   .operation-readiness-grid,
   .operation-activity-card,
   .demo-readiness-card,
