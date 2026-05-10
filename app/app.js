@@ -6450,7 +6450,7 @@ function renderAuditLog() {
           <strong>${event.title}</strong>
           <span>${event.actor} - ${event.date}</span>
         </div>
-        <span class="badge ${event.actor === "agente" ? "phva" : "cumple"}">${event.actor}</span>
+        <span class="badge ${event.type === "ejecucion_agente" ? "en_proceso" : event.actor === "agente" ? "phva" : "cumple"}">${event.type === "ejecucion_agente" ? "ejecucion" : event.actor}</span>
         <p>${event.detail}</p>
         <small>Requisito ${event.code || "N/A"} - ${event.type}</small>
       </div>`).join("")
@@ -6467,6 +6467,18 @@ function recordAuditEvent({ title, detail, code = "", type = "evento", actor = "
     date: today()
   });
   state.auditLog = state.auditLog.slice(0, 80);
+}
+
+function recordAgentExecution(item, result) {
+  if (!item) return;
+  recordAuditEvent({
+    title: `Agente ejecuto: ${item.title}`,
+    detail: `${result} Prioridad: ${item.priority || "media"}. Tipo: ${item.kind || "tarea"}.`,
+    code: item.code || "",
+    type: "ejecucion_agente",
+    actor: "agente"
+  });
+  state.planUsage.agentRuns += 1;
 }
 
 function renderSubscriptionPlans() {
@@ -7157,27 +7169,34 @@ function agentWorkQueueItems() {
     .slice(0, 4);
 }
 
-function runAgentQueueItem(action) {
+function runAgentQueueItem(action, itemIndex = 0) {
+  const queueItem = agentWorkQueueItems()[itemIndex] || agentWorkQueueItems().find((item) => item.action === action);
   if (action === "activity") {
-    const item = agentWorkQueueItems().find((queueItem) => queueItem.action === "activity");
-    if (item?.activity) state.selectedActivityName = item.activity;
+    if (queueItem?.activity) state.selectedActivityName = queueItem.activity;
+    recordAgentExecution(queueItem, "Abri la ficha operativa para revisar brechas por actividad.");
     showView("actividades");
     return;
   }
   if (action === "alert") {
     const alert = buildSystemAlerts().find((item) => item.severity === "alta") || buildSystemAlerts()[0];
     if (alert) createActionFromAlert(alert);
+    recordAgentExecution(queueItem, "Converti o actualice una alerta como accion auditable.");
     return;
   }
   if (action === "human") {
+    recordAgentExecution(queueItem, "Dirigi el pendiente a revision humana; no aprobe ni cerre automaticamente.");
+    saveState();
     showView("revision_humana");
     return;
   }
   if (action === "agenda") {
+    recordAgentExecution(queueItem, "Abri la agenda para programar el pendiente priorizado.");
+    saveState();
     showView("agenda");
     return;
   }
   if (action === "review") {
+    recordAgentExecution(queueItem, "Actualice o prepare entradas para revision por la direccion 9.3.");
     refreshManagementReview(0);
   }
 }
@@ -7195,7 +7214,7 @@ function renderAgentWorkQueue() {
       <span class="badge phva">${items.length}</span>
     </div>
     <div class="agent-queue-grid">
-      ${items.length ? items.map((item) => `
+      ${items.length ? items.map((item, index) => `
         <article class="agent-queue-card ${item.kind === "requiere humano" ? "human" : ""}">
           <div class="gap-guide-title">
             <span class="badge requisito">${item.code || "SG"}</span>
@@ -7204,11 +7223,11 @@ function renderAgentWorkQueue() {
           <strong>${escapeHtml(item.title)}</strong>
           <p>${escapeHtml(item.detail)}</p>
           <small>${item.kind}</small>
-          <button data-agent-queue-run="${item.action}" type="button">${item.kind === "requiere humano" ? "Revisar" : "Ejecutar"}</button>
+          <button data-agent-queue-run="${item.action}" data-agent-queue-index="${index}" type="button">${item.kind === "requiere humano" ? "Revisar" : "Ejecutar"}</button>
         </article>`).join("") : `<div class="muted">No hay trabajos urgentes. El agente queda en vigilancia.</div>`}
     </div>`;
   container.querySelectorAll("[data-agent-queue-run]").forEach((button) => {
-    button.addEventListener("click", () => runAgentQueueItem(button.dataset.agentQueueRun));
+    button.addEventListener("click", () => runAgentQueueItem(button.dataset.agentQueueRun, Number(button.dataset.agentQueueIndex)));
   });
 }
 
