@@ -525,6 +525,25 @@ textarea {
   padding: 10px;
 }
 
+.demo-script-step.listo {
+  background: #f0fdf4;
+}
+
+.demo-script-step.revisar {
+  background: #fffbeb;
+}
+
+.demo-script-step.preparar {
+  background: #f8fafc;
+}
+
+.demo-script-step > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .demo-script-step p {
   color: var(--muted);
   font-size: 13px;

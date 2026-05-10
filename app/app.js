@@ -631,13 +631,16 @@ function renderDemoReadiness() {
 
 function renderDemoScript(demo) {
   const steps = [
-    { view: "empresa", title: "1. Perfil real", detail: "Mostrar ubicacion, alcance, actividades y faltantes que usa el agente." },
-    { view: "brechas_actividad", title: "2. Brechas por actividad", detail: "Ensenar que rafting, senderismo o cuatrimotos se revisan por separado." },
-    { view: "evidencias", title: "3. Paquetes de evidencia", detail: "Mostrar como formularios, documentos y acciones cuentan para cada requisito." },
-    { view: "documentos", title: "4. Documentos generados", detail: "Abrir alcance, politica, procedimiento o emergencia y descargar/imprimir." },
-    { view: "revision", title: "5. Direccion decide", detail: "Mostrar revision 9.3 con decisiones: operar, no ofertar, recursos y acciones." },
-    { view: "acciones", title: "6. Mejora controlada", detail: "Cerrar acciones solo con seguimiento, evidencia y eficacia." }
-  ];
+    { view: "empresa", title: "1. Perfil real", detail: "Mostrar ubicacion, alcance, actividades y faltantes que usa el agente.", ready: companyProfileGaps().length <= 2 },
+    { view: "brechas_actividad", title: "2. Brechas por actividad", detail: "Ensenar que rafting, senderismo o cuatrimotos se revisan por separado.", ready: state.activities.some((activity) => activityReadiness(activity.name).gaps.length > 0), review: state.activities.length > 0 },
+    { view: "evidencias", title: "3. Paquetes de evidencia", detail: "Mostrar como formularios, documentos y acciones cuentan para cada requisito.", ready: requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length >= 6 },
+    { view: "documentos", title: "4. Documentos generados", detail: "Abrir alcance, politica, procedimiento o emergencia y descargar/imprimir.", ready: state.documents.filter((doc) => doc.content).length >= 3 },
+    { view: "revision", title: "5. Direccion decide", detail: "Mostrar revision 9.3 con decisiones: operar, no ofertar, recursos y acciones.", ready: state.managementReviews.length > 0 },
+    { view: "acciones", title: "6. Mejora controlada", detail: "Cerrar acciones solo con seguimiento, evidencia y eficacia.", ready: state.actions.length > 0, review: state.actions.some((action) => action.status === "pendiente_eficacia") }
+  ].map((step) => ({
+    ...step,
+    status: step.ready ? "listo" : step.review ? "revisar" : "preparar"
+  }));
   return `
     <div class="demo-script">
       <div class="demo-script-head">
@@ -649,8 +652,11 @@ function renderDemoScript(demo) {
       </div>
       <div class="demo-script-grid">
         ${steps.map((step) => `
-          <article class="demo-script-step">
-            <strong>${step.title}</strong>
+          <article class="demo-script-step ${step.status}">
+            <div>
+              <strong>${step.title}</strong>
+              <span class="badge ${step.status === "listo" ? "cumple" : step.status === "revisar" ? "en_proceso" : "pendiente"}">${step.status}</span>
+            </div>
             <p>${step.detail}</p>
             <button class="secondary-button" data-demo-step="${step.view}" type="button">Abrir</button>
           </article>`).join("")}
