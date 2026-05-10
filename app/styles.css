@@ -1444,6 +1444,63 @@ textarea {
   margin-bottom: 14px;
 }
 
+.competency-matrix {
+  margin-bottom: 14px;
+}
+
+.competency-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.competency-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.competency-head h3,
+.competency-head p,
+.competency-row p {
+  margin: 0;
+}
+
+.competency-head p,
+.competency-row p,
+.competency-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.competency-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.competency-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.competency-row.ready {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.competency-row.pending {
+  border-color: #fecaca;
+}
+
 .report-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2639,6 +2696,7 @@ textarea {
   .plan-usage,
   .systems-matrix,
   .report-summary,
+  .competency-grid,
   .audit-requirement-head,
   .audit-grid,
   .catalog-summary,

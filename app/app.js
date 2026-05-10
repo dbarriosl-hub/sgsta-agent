@@ -3047,6 +3047,166 @@ function trainingNeedComplete(item) {
   return ["cerrada", "realizada"].includes(item.status) && item.evaluation && item.certificate && item.evidence;
 }
 
+function competencyRequirementsForActivity(activityName) {
+  const lower = String(activityName || "").toLowerCase();
+  const topics = [
+    "Primeros auxilios y respuesta a emergencias",
+    "Gestion de riesgos y briefing de seguridad",
+    "Comunicacion con participantes antes, durante y despues"
+  ];
+  if (lower.includes("rafting") || lower.includes("rio") || lower.includes("agua")) {
+    topics.push("Rescate acuatico y lectura de caudal");
+  } else if (lower.includes("cuatrimoto") || lower.includes("moto")) {
+    topics.push("Conduccion segura, control de velocidad y ruta motorizada");
+  } else if (lower.includes("sender") || lower.includes("caminata") || lower.includes("trek")) {
+    topics.push("Orientacion, terreno, clima y manejo de grupos");
+  } else {
+    topics.push("Operacion segura especifica de la actividad");
+  }
+  return topics;
+}
+
+function competencyMatrixRows() {
+  return state.activities.map((activity) => {
+    const related = activityRelatedItems(activity.name);
+    const guides = related.people;
+    const competentGuides = guides.filter((person) => person.competence === "cumple");
+    const openTraining = state.trainingNeeds.filter((item) => itemActivityName(item) === activity.name && !trainingNeedComplete(item));
+    const requirements = competencyRequirementsForActivity(activity.name);
+    const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12).length;
+    const missing = [];
+    if (!guides.length) missing.push("asignar guia");
+    if (!competentGuides.length) missing.push("competencia vigente");
+    if (!openTraining.length && competentGuides.length < guides.length) missing.push("necesidad de capacitacion");
+    if (highRisks && !openTraining.some((item) => String(item.topic || "").toLowerCase().includes("riesgo"))) missing.push("capacitacion por riesgo alto");
+    const scoreParts = [
+      guides.length > 0,
+      competentGuides.length > 0,
+      openTraining.length > 0 || competentGuides.length === guides.length,
+      highRisks === 0 || openTraining.length > 0
+    ];
+    const score = Math.round((scoreParts.filter(Boolean).length / scoreParts.length) * 100);
+    return { activity, guides, competentGuides, openTraining, requirements, highRisks, missing, score };
+  });
+}
+
+function competencyMatrixText() {
+  const rows = competencyMatrixRows();
+  return [
+    "Matriz de competencia por actividad - SGSTA Agent",
+    "",
+    "Criterio:",
+    "Cada actividad debe tener guia/persona competente, necesidades de capacitacion identificadas, evidencias y certificados vigentes segun los riesgos de la operacion.",
+    "",
+    ...rows.flatMap((row) => [
+      `${row.activity.name} (${row.score}%):`,
+      `- Guias/personas: ${row.guides.map((person) => `${person.name} (${person.competence || "pendiente"})`).join(", ") || "sin guia"}`,
+      `- Requisitos sugeridos: ${row.requirements.join("; ")}`,
+      `- Capacitaciones abiertas: ${row.openTraining.map((item) => item.topic).join(", ") || "ninguna"}`,
+      `- Brechas: ${row.missing.join(", ") || "sin brechas visibles"}`,
+      ""
+    ])
+  ].join("\n");
+}
+
+function downloadCompetencyMatrix() {
+  const blob = new Blob([competencyMatrixText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "matriz_competencia_por_actividad.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Matriz de competencia descargada",
+    detail: "Se descargo la matriz de competencia por actividad.",
+    code: "7.2",
+    type: "capacitacion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createCompetencyTrainingNeeds() {
+  let created = 0;
+  competencyMatrixRows().forEach((row) => {
+    if (!row.missing.length) return;
+    const topic = `Competencia operacional para ${row.activity.name}`;
+    if (!state.trainingNeeds.some((item) => item.topic === topic && itemActivityName(item) === row.activity.name && !trainingNeedComplete(item))) {
+      state.trainingNeeds.unshift({
+        topic,
+        activity: row.activity.name,
+        person: row.guides[0]?.name || row.activity.leader || "Guia por definir",
+        objective: `Cerrar brechas: ${row.missing.join(", ")}. Requisitos: ${row.requirements.join("; ")}.`,
+        origin: row.highRisks ? "riesgo alto/competencia" : "competencia",
+        priority: row.missing.some((item) => ["competencia vigente", "asignar guia"].includes(item)) ? "alta" : "media",
+        status: "pendiente",
+        code: "7.2",
+        date: "",
+        evaluation: "",
+        certificate: "",
+        evidence: ""
+      });
+      created += 1;
+    }
+  });
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  recordAuditEvent({
+    title: "Necesidades de competencia creadas",
+    detail: `Se crearon ${created} necesidad(es) desde la matriz por actividad.`,
+    code: "7.2",
+    type: "capacitacion",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} necesidad(es) de capacitacion desde la matriz de competencia.` : "La matriz no encontro nuevas necesidades o ya estaban abiertas.");
+  saveState();
+  renderAll();
+}
+
+function renderCompetencyMatrix() {
+  const container = document.querySelector("#competencyMatrix");
+  if (!container) return;
+  const rows = competencyMatrixRows();
+  const average = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0;
+  const blocked = rows.filter((row) => row.missing.length).length;
+  container.innerHTML = `
+    <article class="competency-card">
+      <div class="competency-head">
+        <div>
+          <p class="eyebrow">Matriz por actividad</p>
+          <h3>Competencia antes de operar</h3>
+          <p>Relaciona actividades, guias, riesgos y capacitaciones para evidenciar 7.2 y 7.3.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${average}%</strong>
+          <span>${blocked} con brecha</span>
+        </div>
+      </div>
+      <div class="competency-grid">
+        ${rows.map((row) => `
+          <article class="competency-row ${row.missing.length ? "pending" : "ready"}">
+            <div>
+              <span class="badge requisito">7.2</span>
+              <span class="badge ${row.missing.length ? "no_cumple" : "cumple"}">${row.score}%</span>
+            </div>
+            <strong>${row.activity.name}</strong>
+            <p>Guias competentes: ${row.competentGuides.length}/${row.guides.length || 1}. Capacitaciones abiertas: ${row.openTraining.length}.</p>
+            <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Competencia sin brechas visibles."}</small>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-competency-download type="button">Descargar matriz</button>
+        <button data-competency-create type="button">Crear necesidades</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-competency-download]")?.addEventListener("click", downloadCompetencyMatrix);
+  container.querySelector("[data-competency-create]")?.addEventListener("click", createCompetencyTrainingNeeds);
+}
+
 function detectTrainingNeeds() {
   let created = 0;
   state.people.forEach((person) => {
@@ -3101,6 +3261,7 @@ function detectTrainingNeeds() {
 function renderTraining() {
   const container = document.querySelector("#trainingTable");
   const summary = document.querySelector("#trainingSummary");
+  renderCompetencyMatrix();
   if (summary) {
     const open = state.trainingNeeds.filter((item) => !trainingNeedComplete(item)).length;
     const high = state.trainingNeeds.filter((item) => item.priority === "alta" || item.priority === "critica").length;
