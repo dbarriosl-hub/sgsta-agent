@@ -1448,7 +1448,20 @@ textarea {
   margin-bottom: 14px;
 }
 
+.equipment-readiness-matrix {
+  margin-bottom: 14px;
+}
+
 .competency-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.equipment-matrix-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;

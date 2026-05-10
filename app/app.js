@@ -3378,9 +3378,171 @@ function detectEquipmentGaps() {
   renderAll();
 }
 
+function expectedEquipmentForActivity(activityName) {
+  const lower = String(activityName || "").toLowerCase();
+  const base = ["Botiquin", "Comunicacion", "Lista de inspeccion"];
+  if (lower.includes("rafting") || lower.includes("rio") || lower.includes("agua")) {
+    return [...base, "Chaleco salvavidas", "Casco", "Cuerda/rescate acuatico"];
+  }
+  if (lower.includes("cuatrimoto") || lower.includes("moto")) {
+    return [...base, "Casco", "Vehiculo revisado", "Kit de herramientas"];
+  }
+  if (lower.includes("sender") || lower.includes("caminata") || lower.includes("trek")) {
+    return [...base, "Equipo de orientacion", "Linterna", "Equipo clima/terreno"];
+  }
+  return [...base, "Equipo especifico de la actividad"];
+}
+
+function equipmentReadinessRows() {
+  return state.activities.map((activity) => {
+    const items = state.equipment.filter((equipment) => itemActivityName(equipment) === activity.name);
+    const completeItems = items.filter(equipmentIsComplete);
+    const expected = expectedEquipmentForActivity(activity.name);
+    const expectedMatched = expected.filter((expectedItem) => {
+      const lower = expectedItem.toLowerCase();
+      return items.some((equipment) => `${equipment.name || ""} ${equipment.type || ""}`.toLowerCase().includes(lower.split(" ")[0]));
+    });
+    const critical = items.filter((equipment) => ["mantenimiento", "fuera_servicio"].includes(equipment.status)).length;
+    const missing = [];
+    if (!items.length) missing.push("inventario por actividad");
+    if (items.length && completeItems.length < items.length) missing.push("inspeccion/mantenimiento/evidencia");
+    if (critical) missing.push("equipo fuera de operacion");
+    if (expectedMatched.length < Math.min(3, expected.length)) missing.push("equipo minimo esperado");
+    const scoreParts = [
+      items.length > 0,
+      completeItems.length > 0,
+      completeItems.length === items.length && items.length > 0,
+      critical === 0,
+      expectedMatched.length >= Math.min(3, expected.length)
+    ];
+    const score = Math.round((scoreParts.filter(Boolean).length / scoreParts.length) * 100);
+    return { activity, items, completeItems, expected, expectedMatched, critical, missing, score };
+  });
+}
+
+function equipmentReadinessText() {
+  return [
+    "Matriz de equipos por actividad - SGSTA Agent",
+    "",
+    "Criterio:",
+    "Cada actividad debe tener inventario asociado, estado operativo, inspeccion, mantenimiento, responsable y evidencia antes de ofertar u operar.",
+    "",
+    ...equipmentReadinessRows().flatMap((row) => [
+      `${row.activity.name} (${row.score}%):`,
+      `- Equipos registrados: ${row.items.map((item) => `${item.name} (${item.status || "revision"})`).join(", ") || "ninguno"}`,
+      `- Equipos completos: ${row.completeItems.length}/${row.items.length}`,
+      `- Equipo esperado: ${row.expected.join("; ")}`,
+      `- Brechas: ${row.missing.join(", ") || "sin brechas visibles"}`,
+      ""
+    ])
+  ].join("\n");
+}
+
+function downloadEquipmentReadinessMatrix() {
+  const blob = new Blob([equipmentReadinessText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "matriz_equipos_por_actividad.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Matriz de equipos descargada",
+    detail: "Se descargo la matriz de equipos por actividad.",
+    code: "7.1",
+    type: "equipo",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function createEquipmentReadinessActions() {
+  let created = 0;
+  equipmentReadinessRows().forEach((row) => {
+    if (!row.missing.length) return;
+    const title = `Equipos por actividad: cerrar brechas de ${row.activity.name}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: "7.1",
+      status: "abierta",
+      type: "preventiva",
+      origin: "equipo",
+      priority: row.critical || row.missing.includes("inventario por actividad") ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: `La actividad ${row.activity.name} presenta brechas de equipo: ${row.missing.join(", ")}. Equipo esperado: ${row.expected.join("; ")}.`,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      relatedActivity: row.activity.name,
+      sourceDetail: "Matriz de equipos por actividad",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  state.compliance["7.1"] = "en_proceso";
+  state.compliance["8.1"] = "en_proceso";
+  recordAuditEvent({
+    title: "Acciones de equipos por actividad creadas",
+    detail: `Se crearon ${created} accion(es) desde la matriz de equipos.`,
+    code: "7.1",
+    type: "equipo",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) preventivas desde la matriz de equipos por actividad.` : "La matriz de equipos no encontro nuevas acciones o ya estaban abiertas.");
+  saveState();
+  renderAll();
+}
+
+function renderEquipmentReadinessMatrix() {
+  const container = document.querySelector("#equipmentReadinessMatrix");
+  if (!container) return;
+  const rows = equipmentReadinessRows();
+  const average = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0;
+  const blocked = rows.filter((row) => row.missing.length).length;
+  container.innerHTML = `
+    <article class="equipment-matrix-card">
+      <div class="competency-head">
+        <div>
+          <p class="eyebrow">Matriz por actividad</p>
+          <h3>Equipos listos antes de operar</h3>
+          <p>Relaciona inventario, inspeccion, mantenimiento, evidencia y equipo minimo esperado por actividad.</p>
+        </div>
+        <div class="pilot-score">
+          <strong>${average}%</strong>
+          <span>${blocked} con brecha</span>
+        </div>
+      </div>
+      <div class="competency-grid">
+        ${rows.map((row) => `
+          <article class="competency-row ${row.missing.length ? "pending" : "ready"}">
+            <div>
+              <span class="badge requisito">7.1/8.1</span>
+              <span class="badge ${row.missing.length ? "no_cumple" : "cumple"}">${row.score}%</span>
+            </div>
+            <strong>${row.activity.name}</strong>
+            <p>Equipos completos: ${row.completeItems.length}/${row.items.length}. Criticos: ${row.critical}.</p>
+            <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Equipos sin brechas visibles."}</small>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-equipment-matrix-download type="button">Descargar matriz</button>
+        <button data-equipment-matrix-actions type="button">Crear acciones</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-equipment-matrix-download]")?.addEventListener("click", downloadEquipmentReadinessMatrix);
+  container.querySelector("[data-equipment-matrix-actions]")?.addEventListener("click", createEquipmentReadinessActions);
+}
+
 function renderEquipment() {
   const container = document.querySelector("#equipmentTable");
   const summary = document.querySelector("#equipmentSummary");
+  renderEquipmentReadinessMatrix();
   if (summary) {
     const complete = state.equipment.filter(equipmentIsComplete).length;
     const pending = state.equipment.length - complete;
