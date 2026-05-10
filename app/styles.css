@@ -1085,6 +1085,69 @@ textarea {
   gap: 14px;
 }
 
+.phva-maturity {
+  margin-bottom: 14px;
+}
+
+.phva-maturity-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.phva-maturity-card h3,
+.phva-maturity-card p {
+  margin: 0;
+}
+
+.phva-maturity-card p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.phva-maturity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.phva-maturity-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.phva-maturity-item.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.phva-maturity-item.middle {
+  background: #fffdf3;
+  border-color: #fde68a;
+}
+
+.phva-maturity-item.weak {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.phva-maturity-item span,
+.phva-maturity-item small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.phva-maturity-item strong {
+  font-size: 24px;
+}
+
 .plans-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(180px, 1fr));
@@ -2955,6 +3018,7 @@ textarea {
   .operation-activity-card,
   .demo-readiness-card,
   .phva-grid,
+  .phva-maturity-grid,
   .plans-grid,
   .today-grid,
   .panel-grid,

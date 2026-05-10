@@ -1111,6 +1111,7 @@ function renderChapterProgress() {
 
 function renderPhvaBoard() {
   const container = document.querySelector("#phvaBoard");
+  renderPhvaMaturity();
   container.innerHTML = phvaStages.map((stage) => {
     const items = requirements.filter((item) => stage.codes.includes(item.chapter));
     const score = items.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
@@ -1125,6 +1126,87 @@ function renderPhvaBoard() {
         <div class="muted">${pct}% de avance - ${openActions} acciones abiertas</div>
       </article>`;
   }).join("");
+}
+
+function phvaMaturityRows() {
+  return phvaStages.map((stage) => {
+    const items = requirements.filter((item) => stage.codes.includes(item.chapter));
+    const score = items.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
+    const pct = Math.round((score / items.length) * 100);
+    const openActions = state.actions.filter((action) => stage.codes.includes((action.code || "").split(".")[0]) && action.status !== "cerrada");
+    const pendingEvidence = items.filter((item) => evidencePackageForRequirement(item).score < 100).length;
+    return {
+      ...stage,
+      pct,
+      openActions: openActions.length,
+      pendingEvidence,
+      status: pct >= 75 ? "maduro" : pct >= 40 ? "en desarrollo" : "debil"
+    };
+  });
+}
+
+function renderPhvaMaturity() {
+  const container = document.querySelector("#phvaMaturity");
+  if (!container) return;
+  const rows = phvaMaturityRows();
+  const weakest = [...rows].sort((a, b) => a.pct - b.pct || b.openActions - a.openActions)[0];
+  const average = Math.round(rows.reduce((sum, row) => sum + row.pct, 0) / rows.length);
+  container.innerHTML = `
+    <article class="phva-maturity-card">
+      <div>
+        <p class="eyebrow">Madurez PHVA</p>
+        <h3>${average}% balance general</h3>
+        <p>Fase mas debil: <strong>${weakest.label}</strong>. ${weakest.focus}</p>
+      </div>
+      <div class="phva-maturity-grid">
+        ${rows.map((row) => `
+          <div class="phva-maturity-item ${row.status === "debil" ? "weak" : row.status === "en desarrollo" ? "middle" : "ready"}">
+            <span>${row.label}</span>
+            <strong>${row.pct}%</strong>
+            <small>${row.openActions} acciones - ${row.pendingEvidence} evidencias</small>
+          </div>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button data-phva-weak-action type="button">Crear accion fase debil</button>
+        <button class="secondary-button" data-phva-open-weak type="button">Abrir fase</button>
+      </div>
+    </article>`;
+  container.querySelector("[data-phva-weak-action]")?.addEventListener("click", () => createPhvaWeakPhaseAction(weakest));
+  container.querySelector("[data-phva-open-weak]")?.addEventListener("click", () => showView(weakest.id === "planear" ? "implementacion" : weakest.id === "hacer" ? "actividades" : weakest.id === "verificar" ? "revision" : "acciones"));
+}
+
+function createPhvaWeakPhaseAction(stage) {
+  const title = `Fortalecer PHVA ${stage.label}`;
+  if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+    addMessage("agent", `La accion para fortalecer ${stage.label} ya estaba abierta.`);
+    return;
+  }
+  state.actions.unshift({
+    title,
+    code: stage.codes[0],
+    status: "abierta",
+    type: "mejora",
+    origin: "madurez PHVA",
+    priority: stage.pct < 40 ? "alta" : "media",
+    responsible: state.ownerName || "Responsable SGSTA",
+    dueDate: "",
+    cause: `La fase ${stage.label} tiene ${stage.pct}% de madurez, ${stage.openActions} accion(es) abiertas y ${stage.pendingEvidence} evidencia(s) pendientes.`,
+    immediateCorrection: "",
+    followUp: "",
+    efficacyVerification: "",
+    efficacyStatus: "pendiente",
+    createdAt: today()
+  });
+  recordAuditEvent({
+    title: "Accion PHVA creada",
+    detail: `Se creo accion para fortalecer la fase ${stage.label}.`,
+    code: stage.codes[0],
+    type: "madurez_phva",
+    actor: "agente"
+  });
+  addMessage("agent", `Cree una accion para fortalecer ${stage.label}.`);
+  saveState();
+  renderAll();
 }
 
 function implementationStatus(step) {
