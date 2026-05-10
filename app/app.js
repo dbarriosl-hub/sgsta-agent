@@ -4428,7 +4428,7 @@ function managementReviewOperationalDecisions() {
   const review = readiness.filter((item) => item.decision.badge === "en_proceso");
   const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12);
   const equipmentPending = state.equipment.filter((item) => item.status !== "operativo");
-  const peoplePending = state.people.filter((person) => person.competence !== "vigente");
+  const peoplePending = state.people.filter((person) => person.competence !== "cumple");
   const trainingOpen = state.trainingNeeds.filter((item) => item.status !== "cerrada" && item.status !== "realizada");
   const policiesPending = state.policies.filter((policy) => !policyIsComplete(policy));
   const formsPending = formCoverageByRequirement().reduce((sum, group) => sum + group.pending, 0);
@@ -4524,6 +4524,24 @@ function managementReviewOperationalDecisions() {
   return decisions;
 }
 
+function managementReviewActivityRows() {
+  return state.activities.map((activity) => {
+    const status = activityReadiness(activity.name);
+    const decision = activityOperationDecision(status);
+    const checklist = activityDepartureChecklist(activity.name);
+    return {
+      name: activity.name,
+      decision: decision.label,
+      badge: decision.badge,
+      score: status.score,
+      high: status.high,
+      checklistReady: checklist.filter((item) => item.ok).length,
+      checklistTotal: checklist.length,
+      nextGap: status.gaps[0]?.label || "Sin brecha visible"
+    };
+  });
+}
+
 function renderManagementReviews() {
   const container = document.querySelector("#managementReviewTable");
   const inputs = managementReviewInputs();
@@ -4536,6 +4554,7 @@ function renderManagementReviews() {
             <span class="badge ${item.status === "aprobada" ? "cumple" : "en_proceso"}">${item.status}</span>
           </div>
           <div class="row-actions">
+            <button class="secondary-button" data-refresh-review="${index}" type="button">Actualizar datos</button>
             <button class="secondary-button" data-review-actions="${index}" type="button">Crear acciones</button>
             <button class="secondary-button" data-toggle-review="${index}" type="button">${item.status === "aprobada" ? "Borrador" : "Aprobar"}</button>
           </div>
@@ -4567,6 +4586,21 @@ function renderManagementReviews() {
                 <strong>${escapeHtml(decision.title)}</strong>
                 <p>${escapeHtml(decision.detail)}</p>
               </article>`).join("")}
+          </div>
+        </div>
+        <div class="review-activity-panel">
+          <div>
+            <p class="eyebrow">Actividades para decision</p>
+            <strong>Operacion resumida para direccion</strong>
+          </div>
+          <div class="review-activity-grid">
+            ${(item.activityRows?.length ? item.activityRows : managementReviewActivityRows()).map((row) => `
+              <article class="review-activity-card ${row.badge}">
+                <span class="badge ${row.badge}">${escapeHtml(row.decision)}</span>
+                <strong>${escapeHtml(row.name)}</strong>
+                <p>${row.score}% preparada - ${row.checklistReady}/${row.checklistTotal} antes de salir - ${row.high} critica(s)</p>
+                <small>${escapeHtml(row.nextGap)}</small>
+              </article>`).join("") || `<div class="muted">No hay actividades registradas para presentar a direccion.</div>`}
           </div>
         </div>
         <div class="review-detail-grid">
@@ -4601,6 +4635,9 @@ function renderManagementReviews() {
   container.querySelectorAll("[data-review-actions]").forEach((button) => {
     button.addEventListener("click", () => createManagementReviewActions(Number(button.dataset.reviewActions)));
   });
+  container.querySelectorAll("[data-refresh-review]").forEach((button) => {
+    button.addEventListener("click", () => refreshManagementReview(Number(button.dataset.refreshReview)));
+  });
 }
 
 function managementReviewInputs() {
@@ -4629,6 +4666,7 @@ function managementReviewInputs() {
 function buildManagementReviewDraft() {
   const inputs = managementReviewInputs();
   const operationalDecisions = managementReviewOperationalDecisions();
+  const activityRows = managementReviewActivityRows();
   const priorityActivities = state.activities
     .map((activity) => ({ name: activity.name, readiness: activityReadiness(activity.name) }))
     .filter((item) => item.readiness.gaps.length)
@@ -4670,9 +4708,45 @@ function buildManagementReviewDraft() {
     resources,
     outputs,
     operationalDecisions,
+    activityRows,
     preparedBy: "agente",
     createdAt: today()
   };
+}
+
+function refreshManagementReview(index = 0) {
+  if (!state.managementReviews.length) {
+    addManagementReview({ silent: true });
+    addMessage("agent", "Prepare una revision por la direccion con los datos operativos actuales.");
+    saveState();
+    renderAll();
+    return;
+  }
+  const current = state.managementReviews[index] || state.managementReviews[0];
+  const updated = buildManagementReviewDraft();
+  Object.assign(current, {
+    summary: updated.summary,
+    inputs: updated.inputs,
+    entries: updated.entries,
+    decisions: updated.decisions,
+    resources: updated.resources,
+    outputs: updated.outputs,
+    operationalDecisions: updated.operationalDecisions,
+    activityRows: updated.activityRows,
+    updatedAt: today()
+  });
+  if (current.status === "aprobada") current.status = "borrador";
+  state.compliance["9.3"] = "en_proceso";
+  recordAuditEvent({
+    title: "Revision por direccion actualizada",
+    detail: "El agente actualizo entradas, decisiones y actividades operativas para 9.3.",
+    code: "9.3",
+    type: "revision_direccion",
+    actor: "agente"
+  });
+  addMessage("agent", "Actualice la revision por la direccion con el estado actual de actividades, riesgos, equipos, seguros, capacitacion y formularios.");
+  saveState();
+  renderAll();
 }
 
 function createManagementReviewActions(index) {
@@ -8419,6 +8493,7 @@ document.querySelector("#generateDocumentDraft").addEventListener("click", gener
 document.querySelector("#addIncident").addEventListener("click", addIncident);
 document.querySelector("#addAudit").addEventListener("click", addAudit);
 document.querySelector("#addManagementReview").addEventListener("click", addManagementReview);
+document.querySelector("#refreshManagementReview").addEventListener("click", () => refreshManagementReview(0));
 document.querySelector("#generateReport").addEventListener("click", () => generateExecutiveReport(true));
 document.querySelector("#generateAuditReport").addEventListener("click", generateAuditReport);
 document.querySelector("#reportToEvidence").addEventListener("click", convertReportToEvidence);

@@ -2624,6 +2624,59 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.review-activity-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.review-activity-panel > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-activity-panel .eyebrow {
+  margin: 0;
+}
+
+.review-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.review-activity-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.review-activity-card.no_cumple {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.review-activity-card.en_proceso {
+  border-color: #fde68a;
+  background: #fffdf3;
+}
+
+.review-activity-card p,
+.review-activity-card small {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .evidence-packages {
   display: grid;
   gap: 12px;
