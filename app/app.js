@@ -860,12 +860,14 @@ function renderSystemHealthSummary() {
         </ul>
         <div class="row-actions">
           <button data-health-agent type="button">Usar agente</button>
+          <button data-health-actions type="button">Crear acciones 7 dias</button>
           <button class="secondary-button" data-health-direction type="button">Ver direccion</button>
           <button class="secondary-button" data-health-plan type="button">Descargar plan 7 dias</button>
         </div>
       </div>
     </div>`;
   container.querySelector("[data-health-agent]")?.addEventListener("click", () => showView("agente"));
+  container.querySelector("[data-health-actions]")?.addEventListener("click", createSystemHealthWeekActions);
   container.querySelector("[data-health-direction]")?.addEventListener("click", () => showView(health.directionNeeded ? "revision" : "monitor"));
   container.querySelector("[data-health-plan]")?.addEventListener("click", downloadSystemHealthWeekPlan);
 }
@@ -973,6 +975,45 @@ function downloadSystemHealthWeekPlan() {
     type: "plan_semaforo",
     actor: "humano"
   });
+  saveState();
+  renderAll();
+}
+
+function createSystemHealthWeekActions() {
+  const health = systemHealthStatus();
+  const plan = systemHealthWeekPlan(health);
+  let created = 0;
+  plan.forEach((item) => {
+    const title = `Plan 7 dias: ${item.title}`;
+    const exists = state.actions.some((action) => action.title === title && action.status !== "cerrada");
+    if (exists) return;
+    state.actions.unshift({
+      title,
+      code: item.code,
+      status: "abierta",
+      type: item.code === "10.1" ? "mejora" : item.code === "7.5" ? "tarea" : "preventiva",
+      origin: "semaforo SGSTA",
+      priority: health.tone === "blocked" || item.day === "Dia 1" ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: item.detail,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      sourceDetail: item.day,
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Plan 7 dias convertido en acciones",
+    detail: `El agente creo ${created} accion(es) desde el semaforo SGSTA.`,
+    code: "10.1",
+    type: "plan_semaforo",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) desde el plan de 7 dias del semaforo.` : "El plan de 7 dias ya tenia sus acciones abiertas.");
   saveState();
   renderAll();
 }
