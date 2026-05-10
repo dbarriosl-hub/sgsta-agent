@@ -1453,6 +1453,71 @@ textarea {
   margin-bottom: 16px;
 }
 
+.commercial-summary {
+  margin-bottom: 16px;
+}
+
+.commercial-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.commercial-card h3,
+.commercial-card p {
+  margin: 0;
+}
+
+.commercial-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.commercial-copy p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.commercial-proof {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.commercial-proof span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 800;
+  padding: 10px;
+  text-align: center;
+}
+
+.commercial-side {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.commercial-side strong {
+  font-size: 20px;
+}
+
+.commercial-side p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .system-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2398,6 +2463,8 @@ textarea {
   .activity-operational-status,
   .form-filters,
   .activity-form-tools,
+  .commercial-card,
+  .commercial-proof,
   .plan-usage,
   .systems-matrix,
   .report-summary,

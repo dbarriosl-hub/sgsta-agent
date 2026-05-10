@@ -5294,6 +5294,7 @@ function recordAuditEvent({ title, detail, code = "", type = "evento", actor = "
 function renderSubscriptionPlans() {
   const current = subscriptionPlans[state.currentPlan] || subscriptionPlans.profesional;
   const usage = currentPlanUsage();
+  renderCommercialSummary();
   const planUsage = document.querySelector("#planUsage");
   if (planUsage) {
     planUsage.innerHTML = Object.entries(usage).map(([key, item]) => `
@@ -5392,6 +5393,115 @@ function currentPlanUsage() {
     const count = used[key] || 0;
     return [key, { label: labels[key], used: count, limit, pct: Math.round((count / limit) * 100), over: count > limit }];
   }));
+}
+
+function commercialSummaryData() {
+  const plan = subscriptionPlans[state.currentPlan] || subscriptionPlans.profesional;
+  const progress = implementationProgress();
+  const demo = demoReadinessStatus();
+  const evidencePackages = requirements.map(evidencePackageForRequirement);
+  const evidenceWithSupport = evidencePackages.filter((item) => item.score > 0).length;
+  const completeEvidence = evidencePackages.filter((item) => item.score >= 100).length;
+  const blockedActivities = state.activities
+    .map((activity) => activityOperationDecision(activityReadiness(activity.name)))
+    .filter((decision) => decision.badge === "no_cumple").length;
+  const pendingActions = state.actions.filter((action) => action.status !== "cerrada").length;
+  const aiDocuments = state.documents.filter((doc) => doc.content).length;
+  const openTraining = state.trainingNeeds.filter((item) => item.status !== "cerrada").length;
+  const companyName = state.company.legalName || state.orgName || "la empresa";
+  return {
+    plan,
+    progress,
+    demo,
+    companyName,
+    activities: state.activities.length,
+    blockedActivities,
+    evidenceWithSupport,
+    completeEvidence,
+    pendingActions,
+    aiDocuments,
+    openTraining
+  };
+}
+
+function commercialSummaryText() {
+  const data = commercialSummaryData();
+  return [
+    `Resumen comercial SGSTA Agent - ${data.companyName}`,
+    "",
+    "Promesa:",
+    "SGSTA Agent ayuda a operadores de turismo de aventura a implementar, mantener y evidenciar su sistema de gestion ISO 21101 sin depender de formatos sueltos.",
+    "",
+    "Valor actual demostrado:",
+    `- Avance PHVA: ${data.progress.completed}/${data.progress.total} pasos (${data.progress.pct}%).`,
+    `- Preparacion para demo: ${data.demo.completed}/${data.demo.total} controles (${data.demo.score}%, ${data.demo.label}).`,
+    `- Actividades controladas: ${data.activities}; actividades bloqueadas para operar: ${data.blockedActivities}.`,
+    `- Evidencias por requisito: ${data.evidenceWithSupport}/${requirements.length} con soporte inicial; ${data.completeEvidence} completas.`,
+    `- Documentos con borrador IA: ${data.aiDocuments}.`,
+    `- Acciones abiertas trazables: ${data.pendingActions}.`,
+    `- Necesidades de capacitacion abiertas: ${data.openTraining}.`,
+    "",
+    "Como se vende:",
+    `Plan recomendado: ${data.plan.name} (${data.plan.price}). ${data.plan.text}`,
+    `Cliente ideal: ${data.plan.fit}`,
+    "",
+    "Diferenciador:",
+    "El agente no solo llena documentos; cruza actividades, riesgos, personal, capacitacion, equipos, seguros, participantes, evidencias y acciones para sostener el ciclo PHVA.",
+    "",
+    "Regla de control:",
+    "El agente propone, diligencia borradores y crea acciones. La empresa aprueba documentos, cierre de acciones criticas y cumplimiento."
+  ].join("\n");
+}
+
+function downloadCommercialSummary() {
+  const blob = new Blob([commercialSummaryText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "resumen_comercial_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Resumen comercial descargado",
+    detail: "Se descargo el resumen comercial del valor de la plataforma.",
+    type: "suscripcion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function renderCommercialSummary() {
+  const container = document.querySelector("#commercialSummary");
+  if (!container) return;
+  const data = commercialSummaryData();
+  container.innerHTML = `
+    <article class="commercial-card">
+      <div class="commercial-copy">
+        <p class="eyebrow">Propuesta de valor</p>
+        <h3>Vender gestion asistida, no formatos sueltos</h3>
+        <p>El agente convierte actividades reales en controles PHVA: riesgos, guias, equipos, seguros, participantes, evidencias y acciones.</p>
+        <div class="commercial-proof">
+          <span>${data.progress.pct}% PHVA</span>
+          <span>${data.demo.score}% demo</span>
+          <span>${data.evidenceWithSupport}/${requirements.length} evidencias</span>
+          <span>${data.activities} actividades</span>
+        </div>
+      </div>
+      <div class="commercial-side">
+        <span class="badge ${data.demo.score >= 80 ? "cumple" : data.demo.score >= 50 ? "en_proceso" : "pendiente"}">${data.demo.label}</span>
+        <strong>${data.plan.name}</strong>
+        <p>${data.plan.fit}</p>
+        <div class="row-actions">
+          <button class="secondary-button" data-commercial-open-demo type="button">Ver demo</button>
+          <button data-commercial-download type="button">Descargar resumen</button>
+        </div>
+      </div>
+    </article>`;
+  container.querySelector("[data-commercial-open-demo]")?.addEventListener("click", () => showView("panel"));
+  container.querySelector("[data-commercial-download]")?.addEventListener("click", downloadCommercialSummary);
 }
 
 function planAllows(feature) {
