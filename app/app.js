@@ -4819,6 +4819,7 @@ function renderManagementReviews() {
           <div><span>Brechas actividad</span><strong>${item.inputs?.activityGaps ?? inputs.activityGaps}</strong></div>
           <div><span>No ofertar todavia</span><strong>${item.inputs?.activitiesBlocked ?? inputs.activitiesBlocked}</strong></div>
           <div><span>Con revision</span><strong>${item.inputs?.activitiesInReview ?? inputs.activitiesInReview}</strong></div>
+          <div><span>Pend. eficacia</span><strong>${item.inputs?.pendingEfficacy ?? inputs.pendingEfficacy}</strong></div>
           <div><span>Riesgos altos</span><strong>${item.inputs?.highRisks ?? inputs.highRisks}</strong></div>
           <div><span>Capacitacion</span><strong>${item.inputs?.trainingOpen ?? inputs.trainingOpen}</strong></div>
           <div><span>Equipos no listos</span><strong>${item.inputs?.equipmentPending ?? inputs.equipmentPending}</strong></div>
@@ -4937,6 +4938,7 @@ function buildManagementReviewDraft() {
     inputs.activityGaps ? `Priorizar cierre de brechas en actividades: ${priorityActivities.map((item) => item.name).join(", ") || "por definir"}.` : "Mantener controles operacionales actuales.",
     inputs.activitiesBlocked ? "La direccion debe decidir no ofertar actividades bloqueadas hasta cerrar brechas criticas." : "No hay actividades bloqueadas por brechas criticas.",
     inputs.highRisks ? "Aprobar tratamiento inmediato para riesgos altos antes de operar actividades criticas." : "Mantener seguimiento preventivo de riesgos.",
+    inputs.pendingEfficacy ? "La direccion debe revisar acciones pendientes de eficacia antes de considerar controles como cerrados." : "No hay acciones pendientes de eficacia.",
     inputs.trainingOpen ? "Aprobar plan de capacitacion y competencia por actividad." : "Mantener vigilancia de competencias vigentes.",
     inputs.policiesPending ? "Exigir validacion documental de polizas antes de ofertar actividades no cubiertas." : "Mantener control de vigencias de polizas."
   ];
@@ -4948,6 +4950,7 @@ function buildManagementReviewDraft() {
   const outputs = [
     "Asignar responsables y fechas a acciones abiertas prioritarias.",
     "Validar evidencias antes de cerrar acciones.",
+    "Verificar eficacia de acciones implementadas antes de cerrar mejora.",
     "Actualizar tablero de brechas por actividad despues de cada cierre.",
     "Registrar decisiones aprobadas por direccion y recursos autorizados."
   ];
@@ -6419,6 +6422,18 @@ function buildReviewItems() {
   state.actions.forEach((action, index) => {
     const missingOwner = !action.responsible && !action.owner;
     const missingDue = !action.dueDate && !action.deadline && !action.fechaLimite;
+    if (action.status === "pendiente_eficacia" || (action.status !== "cerrada" && action.efficacyVerification && action.efficacyStatus !== "eficaz")) {
+      items.push({
+        kind: "efficacy",
+        index,
+        title: action.title,
+        detail: `Requiere verificacion humana de eficacia antes de cerrar. ${action.efficacyVerification || "Sin criterio de eficacia documentado."}`,
+        code: action.code || "10.1",
+        priority: "alta",
+        status: action.efficacyStatus || "pendiente"
+      });
+      return;
+    }
     if (action.status !== "cerrada" && (missingOwner || missingDue)) {
       items.push({
         kind: "action",
@@ -6459,12 +6474,14 @@ function renderReviewInbox() {
   const forms = items.filter((item) => item.kind === "form").length;
   const evidence = items.filter((item) => item.kind === "evidence").length;
   const actions = items.filter((item) => item.kind === "action").length;
+  const efficacy = items.filter((item) => item.kind === "efficacy").length;
   const packages = items.filter((item) => item.kind === "package").length;
   summary.innerHTML = `
     <div class="report-card"><span>Total pendiente</span><strong>${items.length}</strong></div>
     <div class="report-card"><span>Formularios</span><strong>${forms}</strong></div>
     <div class="report-card"><span>Evidencias</span><strong>${evidence}</strong></div>
     <div class="report-card"><span>Acciones</span><strong>${actions}</strong></div>
+    <div class="report-card"><span>Eficacia</span><strong>${efficacy}</strong></div>
     <div class="report-card"><span>Paquetes</span><strong>${packages}</strong></div>`;
   container.innerHTML = items.length
     ? items.map((item) => `
@@ -6492,6 +6509,7 @@ function reviewKindLabel(kind) {
     form: "Formulario",
     evidence: "Evidencia",
     action: "Accion",
+    efficacy: "Eficacia",
     package: "Paquete"
   }[kind] || kind;
 }
@@ -6510,6 +6528,11 @@ function reviewButtons(item) {
   }
   if (item.kind === "action") {
     return `<button data-review-assign-action="${item.index}" type="button">Asignar</button>`;
+  }
+  if (item.kind === "efficacy") {
+    return `
+      <button class="secondary-button" data-review-open-action="${item.index}" type="button">Ver accion</button>
+      <button data-review-efficacy-action="${item.index}" type="button">Marcar eficaz</button>`;
   }
   if (item.kind === "package") {
     return `
@@ -6558,6 +6581,12 @@ function bindReviewInboxButtons(container) {
   container.querySelectorAll("[data-review-assign-action]").forEach((button) => {
     button.addEventListener("click", () => assignReviewAction(Number(button.dataset.reviewAssignAction)));
   });
+  container.querySelectorAll("[data-review-open-action]").forEach((button) => {
+    button.addEventListener("click", () => focusActionCard(Number(button.dataset.reviewOpenAction)));
+  });
+  container.querySelectorAll("[data-review-efficacy-action]").forEach((button) => {
+    button.addEventListener("click", () => markActionEfficacyReviewed(Number(button.dataset.reviewEfficacyAction)));
+  });
   container.querySelectorAll("[data-review-package-open]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = (state.closurePackages || [])[Number(button.dataset.reviewPackageOpen)];
@@ -6600,6 +6629,24 @@ function assignReviewAction(index) {
     detail: `${action.title} queda a cargo de ${action.responsible} con fecha limite ${action.dueDate}.`,
     code: action.code,
     type: "asignacion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
+function markActionEfficacyReviewed(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  action.efficacyStatus = "eficaz";
+  action.efficacyReviewedBy = `${state.ownerName || "Responsable"} (${roleLabel(state.currentUserRole)})`;
+  action.efficacyReviewedAt = today();
+  action.status = actionReadyToClose(action) ? "abierta" : action.status;
+  recordAuditEvent({
+    title: "Eficacia de accion revisada",
+    detail: `${action.title} fue marcada como eficaz por ${action.efficacyReviewedBy}. Aun requiere cierre humano si sigue abierta.`,
+    code: action.code,
+    type: "revision_eficacia",
     actor: "humano"
   });
   saveState();
