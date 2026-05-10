@@ -537,6 +537,7 @@ function renderAll() {
   renderManagementReviews();
   renderExecutiveReport();
   renderAuditReport();
+  renderAgentWorkQueue();
   renderAgentFindings();
   renderReviewInbox();
   renderAuditLog();
@@ -7084,6 +7085,130 @@ function renderActionWorkQueue() {
       if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
       focusActionCard(Number(button.dataset.queueFocus));
     });
+  });
+}
+
+function agentWorkQueueItems() {
+  const alerts = buildSystemAlerts();
+  const reviewItems = buildReviewItems();
+  const agendaItems = buildAgendaItems();
+  const activityPriority = state.activities
+    .map((activity) => ({ activity, readiness: activityReadiness(activity.name) }))
+    .filter((item) => item.readiness.gaps.length)
+    .sort((a, b) => b.readiness.high - a.readiness.high || a.readiness.score - b.readiness.score)[0];
+  const items = [];
+  if (activityPriority) {
+    items.push({
+      title: `Revisar actividad: ${activityPriority.activity.name}`,
+      detail: `${activityPriority.readiness.gaps.length} brecha(s), ${activityPriority.readiness.high} critica(s).`,
+      code: "8.1",
+      kind: "puedo ejecutar",
+      priority: activityPriority.readiness.high ? "alta" : "media",
+      action: "activity",
+      activity: activityPriority.activity.name
+    });
+  }
+  const criticalAlert = alerts.find((item) => item.severity === "alta") || alerts[0];
+  if (criticalAlert) {
+    items.push({
+      title: criticalAlert.title,
+      detail: criticalAlert.detail,
+      code: criticalAlert.code,
+      kind: "puedo ejecutar",
+      priority: criticalAlert.severity === "alta" ? "alta" : "media",
+      action: "alert"
+    });
+  }
+  const humanReview = reviewItems[0];
+  if (humanReview) {
+    items.push({
+      title: humanReview.title,
+      detail: humanReview.detail,
+      code: humanReview.code,
+      kind: "requiere humano",
+      priority: humanReview.priority || "media",
+      action: "human"
+    });
+  }
+  const agendaItem = agendaItems[0];
+  if (agendaItem) {
+    items.push({
+      title: agendaItem.title,
+      detail: agendaItem.detail,
+      code: agendaItem.code,
+      kind: "programar",
+      priority: agendaItem.priority || "media",
+      action: "agenda"
+    });
+  }
+  if (!state.managementReviews.length) {
+    items.push({
+      title: "Preparar revision por la direccion",
+      detail: "El agente puede consolidar entradas 9.3, pero la direccion debe aprobar.",
+      code: "9.3",
+      kind: "puedo ejecutar",
+      priority: "media",
+      action: "review"
+    });
+  }
+  return items
+    .filter((item, index, list) => list.findIndex((other) => other.title === item.title && other.code === item.code) === index)
+    .sort((a, b) => priorityWeight(b.priority) - priorityWeight(a.priority))
+    .slice(0, 4);
+}
+
+function runAgentQueueItem(action) {
+  if (action === "activity") {
+    const item = agentWorkQueueItems().find((queueItem) => queueItem.action === "activity");
+    if (item?.activity) state.selectedActivityName = item.activity;
+    showView("actividades");
+    return;
+  }
+  if (action === "alert") {
+    const alert = buildSystemAlerts().find((item) => item.severity === "alta") || buildSystemAlerts()[0];
+    if (alert) createActionFromAlert(alert);
+    return;
+  }
+  if (action === "human") {
+    showView("revision_humana");
+    return;
+  }
+  if (action === "agenda") {
+    showView("agenda");
+    return;
+  }
+  if (action === "review") {
+    refreshManagementReview(0);
+  }
+}
+
+function renderAgentWorkQueue() {
+  const container = document.querySelector("#agentWorkQueue");
+  if (!container) return;
+  const items = agentWorkQueueItems();
+  container.innerHTML = `
+    <div class="queue-head agent-queue-head">
+      <div>
+        <p class="eyebrow">Cola del agente</p>
+        <h3>Que puede hacer ahora</h3>
+      </div>
+      <span class="badge phva">${items.length}</span>
+    </div>
+    <div class="agent-queue-grid">
+      ${items.length ? items.map((item) => `
+        <article class="agent-queue-card ${item.kind === "requiere humano" ? "human" : ""}">
+          <div class="gap-guide-title">
+            <span class="badge requisito">${item.code || "SG"}</span>
+            <span class="badge ${item.priority === "alta" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
+          </div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p>${escapeHtml(item.detail)}</p>
+          <small>${item.kind}</small>
+          <button data-agent-queue-run="${item.action}" type="button">${item.kind === "requiere humano" ? "Revisar" : "Ejecutar"}</button>
+        </article>`).join("") : `<div class="muted">No hay trabajos urgentes. El agente queda en vigilancia.</div>`}
+    </div>`;
+  container.querySelectorAll("[data-agent-queue-run]").forEach((button) => {
+    button.addEventListener("click", () => runAgentQueueItem(button.dataset.agentQueueRun));
   });
 }
 
