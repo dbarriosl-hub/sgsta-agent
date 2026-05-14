@@ -614,6 +614,7 @@ function renderDemoReadiness() {
         <div class="row-actions">
           <button class="secondary-button" data-demo-open="${next.view}" type="button">Abrir pendiente</button>
           <button class="secondary-button" data-demo-seed type="button">Cargar piloto ejemplo</button>
+          <button class="secondary-button" data-demo-guide type="button">Descargar guia piloto</button>
           <button data-demo-prepare type="button">Preparar demo</button>
         </div>
       </div>
@@ -628,6 +629,7 @@ function renderDemoReadiness() {
     ${renderDemoScript(demo)}`;
   container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
   container.querySelector("[data-demo-seed]")?.addEventListener("click", loadPilotExampleData);
+  container.querySelector("[data-demo-guide]")?.addEventListener("click", downloadPilotTestGuide);
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
@@ -667,6 +669,77 @@ function renderDemoScript(demo) {
           </article>`).join("")}
       </div>
     </div>`;
+}
+
+function pilotTestGuideText() {
+  const demo = demoReadinessStatus();
+  const health = systemHealthStatus();
+  const rows = phvaMaturityRows();
+  return [
+    "GUIA DE PRUEBA PILOTO - SGSTA AGENT",
+    "",
+    `Empresa sugerida: ${state.company.legalName || state.orgName || "EcoAventura Andina SAS"}`,
+    `Fecha: ${today()}`,
+    `Demo: ${demo.score}% - ${demo.label}`,
+    `Semaforo: ${health.label}`,
+    "",
+    "Objetivo de la prueba",
+    "Validar que el MVP conecta empresa, actividades, riesgos, equipos, personal, seguros, participantes, evidencias, acciones, revision por direccion y mejora.",
+    "",
+    "Preparacion",
+    "1. En Panel, usar 'Cargar piloto ejemplo' si no hay datos cargados.",
+    "2. Revisar Semaforo SGSTA y plan de 7 dias.",
+    "3. Confirmar que hay al menos una actividad lista, una en revision y una con brechas.",
+    "",
+    "Recorrido recomendado",
+    "1. Empresa: verificar alcance, ubicacion, partes interesadas y contexto local.",
+    "2. Actividades: abrir Rafting Rio Claro y revisar ficha operativa.",
+    "3. Brechas por actividad: confirmar cuatrimotos con brecha de guia, seguro o equipo.",
+    "4. Participantes: verificar evidencia externa sin datos sensibles.",
+    "5. Equipos: revisar balsa/chalecos operativos y cuatrimoto en revision.",
+    "6. Seguros: confirmar poliza vigente para rafting/caminata y pendiente para cuatrimotos.",
+    "7. Acciones: usar Avanzar cierre y verificar que no cierre sin eficacia humana.",
+    "8. Revision direccion 9.3: actualizar datos y revisar decisiones.",
+    "9. PHVA: revisar madurez y fase mas debil.",
+    "10. Monitor: descargar bitacora auditable.",
+    "",
+    "Criterios de aceptacion",
+    `- Cumplimiento estimado visible: ${health.compliance}%.`,
+    `- Madurez PHVA: ${rows.map((row) => `${row.label} ${row.pct}%`).join(", ")}.`,
+    "- El agente crea acciones, pero no aprueba documentos ni cierra acciones criticas sin humano.",
+    "- Los participantes se manejan con evidencia externa y datos minimos.",
+    "- La direccion puede ver decisiones operativas antes de autorizar.",
+    "",
+    "Preguntas para el piloto",
+    "- El operador entiende que actividad puede o no puede ofertar?",
+    "- El responsable SGSTA entiende que evidencia falta?",
+    "- La direccion entiende que debe aprobar?",
+    "- El agente reduce trabajo de oficina sin perder control?",
+    "",
+    "Siguiente paso",
+    "Registrar observaciones del piloto y ajustar formularios/reportes antes de vender suscripcion."
+  ].join("\n");
+}
+
+function downloadPilotTestGuide() {
+  const blob = new Blob([pilotTestGuideText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "guia_prueba_piloto_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Guia de prueba piloto descargada",
+    detail: "Se descargo el recorrido recomendado para validar el MVP piloto.",
+    code: "4.4",
+    type: "demo",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 function prepareDemoPackage() {
