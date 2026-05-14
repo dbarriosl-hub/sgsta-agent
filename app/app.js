@@ -613,6 +613,7 @@ function renderDemoReadiness() {
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-demo-open="${next.view}" type="button">Abrir pendiente</button>
+          <button class="secondary-button" data-demo-seed type="button">Cargar piloto ejemplo</button>
           <button data-demo-prepare type="button">Preparar demo</button>
         </div>
       </div>
@@ -626,6 +627,7 @@ function renderDemoReadiness() {
     </div>
     ${renderDemoScript(demo)}`;
   container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
+  container.querySelector("[data-demo-seed]")?.addEventListener("click", loadPilotExampleData);
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
@@ -689,6 +691,104 @@ function prepareDemoPackage() {
     actor: "agente"
   });
   addMessage("agent", `Prepare paquete minimo de demo: perfil actualizado, ${createdDocs} documento(s) generado(s), ${createdReview ? "revision 9.3 creada" : "revision 9.3 ya existente"} y ${createdActions} accion(es) nuevas del plan.`);
+  saveState();
+  renderAll();
+}
+
+function loadPilotExampleData() {
+  state.orgName = "EcoAventura Andina SAS";
+  state.ownerName = "Laura Gomez - Responsable SGSTA";
+  state.currentUserRole = "direccion";
+  state.company = {
+    legalName: "EcoAventura Andina SAS",
+    nit: "900000000-1",
+    country: "Colombia",
+    region: "Santander",
+    city: "San Gil",
+    phone: "300 000 0000",
+    operatingArea: "Rio Claro, Sendero Bosque Alto y Ruta Mirador",
+    activityDescription: "Rafting recreativo, caminata ecologica y paseo guiado en cuatrimotos.",
+    localContext: "Operacion rural con cambios de clima, rios con variacion de caudal, vias destapadas y guias locales.",
+    scope: "Prestacion de actividades guiadas de turismo de aventura: rafting, caminata ecologica y paseo en cuatrimotos.",
+    stakeholders: "Participantes, guias, proveedores de equipos, aseguradora, autoridades locales, comunidad y direccion."
+  };
+  state.activities = [
+    { name: "Rafting Rio Claro", place: "Rio Claro - tramo recreativo", leader: "Carlos Rios", status: "activa", conditions: "Actividad acuatica sujeta a caudal, clima y nivel del grupo.", participantRequirements: "Edad minima definida, chaleco, briefing obligatorio y consentimiento externo." },
+    { name: "Caminata Bosque Alto", place: "Sendero Bosque Alto", leader: "Ana Torres", status: "activa", conditions: "Recorrido de dificultad media con pendientes y cambios de clima.", participantRequirements: "Condicion fisica basica, calzado cerrado, hidratacion y consentimiento externo." },
+    { name: "Ruta Cuatrimotos Mirador", place: "Ruta rural al mirador", leader: "Miguel Perez", status: "revision", conditions: "Ruta motorizada con control de velocidad, casco y verificacion de terreno.", participantRequirements: "Edad minima, casco, briefing y aceptacion de normas de conduccion." }
+  ];
+  state.selectedActivityName = "Rafting Rio Claro";
+  state.selectedFormActivity = "Rafting Rio Claro";
+  state.people = [
+    { name: "Carlos Rios", role: "Guia lider rafting", activity: "Rafting Rio Claro", competence: "cumple", training: "Rescate acuatico y primeros auxilios", evidence: "certificado_rescate_carlos.pdf", certificateDue: "30/11/2026" },
+    { name: "Ana Torres", role: "Guia senderismo", activity: "Caminata Bosque Alto", competence: "cumple", training: "Primeros auxilios y orientacion", evidence: "certificado_ana.pdf", certificateDue: "15/10/2026" },
+    { name: "Miguel Perez", role: "Guia cuatrimotos", activity: "Ruta Cuatrimotos Mirador", competence: "pendiente", training: "Conduccion segura pendiente", evidence: "", certificateDue: "" }
+  ];
+  state.trainingNeeds = [
+    { topic: "Conduccion segura y control de velocidad", activity: "Ruta Cuatrimotos Mirador", origin: "brecha competencia", priority: "alta", status: "pendiente", code: "7.2", person: "Miguel Perez" },
+    { topic: "Simulacro de rescate acuatico", activity: "Rafting Rio Claro", origin: "emergencias", priority: "media", status: "realizada", code: "8.2", evaluation: "aprobada", certificate: "acta_simulacro_rescate.pdf", evidence: "registro_simulacro.pdf" }
+  ];
+  state.equipment = [
+    { name: "Balsa 6 personas", type: "Rafting", activity: "Rafting Rio Claro", status: "operativo", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "inspeccion_balsa_mayo.pdf" },
+    { name: "Chalecos salvavidas", type: "EPP acuatico", activity: "Rafting Rio Claro", status: "operativo", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "checklist_chalecos.pdf" },
+    { name: "Radios VHF", type: "Comunicacion", activity: "Caminata Bosque Alto", status: "operativo", nextCheck: "20/06/2026", inspectionDate: "05/05/2026", maintenanceDate: "05/05/2026", evidence: "prueba_radios.pdf" },
+    { name: "Cuatrimoto 01", type: "Vehiculo recreativo", activity: "Ruta Cuatrimotos Mirador", status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" }
+  ];
+  state.policies = [
+    { number: "RC-2026-001", insurer: "Aseguradora Andina", coverage: "Responsabilidad civil y accidentes", activity: "Rafting Rio Claro", due: "31/12/2026", status: "vigente", document: "poliza_rc_2026.pdf" },
+    { number: "RC-2026-001", insurer: "Aseguradora Andina", coverage: "Responsabilidad civil y accidentes", activity: "Caminata Bosque Alto", due: "31/12/2026", status: "vigente", document: "poliza_rc_2026.pdf" },
+    { number: "RC-MOTO-PEND", insurer: "Por confirmar", coverage: "Cobertura para cuatrimotos pendiente", activity: "Ruta Cuatrimotos Mirador", due: "Por definir", status: "pendiente", document: "" }
+  ];
+  state.risks = [
+    { title: "Caida al agua o golpe con roca", activity: "Rafting Rio Claro", probability: 3, impact: 5, control: "Chaleco, casco, briefing, guia lider y verificacion de caudal" },
+    { title: "Caida en sendero", activity: "Caminata Bosque Alto", probability: 3, impact: 3, control: "Briefing, calzado adecuado, ritmo guiado y botiquin" },
+    { title: "Colision o volcamiento", activity: "Ruta Cuatrimotos Mirador", probability: 3, impact: 5, control: "Casco, velocidad controlada, induccion y revision mecanica" }
+  ];
+  state.participantEvidence = [
+    { activity: "Rafting Rio Claro", phase: "antes", kind: "Formulario externo", consent: "recibido", status: "recibida", date: "10/05/2026", link: "https://forms.example/rafting", evidence: "consentimientos_rafting_mayo.pdf", infoProvided: "Riesgos, condiciones de participacion y equipo.", participantInfoRequested: "Consentimiento externo minimo.", communicationNotes: "Datos sensibles fuera de la plataforma." },
+    { activity: "Rafting Rio Claro", phase: "durante", kind: "Briefing firmado", consent: "recibido", status: "recibida", date: "10/05/2026", link: "https://drive.example/briefing-rafting", evidence: "briefing_rafting.pdf", infoProvided: "Senales y comportamiento en balsa.", participantInfoRequested: "Confirmacion de briefing.", communicationNotes: "Registro externo." },
+    { activity: "Rafting Rio Claro", phase: "despues", kind: "Encuesta externa", consent: "recibido", status: "recibida", date: "10/05/2026", link: "https://forms.example/post-rafting", evidence: "encuesta_post_rafting.pdf", infoProvided: "Canal de reporte posterior.", participantInfoRequested: "Observaciones.", communicationNotes: "Sin datos sensibles." },
+    { activity: "Ruta Cuatrimotos Mirador", phase: "antes", kind: "Formulario externo", consent: "pendiente", status: "pendiente", date: "", link: "", evidence: "", infoProvided: "Normas de conduccion y requisitos.", participantInfoRequested: "Consentimiento externo.", communicationNotes: "Pendiente antes de ofertar." }
+  ];
+  state.documents = [
+    { title: "Alcance del SGSTA", code: "4.3", status: "aprobado", content: "Alcance: rafting, caminata ecologica y cuatrimotos operadas por EcoAventura Andina SAS." },
+    { title: "Politica de seguridad", code: "5.2", status: "aprobado", content: "Compromiso con seguridad de participantes, guias y comunidad mediante gestion de riesgos, competencias, equipos, emergencias y mejora continua." },
+    { title: "Procedimiento operacional", code: "8.1", status: "revision", content: "Verificar guia competente, equipo, seguro, participantes, briefing, emergencia y bitacora antes de operar." },
+    { title: "Plan de emergencia", code: "8.2", status: "borrador", content: "Plan preliminar: rescate acuatico, evacuacion en sendero, incidente con cuatrimoto, comunicacion y simulacros." }
+  ];
+  state.formResponses = [
+    { table: "contexto_actividades", form: "Contexto de actividad", module: "operacion", status: "aprobado", code: "4.1", activity: "Rafting Rio Claro", source: "piloto", values: { actividad: "Rafting Rio Claro" } },
+    { table: "mapa_riesgos", form: "Mapa de riesgos", module: "riesgos", status: "aprobado", code: "6.1.2", activity: "Rafting Rio Claro", source: "piloto", values: { actividad: "Rafting Rio Claro" } },
+    { table: "equipos", form: "Inspeccion de equipos", module: "equipos", status: "aprobado", code: "7.1", activity: "Rafting Rio Claro", source: "piloto", values: { actividad: "Rafting Rio Claro" } },
+    { table: "plan_emergencia", form: "Plan de emergencia", module: "emergencias", status: "revision", code: "8.2", activity: "Rafting Rio Claro", source: "agente", values: { actividad: "Rafting Rio Claro" } },
+    { table: "registro_participantes_evidencia", form: "Participantes evidencia externa", module: "participantes", status: "aprobado", code: "7.4.3", activity: "Rafting Rio Claro", source: "piloto", values: { actividad: "Rafting Rio Claro" } }
+  ];
+  state.evidence = [
+    { title: "Alcance aprobado SGSTA", code: "4.3", source: "documento aprobado", status: "registrada", linkedDocument: "Alcance del SGSTA" },
+    { title: "Politica de seguridad aprobada", code: "5.2", source: "documento aprobado", status: "registrada", linkedDocument: "Politica de seguridad" },
+    { title: "Matriz de riesgos rafting", code: "6.1.2", source: "formulario aprobado", status: "registrada", activity: "Rafting Rio Claro", linkedActivity: "Rafting Rio Claro" },
+    { title: "Inspeccion de balsa y chalecos", code: "7.1", source: "formulario aprobado", status: "registrada", activity: "Rafting Rio Claro", linkedActivity: "Rafting Rio Claro" },
+    { title: "Consentimientos externos rafting", code: "7.4.3", source: "evidencia externa", status: "registrada", activity: "Rafting Rio Claro", linkedActivity: "Rafting Rio Claro" },
+    { title: "Plan de emergencia rafting", code: "8.2", source: "borrador agente", status: "sugerida", activity: "Rafting Rio Claro", linkedActivity: "Rafting Rio Claro" }
+  ];
+  state.incidents = [{ title: "Casi incidente: participante sin calzado adecuado", activity: "Caminata Bosque Alto", date: "08/05/2026", status: "abierto" }];
+  state.audits = [{ title: "Auditoria interna piloto SGSTA", scope: "Rafting Rio Claro y controles transversales", date: "25/05/2026", status: "programada" }];
+  state.actions = [
+    { title: "Validar cobertura de seguro para cuatrimotos", code: "6.1.3", status: "abierta", type: "preventiva", origin: "semaforo SGSTA", priority: "alta", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "22/05/2026", cause: "La actividad Ruta Cuatrimotos Mirador no tiene poliza vigente validada.", followUp: "", evidence: "", efficacyVerification: "", efficacyStatus: "pendiente", relatedActivity: "Ruta Cuatrimotos Mirador", createdAt: today() },
+    { title: "Completar competencia de guia cuatrimotos", code: "7.2", status: "abierta", type: "preventiva", origin: "competencia", priority: "alta", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "24/05/2026", cause: "Miguel Perez no tiene certificado/evidencia vigente para operacion de cuatrimotos.", followUp: "", evidence: "", efficacyVerification: "", efficacyStatus: "pendiente", relatedActivity: "Ruta Cuatrimotos Mirador", createdAt: today() },
+    { title: "Cerrar plan de emergencia rafting", code: "8.2", status: "pendiente_eficacia", type: "mejora", origin: "revision direccion", priority: "media", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "26/05/2026", cause: "Plan de emergencia en revision requiere simulacro y verificacion.", followUp: "Simulacro ejecutado con observaciones menores.", evidence: "acta_simulacro_rescate.pdf", efficacyVerification: "Verificar tiempos de respuesta y comunicacion posterior al simulacro.", efficacyStatus: "pendiente", relatedActivity: "Rafting Rio Claro", createdAt: today() }
+  ];
+  state.compliance = { "4.1": "en_proceso", "4.3": "cumple", "5.2": "cumple", "6.1.2": "en_proceso", "6.1.3": "en_proceso", "7.1": "en_proceso", "7.2": "en_proceso", "7.4.3": "en_proceso", "8.1": "en_proceso", "8.2": "en_proceso", "9.2": "en_proceso", "9.3": "en_proceso", "10.1": "en_proceso" };
+  state.auditLog = [];
+  state.managementReviews = [buildManagementReviewDraft()];
+  recordAuditEvent({
+    title: "Empresa piloto ejemplo cargada",
+    detail: "El agente preparo un flujo de demo con actividades, riesgos, equipos, personal, seguros, participantes, evidencias, acciones y revision por direccion.",
+    code: "4.4",
+    type: "demo",
+    actor: "agente"
+  });
+  addMessage("agent", "Cargue EcoAventura Andina SAS como empresa piloto. Ya puedes probar el flujo completo del MVP.");
   saveState();
   renderAll();
 }
