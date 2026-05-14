@@ -2317,6 +2317,7 @@ function companyIntakeItems() {
 function companyIntakeText() {
   const items = companyIntakeItems();
   const completed = items.filter((item) => item.done).length;
+  const activityRows = companyActivityIntakeRows();
   return [
     "Guia de entrevista inicial - SGSTA Agent",
     "",
@@ -2327,9 +2328,43 @@ function companyIntakeText() {
     "Preguntas para levantar informacion:",
     ...items.map((item) => `- ${item.done ? "[listo]" : "[preguntar]"} ${item.label}: ${item.question}`),
     "",
+    "Datos minimos por actividad:",
+    ...(activityRows.length ? activityRows.flatMap((row) => [
+      `- ${row.name}: ${row.completed}/${row.total} datos (${row.pct}%).`,
+      `  Faltan: ${row.missing.length ? row.missing.join(", ") : "sin faltantes principales"}.`,
+      `  Preguntar: ${row.nextQuestion}`
+    ]) : ["- Registrar al menos una actividad real para evaluar datos minimos."]),
+    "",
     "Notas para el consultor/agente:",
     "Usar respuestas simples, con lenguaje del operador. Luego el agente convierte la informacion en alcance, contexto, riesgos, actividades, evidencias y acciones PHVA."
   ].join("\n");
+}
+
+function companyActivityIntakeRows() {
+  return state.activities.map((activity) => {
+    const name = activity.name || activity.activity || "Actividad sin nombre";
+    const checks = [
+      { key: "ruta/lugar", ok: Boolean(activity.place), question: "Donde se realiza la actividad y cual es la ruta/zona exacta?" },
+      { key: "guia responsable", ok: Boolean(activity.leader) && state.people.some((person) => person.activity === name || person.name === activity.leader), question: "Quien es el guia responsable y que competencia/certificado tiene?" },
+      { key: "riesgos", ok: state.risks.some((risk) => risk.activity === name), question: "Que peligros principales tiene esta actividad y que controles usa la empresa?" },
+      { key: "equipos", ok: state.equipment.some((equipment) => equipment.activity === name), question: "Que equipos se usan y como se inspeccionan/mantienen?" },
+      { key: "seguro", ok: state.policies.some((policy) => policy.activity === name || String(policy.coverage || "").toLowerCase().includes(name.toLowerCase())), question: "La poliza cubre esta actividad especificamente?" },
+      { key: "participantes", ok: state.participantEvidence.some((item) => item.activity === name), question: "Que consentimiento, condiciones de participacion o formulario externo se usa?" },
+      { key: "condiciones", ok: Boolean(activity.conditions && activity.participantRequirements), question: "Que condiciones de operacion y participacion deben comunicarse?" }
+    ];
+    const missing = checks.filter((item) => !item.ok);
+    const completed = checks.length - missing.length;
+    return {
+      name,
+      status: activity.status || "activa",
+      completed,
+      total: checks.length,
+      pct: Math.round((completed / checks.length) * 100),
+      missing: missing.map((item) => item.key),
+      nextQuestion: missing[0]?.question || "Validar evidencias y mantener datos actualizados antes de operar.",
+      badge: completed === checks.length ? "cumple" : missing.length >= 3 ? "no_cumple" : "en_proceso"
+    };
+  });
 }
 
 function downloadCompanyIntakeGuide() {
@@ -2393,6 +2428,7 @@ function renderCompanyIntakeGuide() {
   const container = document.querySelector("#companyIntakeGuide");
   if (!container) return;
   const items = companyIntakeItems();
+  const activityRows = companyActivityIntakeRows();
   const completed = items.filter((item) => item.done).length;
   const pct = Math.round((completed / items.length) * 100);
   const next = items.find((item) => !item.done) || items[items.length - 1];
@@ -2420,6 +2456,27 @@ function renderCompanyIntakeGuide() {
             <span>${item.done ? "ok" : "falta"}</span>
             ${item.label}
           </button>`).join("")}
+      </div>
+      <div class="activity-intake-panel">
+        <div class="activity-intake-head">
+          <div>
+            <p class="eyebrow">Datos por actividad</p>
+            <strong>Minimo para que el agente gestione riesgos, guias, equipos, seguros y participantes</strong>
+          </div>
+          <span class="badge ${activityRows.every((row) => row.pct === 100) ? "cumple" : "en_proceso"}">${activityRows.filter((row) => row.pct === 100).length}/${activityRows.length || 0} completas</span>
+        </div>
+        <div class="activity-intake-list">
+          ${activityRows.length ? activityRows.map((row) => `
+            <article class="activity-intake-item ${row.badge}">
+              <div>
+                <span class="badge ${row.badge}">${row.pct}%</span>
+                <strong>${escapeHtml(row.name)}</strong>
+                <p>Faltan: ${escapeHtml(row.missing.length ? row.missing.join(", ") : "sin faltantes principales")}</p>
+                <small>${escapeHtml(row.nextQuestion)}</small>
+              </div>
+              <button class="secondary-button" data-intake-open="actividades" type="button">Abrir</button>
+            </article>`).join("") : `<div class="empty-state">Registra actividades reales para ver el checklist por actividad.</div>`}
+        </div>
       </div>
       <div class="row-actions">
         <button class="secondary-button" data-intake-download type="button">Descargar entrevista</button>

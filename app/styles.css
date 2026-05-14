@@ -1523,6 +1523,67 @@ textarea {
   background: #f0fdfa;
 }
 
+.activity-intake-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.activity-intake-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.activity-intake-head strong,
+.activity-intake-head .eyebrow {
+  margin: 0;
+}
+
+.activity-intake-list {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-intake-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+}
+
+.activity-intake-item.cumple {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.activity-intake-item.no_cumple {
+  background: #fef2f2;
+}
+
+.activity-intake-item strong {
+  display: block;
+  margin-top: 5px;
+}
+
+.activity-intake-item p,
+.activity-intake-item small {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .company-profile-head {
   display: flex;
   align-items: center;
@@ -3146,6 +3207,7 @@ textarea {
   .org-form,
   .form-grid,
   .company-intake-grid,
+  .activity-intake-item,
   .action-form-grid,
   .activity-operational-status,
   .activity-intake-grid,
