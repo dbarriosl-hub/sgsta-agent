@@ -2352,6 +2352,7 @@ function companyIntakeText() {
     ...(activityRows.length ? activityRows.flatMap((row) => [
       `- ${row.name}: ${row.completed}/${row.total} datos (${row.pct}%).`,
       `  Faltan: ${row.missing.length ? row.missing.join(", ") : "sin faltantes principales"}.`,
+      `  Acciones abiertas relacionadas: ${row.openActions}, altas: ${row.highActions}.`,
       `  Preguntar: ${row.nextQuestion}`
     ]) : ["- Registrar al menos una actividad real para evaluar datos minimos."]),
     "",
@@ -2363,6 +2364,7 @@ function companyIntakeText() {
 function companyActivityIntakeRows() {
   return state.activities.map((activity) => {
     const name = activity.name || activity.activity || "Actividad sin nombre";
+    const openActions = state.actions.filter((action) => action.status !== "cerrada" && action.relatedActivity === name);
     const checks = [
       { key: "ruta/lugar", ok: Boolean(activity.place), question: "Donde se realiza la actividad y cual es la ruta/zona exacta?" },
       { key: "guia responsable", ok: Boolean(activity.leader) && state.people.some((person) => person.activity === name || person.name === activity.leader), question: "Quien es el guia responsable y que competencia/certificado tiene?" },
@@ -2381,6 +2383,8 @@ function companyActivityIntakeRows() {
       total: checks.length,
       pct: Math.round((completed / checks.length) * 100),
       missing: missing.map((item) => item.key),
+      openActions: openActions.length,
+      highActions: openActions.filter((action) => action.priority === "alta").length,
       nextQuestion: missing[0]?.question || "Validar evidencias y mantener datos actualizados antes de operar.",
       badge: completed === checks.length ? "cumple" : missing.length >= 3 ? "no_cumple" : "en_proceso"
     };
@@ -2492,6 +2496,7 @@ function renderCompanyIntakeGuide() {
                 <span class="badge ${row.badge}">${row.pct}%</span>
                 <strong>${escapeHtml(row.name)}</strong>
                 <p>Faltan: ${escapeHtml(row.missing.length ? row.missing.join(", ") : "sin faltantes principales")}</p>
+                <p>Acciones abiertas: ${row.openActions}${row.highActions ? ` (${row.highActions} alta)` : ""}</p>
                 <small>${escapeHtml(row.nextQuestion)}</small>
               </div>
               <div class="activity-intake-actions">
