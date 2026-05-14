@@ -681,7 +681,8 @@ function pilotObservationSummary() {
     total: items.length,
     open: items.filter((item) => item.status === "abierta").length,
     high: items.filter((item) => item.priority === "alta" && item.status !== "cerrada").length,
-    converted: items.filter((item) => item.status === "convertida").length
+    converted: items.filter((item) => item.status === "convertida").length,
+    closed: items.filter((item) => item.status === "cerrada").length
   };
 }
 
@@ -717,6 +718,7 @@ function renderPilotObservationPanel() {
           <span><strong>${summary.open}</strong> abiertas</span>
           <span><strong>${summary.high}</strong> altas</span>
           <span><strong>${summary.converted}</strong> convertidas</span>
+          <span><strong>${summary.closed}</strong> cerradas</span>
         </div>
       </div>
       <div class="pilot-observation-form">
@@ -760,7 +762,10 @@ function renderPilotObservationPanel() {
               <strong>${escapeHtml(item.text || "Observacion sin detalle")}</strong>
               <p>${escapeHtml(item.area || "general")} - ${escapeHtml(item.activity || "General")} - ${escapeHtml(item.source || "sin fuente")} - ${escapeHtml(item.createdAt || "")}</p>
             </div>
-            <button class="secondary-button" data-pilot-observation-action="${index}" type="button" ${item.status === "convertida" ? "disabled" : ""}>Crear accion</button>
+            <div class="pilot-observation-actions">
+              <button class="secondary-button" data-pilot-observation-action="${index}" type="button" ${item.status === "convertida" || item.status === "cerrada" ? "disabled" : ""}>Crear accion</button>
+              <button class="secondary-button" data-pilot-observation-close="${index}" type="button" ${item.status === "cerrada" ? "disabled" : ""}>Cerrar</button>
+            </div>
           </article>`).join("") : `
           <div class="empty-state">Todavia no hay observaciones del piloto. Este sera el cuaderno de ajustes reales del MVP.</div>`}
       </div>
@@ -778,6 +783,9 @@ function bindPilotObservationControls(container) {
       saveState();
       renderAll();
     });
+  });
+  container.querySelectorAll("[data-pilot-observation-close]").forEach((button) => {
+    button.addEventListener("click", () => closePilotObservation(Number(button.dataset.pilotObservationClose)));
   });
 }
 
@@ -859,6 +867,32 @@ function createPilotObservationActions() {
   renderAll();
 }
 
+function closePilotObservation(index) {
+  const observation = state.pilotObservations?.[index];
+  if (!observation || observation.status === "cerrada") return;
+  const reason = window.prompt("Justificacion humana para cerrar/aplazar esta observacion:", observation.decisionNote || "");
+  if (reason === null) return;
+  const note = reason.trim();
+  if (!note) {
+    addMessage("agent", "Para cerrar una observacion del piloto necesito una justificacion humana.");
+    return;
+  }
+  observation.status = "cerrada";
+  observation.closedAt = today();
+  observation.closedBy = state.ownerName || "Responsable SGSTA";
+  observation.decisionNote = note;
+  recordAuditEvent({
+    title: "Observacion piloto cerrada por humano",
+    detail: `${observation.text}. Justificacion: ${note}`,
+    code: "10.2",
+    type: "piloto",
+    actor: "humano"
+  });
+  addMessage("agent", "Cerre la observacion del piloto con justificacion humana. Queda registrada para trazabilidad.");
+  saveState();
+  renderAll();
+}
+
 function pilotObservationRelatedActions(observation) {
   const text = String(observation.text || "");
   return state.actions.filter((action) => {
@@ -872,6 +906,7 @@ function pilotObservationReportText() {
   const observations = state.pilotObservations || [];
   const open = openPilotObservations();
   const converted = observations.filter((item) => item.status === "convertida");
+  const closed = observations.filter((item) => item.status === "cerrada");
   const relatedActions = state.actions.filter((action) => action.origin === "observacion piloto");
   return [
     "REPORTE DE OBSERVACIONES DEL PILOTO - SGSTA AGENT",
@@ -886,6 +921,7 @@ function pilotObservationReportText() {
     `- Abiertas: ${summary.open}`,
     `- Prioridad alta: ${summary.high}`,
     `- Convertidas en acciones: ${summary.converted}`,
+    `- Cerradas con decision humana: ${summary.closed}`,
     `- Acciones de mejora asociadas: ${relatedActions.length}`,
     "",
     "Observaciones abiertas",
@@ -906,6 +942,14 @@ function pilotObservationReportText() {
         `   Accion asociada: ${actions[0]?.title || "por verificar en acciones"}`
       ].join("\n");
     }) : ["- No hay observaciones convertidas."]),
+    "",
+    "Observaciones cerradas o aplazadas",
+    ...(closed.length ? closed.map((item, index) => [
+      `${index + 1}. ${item.priority || "media"} | ${item.area || "general"} | ${item.activity || "General"}`,
+      `   Observacion: ${item.text || ""}`,
+      `   Cerrada: ${item.closedAt || "sin fecha"} | Por: ${item.closedBy || "Responsable SGSTA"}`,
+      `   Justificacion: ${item.decisionNote || "sin justificacion registrada"}`
+    ].join("\n")) : ["- No hay observaciones cerradas o aplazadas."]),
     "",
     "Acciones generadas desde piloto",
     ...(relatedActions.length ? relatedActions.map((action, index) => [

@@ -783,10 +783,15 @@ textarea {
   border-radius: 8px;
   background: #fbfcfe;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px;
+  grid-template-columns: minmax(0, 1fr) 180px;
   gap: 12px;
   align-items: center;
   padding: 10px;
+}
+
+.pilot-observation-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .pilot-observation-card.alta {
