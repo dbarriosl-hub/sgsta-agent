@@ -685,6 +685,18 @@ function pilotObservationSummary() {
   };
 }
 
+function openPilotObservations() {
+  return (state.pilotObservations || []).filter((item) => item.status !== "cerrada" && item.status !== "convertida");
+}
+
+function priorityPilotObservations(limit = 4) {
+  const priorityOrder = { alta: 0, media: 1, baja: 2 };
+  return [...(state.pilotObservations || [])]
+    .filter((item) => item.status !== "cerrada")
+    .sort((a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1))
+    .slice(0, limit);
+}
+
 function renderPilotObservationPanel() {
   const items = state.pilotObservations || [];
   const summary = pilotObservationSummary();
@@ -5311,6 +5323,7 @@ function renderManagementReviews() {
           <div><span>Capacitacion</span><strong>${item.inputs?.trainingOpen ?? inputs.trainingOpen}</strong></div>
           <div><span>Equipos no listos</span><strong>${item.inputs?.equipmentPending ?? inputs.equipmentPending}</strong></div>
           <div><span>Polizas pendientes</span><strong>${item.inputs?.policiesPending ?? inputs.policiesPending}</strong></div>
+          <div><span>Obs. piloto abiertas</span><strong>${item.inputs?.pilotObservationsOpen ?? inputs.pilotObservationsOpen}</strong></div>
         </div>
         <div class="review-decision-panel">
           <div>
@@ -5387,6 +5400,7 @@ function managementReviewInputs() {
     const readiness = activityReadiness(activity.name);
     return activityOperationDecision(readiness).badge;
   });
+  const pilotSummary = pilotObservationSummary();
   return {
     openActions: state.actions.filter((item) => item.status !== "cerrada").length,
     pendingEfficacy: state.actions.filter((item) => item.status === "pendiente_eficacia").length,
@@ -5400,7 +5414,11 @@ function managementReviewInputs() {
     trainingOpen: state.trainingNeeds.filter((item) => item.status !== "cerrada" && item.status !== "realizada").length,
     equipmentPending: state.equipment.filter((item) => item.status !== "operativo").length,
     policiesPending: state.policies.filter((policy) => !policyIsComplete(policy)).length,
-    formsPending: formCoverageByRequirement().reduce((sum, group) => sum + group.pending, 0)
+    formsPending: formCoverageByRequirement().reduce((sum, group) => sum + group.pending, 0),
+    pilotObservations: pilotSummary.total,
+    pilotObservationsOpen: pilotSummary.open,
+    pilotObservationsHigh: pilotSummary.high,
+    pilotObservationsConverted: pilotSummary.converted
   };
 }
 
@@ -5419,7 +5437,9 @@ function buildManagementReviewDraft() {
     `Actividades listas: ${inputs.activitiesReady}; con revision: ${inputs.activitiesInReview}; no ofertar todavia: ${inputs.activitiesBlocked}.`,
     `Riesgos altos: ${inputs.highRisks}; incidentes registrados: ${inputs.incidents}.`,
     `Capacitaciones abiertas: ${inputs.trainingOpen}; equipos no operativos: ${inputs.equipmentPending}.`,
-    `Polizas sin cobertura completa: ${inputs.policiesPending}; formularios pendientes: ${inputs.formsPending}.`
+    `Polizas sin cobertura completa: ${inputs.policiesPending}; formularios pendientes: ${inputs.formsPending}.`,
+    `Observaciones de piloto: ${inputs.pilotObservations}, abiertas: ${inputs.pilotObservationsOpen}, altas: ${inputs.pilotObservationsHigh}, convertidas en acciones: ${inputs.pilotObservationsConverted}.`,
+    ...priorityPilotObservations(3).map((item) => `Observacion prioritaria piloto (${item.priority || "media"}): ${item.text}`)
   ];
   const decisions = [
     inputs.activityGaps ? `Priorizar cierre de brechas en actividades: ${priorityActivities.map((item) => item.name).join(", ") || "por definir"}.` : "Mantener controles operacionales actuales.",
@@ -5427,23 +5447,26 @@ function buildManagementReviewDraft() {
     inputs.highRisks ? "Aprobar tratamiento inmediato para riesgos altos antes de operar actividades criticas." : "Mantener seguimiento preventivo de riesgos.",
     inputs.pendingEfficacy ? "La direccion debe revisar acciones pendientes de eficacia antes de considerar controles como cerrados." : "No hay acciones pendientes de eficacia.",
     inputs.trainingOpen ? "Aprobar plan de capacitacion y competencia por actividad." : "Mantener vigilancia de competencias vigentes.",
-    inputs.policiesPending ? "Exigir validacion documental de polizas antes de ofertar actividades no cubiertas." : "Mantener control de vigencias de polizas."
+    inputs.policiesPending ? "Exigir validacion documental de polizas antes de ofertar actividades no cubiertas." : "Mantener control de vigencias de polizas.",
+    inputs.pilotObservationsOpen ? "Decidir cuales observaciones del piloto se convierten en mejora antes de la siguiente demo." : "Mantener registro de aprendizajes del piloto."
   ];
   const resources = [
     inputs.equipmentPending ? "Presupuesto/tiempo para inspeccion, mantenimiento o reposicion de equipos." : "Recursos actuales de equipos sin solicitud critica.",
     inputs.trainingOpen ? "Horas de instructor, evaluacion de competencia y emision de certificados." : "Recursos de capacitacion bajo demanda.",
-    inputs.formsPending ? "Tiempo del responsable SGSTA para revisar formularios y evidencias." : "Tiempo de seguimiento documental normal."
+    inputs.formsPending ? "Tiempo del responsable SGSTA para revisar formularios y evidencias." : "Tiempo de seguimiento documental normal.",
+    inputs.pilotObservationsOpen ? "Tiempo de producto/implementacion para ajustar pantallas, reportes o formularios observados en piloto." : "Sin recursos adicionales por observaciones del piloto."
   ];
   const outputs = [
     "Asignar responsables y fechas a acciones abiertas prioritarias.",
     "Validar evidencias antes de cerrar acciones.",
     "Verificar eficacia de acciones implementadas antes de cerrar mejora.",
     "Actualizar tablero de brechas por actividad despues de cada cierre.",
-    "Registrar decisiones aprobadas por direccion y recursos autorizados."
+    "Registrar decisiones aprobadas por direccion y recursos autorizados.",
+    inputs.pilotObservationsOpen ? "Convertir observaciones abiertas de piloto en acciones de mejora 10.2." : "Mantener observaciones de piloto cerradas o trazadas."
   ];
   return {
     period: `Revision ${today()}`,
-    summary: `Entradas 9.3 preparadas por el agente: ${inputs.openActions} acciones, ${inputs.activityGaps} brechas por actividad, ${inputs.highRisks} riesgos altos y ${inputs.trainingOpen} capacitaciones abiertas.`,
+    summary: `Entradas 9.3 preparadas por el agente: ${inputs.openActions} acciones, ${inputs.activityGaps} brechas por actividad, ${inputs.highRisks} riesgos altos, ${inputs.trainingOpen} capacitaciones abiertas y ${inputs.pilotObservationsOpen} observaciones piloto abiertas.`,
     status: "borrador",
     inputs,
     entries,
@@ -5719,11 +5742,13 @@ function generateAuditReport() {
 
 function executiveReportFindings(stats = reportStats()) {
   const gaps = [];
+  const pilot = pilotObservationSummary();
   if (stats.compliance < 70) gaps.push({ code: "4.4", title: "Cumplimiento general bajo", detail: `El sistema esta en ${stats.compliance}%. Priorizar cierre PHVA.`, priority: "alta" });
   if (stats.openActions.length > 5) gaps.push({ code: "10.1", title: "Acciones abiertas acumuladas", detail: `${stats.openActions.length} acciones abiertas requieren priorizacion.`, priority: "media" });
   if (stats.pendingForms > 0) gaps.push({ code: "7.5", title: "Formularios pendientes de diligenciar", detail: `${stats.pendingForms} formularios aun no tienen borrador.`, priority: "media" });
   if (stats.highRisks.length > 0) gaps.push({ code: "6.1.2", title: "Riesgos altos activos", detail: `${stats.highRisks.length} riesgos altos requieren tratamiento y verificacion.`, priority: "alta" });
   if (!state.managementReviews.length) gaps.push({ code: "9.3", title: "Revision por direccion pendiente", detail: "No hay revision por direccion preparada.", priority: "media" });
+  if (pilot.open > 0) gaps.push({ code: "10.2", title: "Observaciones piloto abiertas", detail: `${pilot.open} observacion(es) del piloto requieren decision o accion de mejora.`, priority: pilot.high > 0 ? "alta" : "media" });
   return gaps;
 }
 
@@ -5731,6 +5756,8 @@ function generateExecutiveReport(save = true) {
   const stats = reportStats();
   const system = activeSystem();
   const gaps = executiveReportFindings(stats);
+  const pilot = pilotObservationSummary();
+  const pilotRows = priorityPilotObservations(5);
   const content = `REPORTE EJECUTIVO DEL SISTEMA DE GESTION
 
 Organizacion: ${state.orgName}
@@ -5746,6 +5773,7 @@ Resumen:
 - Formularios pendientes: ${stats.pendingForms}
 - Riesgos altos: ${stats.highRisks.length}
 - Ejecuciones del agente usadas: ${state.planUsage.agentRuns}
+- Observaciones piloto: ${pilot.total} total, ${pilot.open} abiertas, ${pilot.high} altas, ${pilot.converted} convertidas en acciones
 
 Lectura PHVA:
 - Planear: contexto, liderazgo, riesgos, requisitos legales y objetivos deben mantenerse actualizados.
@@ -5756,8 +5784,11 @@ Lectura PHVA:
 Brechas priorizadas:
 ${gaps.length ? gaps.map((gap) => `- ${gap.code}: ${gap.title}. ${gap.detail}`).join("\n") : "- No se identifican brechas ejecutivas nuevas."}
 
+Aprendizajes del piloto:
+${pilotRows.length ? pilotRows.map((item) => `- ${item.priority || "media"}: ${item.text} (${item.area || "general"} / ${item.activity || "General"})`).join("\n") : "- No hay observaciones piloto registradas."}
+
 Recomendacion del agente:
-Priorizar formularios y evidencias pendientes, cerrar acciones abiertas de alto impacto y preparar revision por la direccion con datos de auditoria, incidentes, capacitacion, riesgos y oportunidades.
+Priorizar formularios y evidencias pendientes, cerrar acciones abiertas de alto impacto y preparar revision por la direccion con datos de auditoria, incidentes, capacitacion, riesgos, oportunidades y observaciones reales del piloto.
 
 Nota: este reporte es un borrador generado por el agente y requiere revision/aprobacion humana.`;
   const report = { title: `Reporte ejecutivo ${today()}`, code: "9.1", content, generatedAt: today(), status: "borrador" };
@@ -7444,6 +7475,7 @@ function commercialSummaryData() {
   const aiDocuments = state.documents.filter((doc) => doc.content).length;
   const openTraining = state.trainingNeeds.filter((item) => item.status !== "cerrada").length;
   const companyName = state.company.legalName || state.orgName || "la empresa";
+  const pilot = pilotObservationSummary();
   return {
     plan,
     progress,
@@ -7455,7 +7487,8 @@ function commercialSummaryData() {
     completeEvidence,
     pendingActions,
     aiDocuments,
-    openTraining
+    openTraining,
+    pilot
   };
 }
 
@@ -7475,6 +7508,7 @@ function commercialSummaryText() {
     `- Documentos con borrador IA: ${data.aiDocuments}.`,
     `- Acciones abiertas trazables: ${data.pendingActions}.`,
     `- Necesidades de capacitacion abiertas: ${data.openTraining}.`,
+    `- Observaciones del piloto: ${data.pilot.total} registradas, ${data.pilot.open} abiertas, ${data.pilot.converted} convertidas en mejora.`,
     "",
     "Como se vende:",
     `Plan recomendado: ${data.plan.name} (${data.plan.price}). ${data.plan.text}`,
@@ -7484,7 +7518,10 @@ function commercialSummaryText() {
     "El agente no solo llena documentos; cruza actividades, riesgos, personal, capacitacion, equipos, seguros, participantes, evidencias y acciones para sostener el ciclo PHVA.",
     "",
     "Regla de control:",
-    "El agente propone, diligencia borradores y crea acciones. La empresa aprueba documentos, cierre de acciones criticas y cumplimiento."
+    "El agente propone, diligencia borradores y crea acciones. La empresa aprueba documentos, cierre de acciones criticas y cumplimiento.",
+    "",
+    "Aprendizajes reales del piloto:",
+    ...(priorityPilotObservations(5).length ? priorityPilotObservations(5).map((item) => `- ${item.priority || "media"}: ${item.text}`) : ["- Registrar observaciones del primer piloto para ajustar producto, implementacion y venta."])
   ].join("\n");
 }
 
@@ -7542,6 +7579,7 @@ function renderCommercialSummary() {
 function pilotSalesPlan() {
   const demo = demoReadinessStatus();
   const progress = implementationProgress();
+  const pilot = pilotObservationSummary();
   const companyReady = companyProfileGaps().length <= 2;
   const hasActivities = state.activities.length > 0;
   const hasEvidence = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length >= 6;
@@ -7587,6 +7625,14 @@ function pilotSalesPlan() {
       done: Boolean(state.currentPlan),
       action: "Definir propuesta de suscripcion para cliente piloto",
       code: "4.4"
+    },
+    {
+      id: "aprendizaje_piloto",
+      label: "Aprendizajes del piloto",
+      detail: "Registrar observaciones reales y convertir las abiertas en acciones de mejora.",
+      done: pilot.total > 0 && pilot.open === 0,
+      action: "Convertir observaciones piloto en mejoras trazables",
+      code: "10.2"
     }
   ];
   const completed = steps.filter((step) => step.done).length;
@@ -7597,6 +7643,7 @@ function pilotSalesPlan() {
     completed,
     total: steps.length,
     pct: Math.round((completed / steps.length) * 100),
+    pilot,
     next: steps.find((step) => !step.done) || steps[steps.length - 1]
   };
 }
@@ -7609,6 +7656,7 @@ function pilotSalesPlanText() {
     `Estado: ${plan.completed}/${plan.total} pasos (${plan.pct}%).`,
     `Avance PHVA del sistema: ${plan.progress.pct}%.`,
     `Demo: ${plan.demo.score}% - ${plan.demo.label}.`,
+    `Observaciones piloto: ${plan.pilot.total} total, ${plan.pilot.open} abiertas, ${plan.pilot.converted} convertidas.`,
     "",
     "Objetivo:",
     "Conseguir una primera empresa piloto que pruebe la plataforma con actividades reales de turismo de aventura y valide el valor del agente.",
