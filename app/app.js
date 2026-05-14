@@ -1621,9 +1621,25 @@ function renderChapterProgress() {
   }).join("");
 
   const openActions = state.actions.filter((item) => item.status !== "cerrada").slice(0, 5);
-  document.querySelector("#nextActions").innerHTML = openActions.length
-    ? openActions.map((item) => `<div class="action-card"><strong>${item.title}</strong><div class="muted">Requisito ${item.code}</div></div>`).join("")
+  const nextActions = document.querySelector("#nextActions");
+  nextActions.innerHTML = openActions.length
+    ? openActions.map((item, index) => `
+      <div class="action-card action-card-link">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <div class="muted">Requisito ${escapeHtml(item.code || "N/A")}${item.relatedActivity ? ` - ${escapeHtml(item.relatedActivity)}` : ""}</div>
+        </div>
+        <button class="secondary-button" data-next-action-open="${index}" type="button">Abrir</button>
+      </div>`).join("")
     : `<div class="muted">No hay acciones abiertas.</div>`;
+  nextActions.querySelectorAll("[data-next-action-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = openActions[Number(button.dataset.nextActionOpen)];
+      if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
+      showView("acciones");
+      renderAll();
+    });
+  });
 }
 
 function renderPhvaBoard() {

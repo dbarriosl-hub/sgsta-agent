@@ -515,6 +515,13 @@ textarea {
   font-size: 18px;
 }
 
+.action-card-link {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 10px;
+}
+
 .today-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 0.95fr));
