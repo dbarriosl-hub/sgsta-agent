@@ -2412,6 +2412,72 @@ function downloadCompanyIntakeGuide() {
   renderAll();
 }
 
+function companyImplementationPackageText() {
+  const activityRows = companyActivityIntakeRows();
+  const openActions = state.actions.filter((action) => action.status !== "cerrada");
+  return [
+    "PAQUETE INICIAL DE IMPLEMENTACION SGSTA",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Sistema: ${activeSystem().name} (${activeSystem().code})`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    "",
+    "1. Perfil de implementacion",
+    buildCompanyImplementationProfile(),
+    "",
+    "2. Entrevista inicial",
+    companyIntakeText(),
+    "",
+    "3. Estado por actividad",
+    ...(activityRows.length ? activityRows.flatMap((row) => [
+      `${row.name}`,
+      `- Avance datos minimos: ${row.completed}/${row.total} (${row.pct}%).`,
+      `- Faltantes: ${row.missing.length ? row.missing.join(", ") : "sin faltantes principales"}.`,
+      `- Acciones abiertas: ${row.openActions}; altas: ${row.highActions}.`,
+      `- Proxima pregunta: ${row.nextQuestion}`
+    ]) : ["- Sin actividades registradas."]),
+    "",
+    "4. Acciones abiertas relacionadas",
+    ...(openActions.length ? openActions.slice(0, 20).map((action, index) => [
+      `${index + 1}. ${action.title}`,
+      `   Requisito: ${action.code || "N/A"} | Tipo: ${action.type || "tarea"} | Prioridad: ${action.priority || "media"}`,
+      `   Actividad: ${action.relatedActivity || "General"} | Responsable: ${action.responsible || "por asignar"}`,
+      `   Origen: ${action.origin || "agente"}`
+    ].join("\n")) : ["- No hay acciones abiertas."]),
+    "",
+    "5. Proximo hito recomendado",
+    "- Completar datos minimos por actividad.",
+    "- Generar o aprobar formularios/evidencias para requisitos 4 a 10.",
+    "- Preparar revision por direccion 9.3 con brechas, acciones, riesgos y recursos.",
+    "- Probar el flujo con una empresa piloto real y registrar observaciones.",
+    "",
+    "Regla de gobierno",
+    "Este paquete es un borrador operativo. El agente ayuda a implementar y mantener, pero la empresa aprueba documentos, decisiones, cierres y cumplimiento."
+  ].join("\n");
+}
+
+function downloadCompanyImplementationPackage() {
+  const blob = new Blob([companyImplementationPackageText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "paquete_inicial_implementacion_sgsta.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Paquete inicial de implementacion descargado",
+    detail: "Se descargo perfil, entrevista, datos por actividad y acciones abiertas para iniciar implementacion SGSTA.",
+    code: "4.4",
+    type: "perfil_empresa",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function createCompanyIntakeActions() {
   const pending = companyIntakeItems().filter((item) => !item.done);
   let created = 0;
@@ -2508,6 +2574,7 @@ function renderCompanyIntakeGuide() {
       </div>
       <div class="row-actions">
         <button class="secondary-button" data-intake-download type="button">Descargar entrevista</button>
+        <button class="secondary-button" data-intake-package type="button">Descargar paquete inicial</button>
         <button data-intake-actions type="button">Crear acciones</button>
       </div>
     </article>`;
@@ -2515,6 +2582,7 @@ function renderCompanyIntakeGuide() {
     button.addEventListener("click", () => showView(button.dataset.intakeOpen));
   });
   container.querySelector("[data-intake-download]")?.addEventListener("click", downloadCompanyIntakeGuide);
+  container.querySelector("[data-intake-package]")?.addEventListener("click", downloadCompanyImplementationPackage);
   container.querySelector("[data-intake-actions]")?.addEventListener("click", createCompanyIntakeActions);
   container.querySelectorAll("[data-intake-activity-actions]").forEach((button) => {
     button.addEventListener("click", () => createActivityIntakeActions(button.dataset.intakeActivityActions));
