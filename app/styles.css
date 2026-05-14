@@ -701,6 +701,116 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.pilot-observation-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.pilot-observation-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.pilot-observation-head h3,
+.pilot-observation-head p {
+  margin: 0;
+}
+
+.pilot-observation-head > div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.pilot-observation-head > div:first-child p:last-child {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.pilot-observation-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(82px, 1fr));
+  gap: 8px;
+  min-width: 220px;
+}
+
+.pilot-observation-metrics span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--muted);
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.pilot-observation-metrics strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.pilot-observation-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.pilot-observation-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.pilot-observation-form .wide {
+  grid-column: 1 / -1;
+}
+
+.pilot-observation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pilot-observation-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+}
+
+.pilot-observation-card.alta {
+  background: #fef2f2;
+}
+
+.pilot-observation-card.media {
+  background: #fffbeb;
+}
+
+.pilot-observation-card strong {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.pilot-observation-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .activity-decision-mini {
   display: grid;
   gap: 5px;
@@ -3038,6 +3148,8 @@ textarea {
   .activity-form-tools,
   .commercial-card,
   .commercial-proof,
+  .pilot-observation-form,
+  .pilot-observation-card,
   .pilot-steps,
   .plan-usage,
   .systems-matrix,
@@ -3056,6 +3168,14 @@ textarea {
 
   .demo-readiness-main {
     display: grid;
+  }
+
+  .pilot-observation-head {
+    display: grid;
+  }
+
+  .pilot-observation-metrics {
+    min-width: 0;
   }
 
   .topbar {

@@ -247,6 +247,7 @@ const defaultState = {
     { title: "Crear politica de seguridad", code: "5.2", status: "abierta", type: "tarea", origin: "agente" },
     { title: "Levantar mapa de riesgos por actividad", code: "6.1.2", status: "abierta", type: "preventiva", origin: "riesgo" }
   ],
+  pilotObservations: [],
   evidence: [],
   auditLog: []
 };
@@ -297,6 +298,7 @@ function mergeState(base, current) {
     formFilters: { ...base.formFilters, ...(current.formFilters || {}) },
     formResponses: current.formResponses || base.formResponses,
     actions: current.actions || base.actions,
+    pilotObservations: current.pilotObservations || base.pilotObservations,
     evidence: current.evidence || base.evidence,
     auditLog: current.auditLog || base.auditLog,
     planUsage: { ...base.planUsage, ...(current.planUsage || {}) }
@@ -626,7 +628,8 @@ function renderDemoReadiness() {
           <strong>${item.label}</strong>
         </div>`).join("")}
     </div>
-    ${renderDemoScript(demo)}`;
+    ${renderDemoScript(demo)}
+    ${renderPilotObservationPanel()}`;
   container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
   container.querySelector("[data-demo-seed]")?.addEventListener("click", loadPilotExampleData);
   container.querySelector("[data-demo-guide]")?.addEventListener("click", downloadPilotTestGuide);
@@ -634,6 +637,7 @@ function renderDemoReadiness() {
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
   });
+  bindPilotObservationControls(container);
 }
 
 function renderDemoScript(demo) {
@@ -669,6 +673,176 @@ function renderDemoScript(demo) {
           </article>`).join("")}
       </div>
     </div>`;
+}
+
+function pilotObservationSummary() {
+  const items = state.pilotObservations || [];
+  return {
+    total: items.length,
+    open: items.filter((item) => item.status === "abierta").length,
+    high: items.filter((item) => item.priority === "alta" && item.status !== "cerrada").length,
+    converted: items.filter((item) => item.status === "convertida").length
+  };
+}
+
+function renderPilotObservationPanel() {
+  const items = state.pilotObservations || [];
+  const summary = pilotObservationSummary();
+  const activityOptions = ["General", ...state.activities.map((activity) => activity.name || activity.activity).filter(Boolean)]
+    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+    .join("");
+  const recent = items.slice(0, 6);
+  return `
+    <div class="pilot-observation-panel">
+      <div class="pilot-observation-head">
+        <div>
+          <p class="eyebrow">Prueba piloto</p>
+          <h3>Observaciones para convertir en mejoras</h3>
+          <p>Registra comentarios de operadores, guias, direccion o cliente piloto y conviertelos en acciones 10.1/10.2.</p>
+        </div>
+        <div class="pilot-observation-metrics">
+          <span><strong>${summary.total}</strong> total</span>
+          <span><strong>${summary.open}</strong> abiertas</span>
+          <span><strong>${summary.high}</strong> altas</span>
+          <span><strong>${summary.converted}</strong> convertidas</span>
+        </div>
+      </div>
+      <div class="pilot-observation-form">
+        <label>Area
+          <select id="pilotObservationArea">
+            <option value="operacion">Operacion</option>
+            <option value="formularios">Formularios</option>
+            <option value="evidencias">Evidencias</option>
+            <option value="agente">Agente</option>
+            <option value="comercial">Comercial</option>
+            <option value="otro">Otro</option>
+          </select>
+        </label>
+        <label>Actividad
+          <select id="pilotObservationActivity">${activityOptions}</select>
+        </label>
+        <label>Quien observa
+          <input id="pilotObservationSource" type="text" placeholder="Guia, direccion, responsable SGSTA">
+        </label>
+        <label>Prioridad
+          <select id="pilotObservationPriority">
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+            <option value="baja">Baja</option>
+          </select>
+        </label>
+        <label class="wide">Observacion
+          <textarea id="pilotObservationText" rows="3" placeholder="Ejemplo: el guia no entiende que evidencia debe subir despues de la actividad"></textarea>
+        </label>
+        <div class="row-actions wide">
+          <button class="secondary-button" data-pilot-observation-actions type="button">Convertir abiertas en acciones</button>
+          <button data-pilot-observation-add type="button">Registrar observacion</button>
+        </div>
+      </div>
+      <div class="pilot-observation-list">
+        ${recent.length ? recent.map((item, index) => `
+          <article class="pilot-observation-card ${item.priority || "media"}">
+            <div>
+              <span class="badge ${item.status === "convertida" ? "cumple" : item.priority === "alta" ? "no_cumple" : "en_proceso"}">${escapeHtml(item.status || "abierta")}</span>
+              <strong>${escapeHtml(item.text || "Observacion sin detalle")}</strong>
+              <p>${escapeHtml(item.area || "general")} - ${escapeHtml(item.activity || "General")} - ${escapeHtml(item.source || "sin fuente")} - ${escapeHtml(item.createdAt || "")}</p>
+            </div>
+            <button class="secondary-button" data-pilot-observation-action="${index}" type="button" ${item.status === "convertida" ? "disabled" : ""}>Crear accion</button>
+          </article>`).join("") : `
+          <div class="empty-state">Todavia no hay observaciones del piloto. Este sera el cuaderno de ajustes reales del MVP.</div>`}
+      </div>
+    </div>`;
+}
+
+function bindPilotObservationControls(container) {
+  container.querySelector("[data-pilot-observation-add]")?.addEventListener("click", addPilotObservation);
+  container.querySelector("[data-pilot-observation-actions]")?.addEventListener("click", createPilotObservationActions);
+  container.querySelectorAll("[data-pilot-observation-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const created = createPilotObservationAction(Number(button.dataset.pilotObservationAction));
+      addMessage("agent", created ? "Converti la observacion del piloto en una accion de mejora." : "Esa observacion ya tenia una accion asociada.");
+      saveState();
+      renderAll();
+    });
+  });
+}
+
+function addPilotObservation() {
+  const text = document.querySelector("#pilotObservationText")?.value.trim();
+  if (!text) {
+    addMessage("agent", "Escribe la observacion del piloto antes de registrarla.");
+    return;
+  }
+  const observation = {
+    text,
+    area: document.querySelector("#pilotObservationArea")?.value || "operacion",
+    activity: document.querySelector("#pilotObservationActivity")?.value || "General",
+    source: document.querySelector("#pilotObservationSource")?.value.trim() || state.ownerName || "Responsable SGSTA",
+    priority: document.querySelector("#pilotObservationPriority")?.value || "media",
+    status: "abierta",
+    createdAt: today()
+  };
+  state.pilotObservations.unshift(observation);
+  recordAuditEvent({
+    title: "Observacion de piloto registrada",
+    detail: `${observation.area} - ${observation.activity}: ${observation.text}`,
+    code: "10.1",
+    type: "piloto",
+    actor: "humano"
+  });
+  addMessage("agent", "Registre la observacion del piloto. Cuando quieras, puedo convertirla en accion de mejora.");
+  saveState();
+  renderAll();
+}
+
+function createPilotObservationAction(index) {
+  const observation = state.pilotObservations?.[index];
+  if (!observation || observation.status === "convertida") return false;
+  const title = `Piloto: ${observation.text.slice(0, 80)}${observation.text.length > 80 ? "..." : ""}`;
+  if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) {
+    observation.status = "convertida";
+    observation.convertedAt = today();
+    return false;
+  }
+  state.actions.unshift({
+    title,
+    code: "10.2",
+    status: "abierta",
+    type: "mejora",
+    origin: "observacion piloto",
+    priority: observation.priority || "media",
+    responsible: state.ownerName || "Responsable SGSTA",
+    dueDate: "",
+    cause: `Observacion piloto (${observation.area || "general"} / ${observation.activity || "General"} / ${observation.source || "sin fuente"}): ${observation.text}`,
+    immediateCorrection: "",
+    followUp: "",
+    evidence: "",
+    efficacyVerification: "Verificar en una nueva prueba piloto que el ajuste resolvio la observacion.",
+    efficacyStatus: "pendiente",
+    relatedActivity: observation.activity === "General" ? "" : observation.activity,
+    createdAt: today()
+  });
+  observation.status = "convertida";
+  observation.convertedAt = today();
+  recordAuditEvent({
+    title: "Observacion piloto convertida en accion",
+    detail: title,
+    code: "10.2",
+    type: "accion_mejora",
+    actor: "agente"
+  });
+  return true;
+}
+
+function createPilotObservationActions() {
+  const openIndexes = (state.pilotObservations || [])
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.status === "abierta")
+    .map(({ index }) => index);
+  const created = openIndexes.filter((index) => createPilotObservationAction(index)).length;
+  addMessage("agent", created ? `Converti ${created} observacion(es) del piloto en acciones de mejora.` : "No habia observaciones abiertas nuevas para convertir.");
+  saveState();
+  renderAll();
 }
 
 function pilotTestGuideText() {
@@ -850,6 +1024,10 @@ function loadPilotExampleData() {
     { title: "Validar cobertura de seguro para cuatrimotos", code: "6.1.3", status: "abierta", type: "preventiva", origin: "semaforo SGSTA", priority: "alta", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "22/05/2026", cause: "La actividad Ruta Cuatrimotos Mirador no tiene poliza vigente validada.", followUp: "", evidence: "", efficacyVerification: "", efficacyStatus: "pendiente", relatedActivity: "Ruta Cuatrimotos Mirador", createdAt: today() },
     { title: "Completar competencia de guia cuatrimotos", code: "7.2", status: "abierta", type: "preventiva", origin: "competencia", priority: "alta", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "24/05/2026", cause: "Miguel Perez no tiene certificado/evidencia vigente para operacion de cuatrimotos.", followUp: "", evidence: "", efficacyVerification: "", efficacyStatus: "pendiente", relatedActivity: "Ruta Cuatrimotos Mirador", createdAt: today() },
     { title: "Cerrar plan de emergencia rafting", code: "8.2", status: "pendiente_eficacia", type: "mejora", origin: "revision direccion", priority: "media", responsible: "Laura Gomez - Responsable SGSTA", dueDate: "26/05/2026", cause: "Plan de emergencia en revision requiere simulacro y verificacion.", followUp: "Simulacro ejecutado con observaciones menores.", evidence: "acta_simulacro_rescate.pdf", efficacyVerification: "Verificar tiempos de respuesta y comunicacion posterior al simulacro.", efficacyStatus: "pendiente", relatedActivity: "Rafting Rio Claro", createdAt: today() }
+  ];
+  state.pilotObservations = [
+    { text: "El responsable SGSTA quiere ver mas claro que evidencia falta antes de operar cuatrimotos.", area: "evidencias", activity: "Ruta Cuatrimotos Mirador", source: "Responsable SGSTA", priority: "alta", status: "abierta", createdAt: today() },
+    { text: "La direccion entiende el semaforo, pero pide un resumen mas corto para decidir recursos.", area: "comercial", activity: "General", source: "Direccion", priority: "media", status: "abierta", createdAt: today() }
   ];
   state.compliance = { "4.1": "en_proceso", "4.3": "cumple", "5.2": "cumple", "6.1.2": "en_proceso", "6.1.3": "en_proceso", "7.1": "en_proceso", "7.2": "en_proceso", "7.4.3": "en_proceso", "8.1": "en_proceso", "8.2": "en_proceso", "9.2": "en_proceso", "9.3": "en_proceso", "10.1": "en_proceso" };
   state.auditLog = [];
