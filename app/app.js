@@ -1191,6 +1191,9 @@ function loadPilotExampleData() {
 }
 
 function todayWorkItems() {
+  const activityIntake = companyActivityIntakeRows()
+    .filter((row) => row.pct < 100)
+    .sort((a, b) => a.pct - b.pct || b.missing.length - a.missing.length)[0];
   const closure = requirements
     .map((item) => closurePathForRequirement(item.code))
     .filter((item) => item.score < 100)
@@ -1202,7 +1205,7 @@ function todayWorkItems() {
   const reviewForms = state.formResponses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
   const openActions = state.actions.filter((item) => item.status !== "cerrada").length;
   const reviewDecisions = managementReviewOperationalDecisions().filter((decision) => decision.priority !== "baja");
-  return { closure, activity, reviewForms, openActions, reviewDecisions };
+  return { activityIntake, closure, activity, reviewForms, openActions, reviewDecisions };
 }
 
 function renderTodayWork() {
@@ -1210,15 +1213,25 @@ function renderTodayWork() {
   if (!container) return;
   const work = todayWorkItems();
   const activityGap = work.activity?.readiness.gaps[0];
+  const primaryTitle = work.activityIntake
+    ? `Completar ${work.activityIntake.name}`
+    : work.activity
+      ? `Asegurar ${work.activity.activity.name}`
+      : "Crear actividades reales";
+  const primaryDetail = work.activityIntake
+    ? `Dato minimo faltante: ${work.activityIntake.missing[0]}. ${work.activityIntake.nextQuestion}`
+    : work.activity
+      ? `${activityGap?.label || "Brecha"}: ${activityGap?.detail || "Revisar controles de la actividad."}`
+      : "Registra rafting, senderismo, cuatrimotos u otras actividades para empezar el control operativo.";
   container.innerHTML = `
     <div class="today-grid">
       <article class="today-card primary">
         <span class="badge en_proceso">Primero</span>
-        <h3>${work.activity ? `Asegurar ${work.activity.activity.name}` : "Crear actividades reales"}</h3>
-        <p>${work.activity ? `${activityGap?.label || "Brecha"}: ${activityGap?.detail || "Revisar controles de la actividad."}` : "Registra rafting, senderismo, cuatrimotos u otras actividades para empezar el control operativo."}</p>
+        <h3>${escapeHtml(primaryTitle)}</h3>
+        <p>${escapeHtml(primaryDetail)}</p>
         <div class="row-actions">
-          <button data-today-action="activity" type="button">${work.activity ? "Ver actividad" : "Crear actividad"}</button>
-          ${work.activity ? `<button class="secondary-button" data-today-action="activity-action" type="button">Crear accion</button>` : ""}
+          <button data-today-action="activity" type="button">${work.activityIntake || work.activity ? "Ver actividad" : "Crear actividad"}</button>
+          ${work.activityIntake ? `<button class="secondary-button" data-today-action="activity-intake-action" type="button">Crear acciones</button>` : work.activity ? `<button class="secondary-button" data-today-action="activity-action" type="button">Crear accion</button>` : ""}
         </div>
       </article>
       <article class="today-card">
@@ -1240,7 +1253,10 @@ function renderTodayWork() {
       </article>
     </div>`;
   container.querySelector("[data-today-action='activity']")?.addEventListener("click", () => {
-    if (work.activity) {
+    if (work.activityIntake) {
+      state.selectedActivityName = work.activityIntake.name;
+      showView("actividades");
+    } else if (work.activity) {
       state.selectedActivityName = work.activity.activity.name;
       showView("actividades");
     } else {
@@ -1248,6 +1264,10 @@ function renderTodayWork() {
       showView("actividades");
     }
     renderAll();
+  });
+  container.querySelector("[data-today-action='activity-intake-action']")?.addEventListener("click", () => {
+    if (!work.activityIntake) return;
+    createActivityIntakeActions(work.activityIntake.name);
   });
   container.querySelector("[data-today-action='activity-action']")?.addEventListener("click", () => {
     if (!work.activity || !activityGap) return;
