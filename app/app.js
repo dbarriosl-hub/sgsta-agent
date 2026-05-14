@@ -2474,7 +2474,10 @@ function renderCompanyIntakeGuide() {
                 <p>Faltan: ${escapeHtml(row.missing.length ? row.missing.join(", ") : "sin faltantes principales")}</p>
                 <small>${escapeHtml(row.nextQuestion)}</small>
               </div>
-              <button class="secondary-button" data-intake-open="actividades" type="button">Abrir</button>
+              <div class="activity-intake-actions">
+                <button class="secondary-button" data-intake-open="actividades" type="button">Abrir</button>
+                <button class="secondary-button" data-intake-activity-actions="${escapeHtml(row.name)}" type="button" ${row.pct === 100 ? "disabled" : ""}>Crear acciones</button>
+              </div>
             </article>`).join("") : `<div class="empty-state">Registra actividades reales para ver el checklist por actividad.</div>`}
         </div>
       </div>
@@ -2488,6 +2491,9 @@ function renderCompanyIntakeGuide() {
   });
   container.querySelector("[data-intake-download]")?.addEventListener("click", downloadCompanyIntakeGuide);
   container.querySelector("[data-intake-actions]")?.addEventListener("click", createCompanyIntakeActions);
+  container.querySelectorAll("[data-intake-activity-actions]").forEach((button) => {
+    button.addEventListener("click", () => createActivityIntakeActions(button.dataset.intakeActivityActions));
+  });
 }
 
 function buildCompanyImplementationProfile() {

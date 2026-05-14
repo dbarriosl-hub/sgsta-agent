@@ -1554,10 +1554,15 @@ textarea {
   border-radius: 8px;
   background: #ffffff;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-columns: minmax(0, 1fr) 150px;
   gap: 10px;
   align-items: center;
   padding: 10px;
+}
+
+.activity-intake-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .activity-intake-item.cumple {
