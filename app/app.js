@@ -747,6 +747,7 @@ function renderPilotObservationPanel() {
           <textarea id="pilotObservationText" rows="3" placeholder="Ejemplo: el guia no entiende que evidencia debe subir despues de la actividad"></textarea>
         </label>
         <div class="row-actions wide">
+          <button class="secondary-button" data-pilot-observation-report type="button">Descargar observaciones</button>
           <button class="secondary-button" data-pilot-observation-actions type="button">Convertir abiertas en acciones</button>
           <button data-pilot-observation-add type="button">Registrar observacion</button>
         </div>
@@ -769,6 +770,7 @@ function renderPilotObservationPanel() {
 function bindPilotObservationControls(container) {
   container.querySelector("[data-pilot-observation-add]")?.addEventListener("click", addPilotObservation);
   container.querySelector("[data-pilot-observation-actions]")?.addEventListener("click", createPilotObservationActions);
+  container.querySelector("[data-pilot-observation-report]")?.addEventListener("click", downloadPilotObservationReport);
   container.querySelectorAll("[data-pilot-observation-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const created = createPilotObservationAction(Number(button.dataset.pilotObservationAction));
@@ -853,6 +855,94 @@ function createPilotObservationActions() {
     .map(({ index }) => index);
   const created = openIndexes.filter((index) => createPilotObservationAction(index)).length;
   addMessage("agent", created ? `Converti ${created} observacion(es) del piloto en acciones de mejora.` : "No habia observaciones abiertas nuevas para convertir.");
+  saveState();
+  renderAll();
+}
+
+function pilotObservationRelatedActions(observation) {
+  const text = String(observation.text || "");
+  return state.actions.filter((action) => {
+    if (action.origin !== "observacion piloto") return false;
+    return String(action.title || "").includes(text.slice(0, 40)) || String(action.cause || "").includes(text);
+  });
+}
+
+function pilotObservationReportText() {
+  const summary = pilotObservationSummary();
+  const observations = state.pilotObservations || [];
+  const open = openPilotObservations();
+  const converted = observations.filter((item) => item.status === "convertida");
+  const relatedActions = state.actions.filter((action) => action.origin === "observacion piloto");
+  return [
+    "REPORTE DE OBSERVACIONES DEL PILOTO - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName}`,
+    `Sistema: ${activeSystem().name} (${activeSystem().code})`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName}`,
+    "",
+    "Resumen",
+    `- Observaciones registradas: ${summary.total}`,
+    `- Abiertas: ${summary.open}`,
+    `- Prioridad alta: ${summary.high}`,
+    `- Convertidas en acciones: ${summary.converted}`,
+    `- Acciones de mejora asociadas: ${relatedActions.length}`,
+    "",
+    "Observaciones abiertas",
+    ...(open.length ? open.map((item, index) => [
+      `${index + 1}. ${item.priority || "media"} | ${item.area || "general"} | ${item.activity || "General"}`,
+      `   Fuente: ${item.source || "sin fuente"} | Fecha: ${item.createdAt || ""}`,
+      `   Observacion: ${item.text || ""}`,
+      "   Decision requerida: convertir en accion de mejora, aplazar o cerrar con justificacion humana."
+    ].join("\n")) : ["- No hay observaciones abiertas."]),
+    "",
+    "Observaciones convertidas",
+    ...(converted.length ? converted.map((item, index) => {
+      const actions = pilotObservationRelatedActions(item);
+      return [
+        `${index + 1}. ${item.priority || "media"} | ${item.area || "general"} | ${item.activity || "General"}`,
+        `   Observacion: ${item.text || ""}`,
+        `   Convertida: ${item.convertedAt || "sin fecha"}`,
+        `   Accion asociada: ${actions[0]?.title || "por verificar en acciones"}`
+      ].join("\n");
+    }) : ["- No hay observaciones convertidas."]),
+    "",
+    "Acciones generadas desde piloto",
+    ...(relatedActions.length ? relatedActions.map((action, index) => [
+      `${index + 1}. ${action.title}`,
+      `   Estado: ${action.status || "abierta"} | Prioridad: ${action.priority || "media"} | Requisito: ${action.code || "10.2"}`,
+      `   Responsable: ${action.responsible || "por asignar"} | Actividad: ${action.relatedActivity || "General"}`,
+      `   Verificacion de eficacia: ${action.efficacyVerification || "por definir"}`
+    ].join("\n")) : ["- Todavia no hay acciones generadas desde observaciones piloto."]),
+    "",
+    "Uso en PHVA",
+    "- Planear: ajustar alcance, riesgos o recursos segun aprendizaje del piloto.",
+    "- Hacer: modificar formularios, evidencias, actividades o capacitaciones.",
+    "- Verificar: revisar en direccion y confirmar si el ajuste funciono.",
+    "- Actuar: cerrar como mejora solo con evidencia y eficacia humana.",
+    "",
+    "Regla de gobierno",
+    "Este reporte es trazabilidad de aprendizaje. El agente puede proponer acciones, pero la empresa decide aprobacion, cierre y eficacia."
+  ].join("\n");
+}
+
+function downloadPilotObservationReport() {
+  const blob = new Blob([pilotObservationReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "reporte_observaciones_piloto_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Reporte de observaciones piloto descargado",
+    detail: "Se descargo trazabilidad de observaciones, aprendizajes y acciones derivadas del piloto.",
+    code: "10.2",
+    type: "piloto",
+    actor: "humano"
+  });
   saveState();
   renderAll();
 }
