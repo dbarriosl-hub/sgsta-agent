@@ -8252,31 +8252,43 @@ function convertActionsReportToEvidence() {
   const title = activeActivityFilter
     ? `Reporte de acciones - ${activeActivityFilter}`
     : "Reporte general de acciones de gestion";
-  const existing = state.evidence.find((item) => item.linkedDocument === title && item.source === "reporte acciones");
-  const evidence = {
-    title,
-    code: "10.1",
-    source: "reporte acciones",
-    status: "sugerida",
-    linkedDocument: title,
-    activity: activeActivityFilter,
-    linkedActivity: activeActivityFilter,
-    content: actionsReportText()
-  };
-  if (existing) Object.assign(existing, evidence, { date: today() });
-  else addEvidenceRecord(evidence);
-  if (existing) {
-    recordAuditEvent({
-      title: "Evidencia de acciones actualizada",
-      detail: `${title} fue actualizado como soporte sugerido de acciones y mejora.`,
-      code: "10.1",
-      type: "evidencia",
-      actor: "humano"
-    });
-    saveState();
-    renderAll();
-  }
-  addMessage("agent", `Asocie "${title}" como evidencia sugerida para acciones 10.1/10.2. Requiere validacion humana.`);
+  const rows = actionsReportRows();
+  const codes = rows.some((action) => action.type === "mejora" || action.code === "10.2") ? ["10.1", "10.2"] : ["10.1"];
+  const content = actionsReportText();
+  let created = 0;
+  let updated = 0;
+  codes.forEach((code) => {
+    const linkedDocument = `${title} (${code})`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "reporte acciones");
+    const evidence = {
+      title: `${title} - requisito ${code}`,
+      code,
+      source: "reporte acciones",
+      status: "sugerida",
+      linkedDocument,
+      activity: activeActivityFilter,
+      linkedActivity: activeActivityFilter,
+      content
+    };
+    if (existing) {
+      Object.assign(existing, evidence, { date: today() });
+      updated += 1;
+    } else {
+      state.evidence.unshift({ date: today(), ...evidence });
+      created += 1;
+    }
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  recordAuditEvent({
+    title: "Reporte de acciones enviado a evidencias",
+    detail: `${title}: ${created} evidencia(s) creada(s), ${updated} actualizada(s), requisitos ${codes.join(", ")}.`,
+    code: codes.join("/"),
+    type: "evidencia",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+  addMessage("agent", `Asocie "${title}" como evidencia sugerida para ${codes.join(" y ")}. Requiere validacion humana.`);
 }
 
 function actionClosureStage(action) {
