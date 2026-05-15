@@ -522,6 +522,33 @@ textarea {
   gap: 10px;
 }
 
+.action-filter-bar {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+}
+
+.action-filter-bar .eyebrow,
+.action-filter-bar strong,
+.action-filter-bar span {
+  display: block;
+}
+
+.action-filter-bar .eyebrow {
+  margin: 0 0 4px;
+}
+
+.action-filter-bar span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
 .today-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 0.95fr));
@@ -3221,6 +3248,7 @@ textarea {
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,
+  .action-filter-bar,
   .activity-operational-status,
   .activity-intake-grid,
   .form-filters,

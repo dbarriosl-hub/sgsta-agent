@@ -234,6 +234,7 @@ const defaultState = {
   agentFindings: [],
   closurePackages: [],
   selectedActivityName: "Senderismo",
+  actionFilterActivity: "",
   selectedFormActivity: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
   formFilters: { search: "", phva: "todos", status: "todos" },
@@ -293,6 +294,7 @@ function mergeState(base, current) {
     executiveReport: current.executiveReport || base.executiveReport,
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
+    actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
     selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
     selectedFormTable: current.selectedFormTable || base.selectedFormTable,
     formFilters: { ...base.formFilters, ...(current.formFilters || {}) },
@@ -1635,7 +1637,10 @@ function renderChapterProgress() {
   nextActions.querySelectorAll("[data-next-action-open]").forEach((button) => {
     button.addEventListener("click", () => {
       const action = openActions[Number(button.dataset.nextActionOpen)];
-      if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
+      if (action?.relatedActivity) {
+        state.selectedActivityName = action.relatedActivity;
+        state.actionFilterActivity = action.relatedActivity;
+      }
       showView("acciones");
       renderAll();
     });
@@ -8107,6 +8112,10 @@ function canRunAgent() {
 function renderActions() {
   const container = document.querySelector("#actionsTable");
   const summary = document.querySelector("#actionsSummary");
+  const selectedActivity = state.selectedActivityName || state.activities[0]?.name || "";
+  const activityActions = selectedActivity
+    ? state.actions.filter((item) => item.status !== "cerrada" && item.relatedActivity === selectedActivity)
+    : [];
   if (summary) {
     const open = state.actions.filter((item) => item.status !== "cerrada").length;
     const assigned = state.actions.filter((item) => item.responsible && item.dueDate).length;
@@ -8118,14 +8127,54 @@ function renderActions() {
       <div class="report-card"><span>Asignadas</span><strong>${assigned}</strong></div>
       <div class="report-card"><span>Correctivas</span><strong>${corrective}</strong></div>
       <div class="report-card"><span>Eficaces</span><strong>${efficacy}</strong></div>
-      <div class="report-card"><span>Pend. eficacia</span><strong>${pendingEfficacy}</strong></div>`;
+      <div class="report-card"><span>Pend. eficacia</span><strong>${pendingEfficacy}</strong></div>
+      <div class="report-card"><span>${escapeHtml(selectedActivity || "Actividad")}</span><strong>${activityActions.length}</strong></div>`;
   }
   renderActionClosureBoard();
   renderActionWorkQueue();
-  container.innerHTML = state.actions.length
-    ? state.actions.map((item, index) => actionCardTemplate(item, index)).join("")
-    : `<div class="muted">No hay acciones registradas.</div>`;
+  const activeActivityFilter = state.actionFilterActivity || "";
+  const rows = state.actions
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !activeActivityFilter || item.relatedActivity === activeActivityFilter);
+  container.innerHTML = `
+    ${renderActionFilterBar(selectedActivity, activeActivityFilter, activityActions.length)}
+    ${rows.length
+      ? rows.map(({ item, index }) => actionCardTemplate(item, index)).join("")
+      : `<div class="muted">No hay acciones para el filtro seleccionado.</div>`}`;
+  bindActionFilterControls(container);
   bindActionControls(container);
+}
+
+function renderActionFilterBar(selectedActivity, activeActivityFilter, activityActionCount) {
+  return `
+    <div class="action-filter-bar">
+      <div>
+        <p class="eyebrow">Contexto</p>
+        <strong>${activeActivityFilter ? `Filtrando: ${escapeHtml(activeActivityFilter)}` : "Todas las acciones"}</strong>
+        <span>${selectedActivity ? `Actividad seleccionada: ${escapeHtml(selectedActivity)} (${activityActionCount} abierta(s))` : "Sin actividad seleccionada"}</span>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
+        <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
+        <button data-action-filter="open-activity" type="button" ${selectedActivity ? "" : "disabled"}>Ver actividad</button>
+      </div>
+    </div>`;
+}
+
+function bindActionFilterControls(container) {
+  container.querySelector("[data-action-filter='all']")?.addEventListener("click", () => {
+    state.actionFilterActivity = "";
+    saveState();
+    renderAll();
+  });
+  container.querySelector("[data-action-filter='activity']")?.addEventListener("click", () => {
+    state.actionFilterActivity = state.selectedActivityName || "";
+    saveState();
+    renderAll();
+  });
+  container.querySelector("[data-action-filter='open-activity']")?.addEventListener("click", () => {
+    showView("actividades");
+  });
 }
 
 function actionClosureStage(action) {
