@@ -8157,6 +8157,7 @@ function renderActionFilterBar(selectedActivity, activeActivityFilter, activityA
         <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
         <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
         <button class="secondary-button" data-action-filter="download" type="button">Descargar</button>
+        <button class="secondary-button" data-action-filter="evidence" type="button">Enviar a evidencias</button>
         <button data-action-filter="open-activity" type="button" ${selectedActivity ? "" : "disabled"}>Ver actividad</button>
       </div>
     </div>`;
@@ -8177,6 +8178,7 @@ function bindActionFilterControls(container) {
     showView("actividades");
   });
   container.querySelector("[data-action-filter='download']")?.addEventListener("click", downloadActionsReport);
+  container.querySelector("[data-action-filter='evidence']")?.addEventListener("click", convertActionsReportToEvidence);
 }
 
 function actionsReportRows() {
@@ -8243,6 +8245,38 @@ function downloadActionsReport() {
   });
   saveState();
   renderAll();
+}
+
+function convertActionsReportToEvidence() {
+  const activeActivityFilter = state.actionFilterActivity || "";
+  const title = activeActivityFilter
+    ? `Reporte de acciones - ${activeActivityFilter}`
+    : "Reporte general de acciones de gestion";
+  const existing = state.evidence.find((item) => item.linkedDocument === title && item.source === "reporte acciones");
+  const evidence = {
+    title,
+    code: "10.1",
+    source: "reporte acciones",
+    status: "sugerida",
+    linkedDocument: title,
+    activity: activeActivityFilter,
+    linkedActivity: activeActivityFilter,
+    content: actionsReportText()
+  };
+  if (existing) Object.assign(existing, evidence, { date: today() });
+  else addEvidenceRecord(evidence);
+  if (existing) {
+    recordAuditEvent({
+      title: "Evidencia de acciones actualizada",
+      detail: `${title} fue actualizado como soporte sugerido de acciones y mejora.`,
+      code: "10.1",
+      type: "evidencia",
+      actor: "humano"
+    });
+    saveState();
+    renderAll();
+  }
+  addMessage("agent", `Asocie "${title}" como evidencia sugerida para acciones 10.1/10.2. Requiere validacion humana.`);
 }
 
 function actionClosureStage(action) {
