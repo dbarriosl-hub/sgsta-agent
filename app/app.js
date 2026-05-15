@@ -8156,6 +8156,7 @@ function renderActionFilterBar(selectedActivity, activeActivityFilter, activityA
       <div class="row-actions">
         <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
         <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
+        <button class="secondary-button" data-action-filter="download" type="button">Descargar</button>
         <button data-action-filter="open-activity" type="button" ${selectedActivity ? "" : "disabled"}>Ver actividad</button>
       </div>
     </div>`;
@@ -8175,6 +8176,73 @@ function bindActionFilterControls(container) {
   container.querySelector("[data-action-filter='open-activity']")?.addEventListener("click", () => {
     showView("actividades");
   });
+  container.querySelector("[data-action-filter='download']")?.addEventListener("click", downloadActionsReport);
+}
+
+function actionsReportRows() {
+  const activeActivityFilter = state.actionFilterActivity || "";
+  return state.actions.filter((action) => !activeActivityFilter || action.relatedActivity === activeActivityFilter);
+}
+
+function actionsReportText() {
+  const activeActivityFilter = state.actionFilterActivity || "";
+  const rows = actionsReportRows();
+  const open = rows.filter((action) => action.status !== "cerrada");
+  const high = open.filter((action) => action.priority === "alta");
+  const pendingEfficacy = rows.filter((action) => action.status === "pendiente_eficacia" || (action.status === "cerrada" && action.efficacyStatus !== "eficaz"));
+  return [
+    activeActivityFilter ? `REPORTE DE ACCIONES - ${activeActivityFilter}` : "REPORTE DE ACCIONES DE GESTION",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Sistema: ${activeSystem().name} (${activeSystem().code})`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    `Filtro: ${activeActivityFilter || "Todas las acciones"}`,
+    "",
+    "Resumen",
+    `- Acciones incluidas: ${rows.length}`,
+    `- Abiertas: ${open.length}`,
+    `- Prioridad alta abiertas: ${high.length}`,
+    `- Pendientes de eficacia: ${pendingEfficacy.length}`,
+    "",
+    "Detalle",
+    ...(rows.length ? rows.map((action, index) => [
+      `${index + 1}. ${action.title || "Accion sin titulo"}`,
+      `   Requisito: ${action.code || "N/A"} | Tipo: ${action.type || "tarea"} | Prioridad: ${action.priority || "media"} | Estado: ${action.status || "abierta"}`,
+      `   Actividad: ${action.relatedActivity || action.activity || "General"} | Responsable: ${action.responsible || "por asignar"} | Fecha limite: ${action.dueDate || "por definir"}`,
+      `   Origen: ${action.origin || "agente"}${action.sourceDetail ? ` | Fuente: ${action.sourceDetail}` : ""}`,
+      `   Causa/razon: ${action.cause || "por documentar"}`,
+      `   Seguimiento: ${action.followUp || "pendiente"}`,
+      `   Evidencia: ${action.evidence || "pendiente"}`,
+      `   Eficacia: ${action.efficacyStatus || "pendiente"} - ${action.efficacyVerification || "por verificar"}`
+    ].join("\n")) : ["- No hay acciones para el filtro seleccionado."]),
+    "",
+    "Regla de gobierno",
+    "El agente puede preparar y priorizar acciones. La aprobacion, evidencia real, cierre y verificacion de eficacia requieren validacion humana."
+  ].join("\n");
+}
+
+function downloadActionsReport() {
+  const activeActivityFilter = state.actionFilterActivity || "todas";
+  const filename = `reporte_acciones_${activeActivityFilter.toLowerCase().replaceAll(" ", "_").replaceAll("/", "-")}.txt`;
+  const blob = new Blob([actionsReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Reporte de acciones descargado",
+    detail: `Se descargo reporte de acciones con filtro: ${state.actionFilterActivity || "todas"}.`,
+    code: "10.1",
+    type: "accion_gestion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 function actionClosureStage(action) {
