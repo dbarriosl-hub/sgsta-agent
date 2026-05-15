@@ -9251,7 +9251,11 @@ function evidencePackageLinkedItems(item) {
   item.forms.slice(0, 2).forEach((form) => linked.push(`${form.title}: ${form.status}`));
   item.activityForms.slice(0, 2).forEach((form) => linked.push(`${form.activity}: ${form.status}`));
   item.documents.slice(0, 1).forEach((doc) => linked.push(`Documento: ${doc.status || "borrador"}`));
-  item.evidences.slice(0, 1).forEach((evidence) => linked.push(`Evidencia: ${evidence.status || "registrada"}`));
+  const actionReports = item.evidences.filter((evidence) => evidence.source === "reporte acciones");
+  actionReports.slice(0, 2).forEach((evidence) => {
+    linked.push(`Reporte acciones: ${evidence.status || "sugerida"}${evidence.linkedActivity ? ` - ${evidence.linkedActivity}` : ""}`);
+  });
+  item.evidences.filter((evidence) => evidence.source !== "reporte acciones").slice(0, 1).forEach((evidence) => linked.push(`Evidencia: ${evidence.status || "registrada"}`));
   if (!linked.length) linked.push("Sin soportes enlazados todavia");
   return linked;
 }
