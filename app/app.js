@@ -639,6 +639,7 @@ function renderDemoReadiness() {
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
   container.querySelector("[data-mvp-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.mvpOpen));
   container.querySelector("[data-mvp-report]")?.addEventListener("click", downloadMvpPilotReport);
+  container.querySelector("[data-mvp-evidence]")?.addEventListener("click", convertMvpPilotReportToEvidence);
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
   });
@@ -689,6 +690,7 @@ function renderMvpPilotStatus(demo) {
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-mvp-report type="button">Descargar estado</button>
+          <button class="secondary-button" data-mvp-evidence type="button">Enviar a evidencias</button>
           <button class="secondary-button" data-mvp-open="${mvp.next.view}" type="button">Abrir proximo</button>
         </div>
       </div>
@@ -759,6 +761,44 @@ function downloadMvpPilotReport() {
   });
   saveState();
   renderAll();
+}
+
+function convertMvpPilotReportToEvidence() {
+  const title = `Estado MVP piloto ${today()}`;
+  const content = mvpPilotReportText();
+  const codes = ["4.4", "9.1"];
+  let created = 0;
+  let updated = 0;
+  codes.forEach((code) => {
+    const linkedDocument = `${title} (${code})`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "reporte mvp piloto");
+    const evidence = {
+      title: `${title} - requisito ${code}`,
+      code,
+      source: "reporte mvp piloto",
+      status: "sugerida",
+      linkedDocument,
+      content
+    };
+    if (existing) {
+      Object.assign(existing, evidence, { date: today() });
+      updated += 1;
+    } else {
+      state.evidence.unshift({ date: today(), ...evidence });
+      created += 1;
+    }
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  recordAuditEvent({
+    title: "Estado MVP piloto enviado a evidencias",
+    detail: `${created} evidencia(s) creada(s), ${updated} actualizada(s), requisitos ${codes.join(", ")}.`,
+    code: "4.4/9.1",
+    type: "mvp_piloto",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+  addMessage("agent", "Asocie el estado del MVP piloto como evidencia sugerida para 4.4 y 9.1. Requiere validacion humana.");
 }
 
 function renderDemoScript(demo) {
