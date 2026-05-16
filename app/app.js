@@ -630,16 +630,65 @@ function renderDemoReadiness() {
           <strong>${item.label}</strong>
         </div>`).join("")}
     </div>
+    ${renderMvpPilotStatus(demo)}
     ${renderDemoScript(demo)}
     ${renderPilotObservationPanel()}`;
   container.querySelector("[data-demo-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoOpen));
   container.querySelector("[data-demo-seed]")?.addEventListener("click", loadPilotExampleData);
   container.querySelector("[data-demo-guide]")?.addEventListener("click", downloadPilotTestGuide);
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
+  container.querySelector("[data-mvp-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.mvpOpen));
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
   });
   bindPilotObservationControls(container);
+}
+
+function mvpPilotStatus(demo) {
+  const progress = implementationProgress();
+  const activityRows = companyActivityIntakeRows();
+  const activityPct = activityRows.length
+    ? Math.round(activityRows.reduce((sum, row) => sum + row.pct, 0) / activityRows.length)
+    : 0;
+  const evidenceWithSupport = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length;
+  const evidencePct = Math.round((evidenceWithSupport / requirements.length) * 100);
+  const reviewPct = state.managementReviews.length ? 100 : 0;
+  const score = Math.round((demo.score * 0.25) + (progress.pct * 0.25) + (activityPct * 0.2) + (evidencePct * 0.2) + (reviewPct * 0.1));
+  const weakActivity = activityRows.filter((row) => row.pct < 100).sort((a, b) => a.pct - b.pct)[0];
+  const next = weakActivity
+    ? { label: `Completar datos de ${weakActivity.name}`, detail: weakActivity.nextQuestion, view: "empresa" }
+    : evidencePct < 60
+      ? { label: "Preparar evidencias por requisito", detail: `${evidenceWithSupport}/${requirements.length} requisitos tienen soporte inicial.`, view: "evidencias" }
+      : !state.managementReviews.length
+        ? { label: "Preparar revision por direccion", detail: "La direccion debe revisar recursos, brechas y decisiones.", view: "revision" }
+        : { label: "Probar con empresa real", detail: "Ejecutar piloto, registrar observaciones y convertir aprendizajes en mejora.", view: "panel" };
+  const label = score >= 90 ? "MVP piloto casi listo" : score >= 75 ? "MVP piloto funcional" : score >= 55 ? "MVP en armado" : "MVP base";
+  return { score, label, progress, activityPct, evidencePct, reviewPct, next };
+}
+
+function renderMvpPilotStatus(demo) {
+  const mvp = mvpPilotStatus(demo);
+  return `
+    <div class="mvp-pilot-card">
+      <div class="mvp-pilot-score">
+        <strong>${mvp.score}%</strong>
+        <span>${mvp.label}</span>
+      </div>
+      <div class="mvp-pilot-main">
+        <div>
+          <p class="eyebrow">Hito del proyecto</p>
+          <h3>Camino al MVP piloto demostrable</h3>
+          <p>${escapeHtml(mvp.next.label)}. ${escapeHtml(mvp.next.detail)}</p>
+        </div>
+        <div class="mvp-pilot-metrics">
+          <span>PHVA <strong>${mvp.progress.pct}%</strong></span>
+          <span>Actividades <strong>${mvp.activityPct}%</strong></span>
+          <span>Evidencias <strong>${mvp.evidencePct}%</strong></span>
+          <span>Direccion <strong>${mvp.reviewPct}%</strong></span>
+        </div>
+        <button class="secondary-button" data-mvp-open="${mvp.next.view}" type="button">Abrir proximo</button>
+      </div>
+    </div>`;
 }
 
 function renderDemoScript(demo) {

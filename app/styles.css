@@ -671,6 +671,77 @@ textarea {
   background: #f0fdf4;
 }
 
+.mvp-pilot-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.mvp-pilot-score {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f0fdfa;
+  color: var(--accent);
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+}
+
+.mvp-pilot-score strong {
+  font-size: 30px;
+}
+
+.mvp-pilot-score span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mvp-pilot-main {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr) auto;
+  gap: 12px;
+}
+
+.mvp-pilot-main h3,
+.mvp-pilot-main p {
+  margin: 0;
+}
+
+.mvp-pilot-main p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.mvp-pilot-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.mvp-pilot-metrics span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+}
+
+.mvp-pilot-metrics strong {
+  color: var(--text);
+}
+
 .demo-script {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3232,6 +3303,8 @@ textarea {
   .operation-readiness-grid,
   .operation-activity-card,
   .demo-readiness-card,
+  .mvp-pilot-card,
+  .mvp-pilot-main,
   .phva-grid,
   .phva-maturity-grid,
   .plans-grid,
@@ -3255,6 +3328,7 @@ textarea {
   .activity-form-tools,
   .commercial-card,
   .commercial-proof,
+  .mvp-pilot-metrics,
   .pilot-observation-form,
   .pilot-observation-card,
   .pilot-steps,
