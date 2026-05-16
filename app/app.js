@@ -638,6 +638,7 @@ function renderDemoReadiness() {
   container.querySelector("[data-demo-guide]")?.addEventListener("click", downloadPilotTestGuide);
   container.querySelector("[data-demo-prepare]")?.addEventListener("click", prepareDemoPackage);
   container.querySelector("[data-mvp-open]")?.addEventListener("click", (event) => showView(event.currentTarget.dataset.mvpOpen));
+  container.querySelector("[data-mvp-report]")?.addEventListener("click", downloadMvpPilotReport);
   container.querySelectorAll("[data-demo-step]").forEach((button) => {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
   });
@@ -686,9 +687,78 @@ function renderMvpPilotStatus(demo) {
           <span>Evidencias <strong>${mvp.evidencePct}%</strong></span>
           <span>Direccion <strong>${mvp.reviewPct}%</strong></span>
         </div>
-        <button class="secondary-button" data-mvp-open="${mvp.next.view}" type="button">Abrir proximo</button>
+        <div class="row-actions">
+          <button class="secondary-button" data-mvp-report type="button">Descargar estado</button>
+          <button class="secondary-button" data-mvp-open="${mvp.next.view}" type="button">Abrir proximo</button>
+        </div>
       </div>
     </div>`;
+}
+
+function mvpPilotReportText() {
+  const demo = demoReadinessStatus();
+  const mvp = mvpPilotStatus(demo);
+  const activityRows = companyActivityIntakeRows();
+  const weakActivities = activityRows.filter((row) => row.pct < 100).sort((a, b) => a.pct - b.pct).slice(0, 5);
+  const evidencePackages = requirements.map(evidencePackageForRequirement).sort((a, b) => a.score - b.score).slice(0, 6);
+  const openActions = state.actions.filter((action) => action.status !== "cerrada");
+  return [
+    "ESTADO DEL MVP PILOTO - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Sistema: ${activeSystem().name} (${activeSystem().code})`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    "",
+    "Resumen",
+    `- Hito MVP piloto: ${mvp.score}% (${mvp.label}).`,
+    `- Demo: ${demo.score}% (${demo.label}).`,
+    `- Implementacion PHVA: ${mvp.progress.completed}/${mvp.progress.total} pasos (${mvp.progress.pct}%).`,
+    `- Datos por actividad: ${mvp.activityPct}%.`,
+    `- Evidencias por requisito: ${mvp.evidencePct}%.`,
+    `- Revision por direccion: ${mvp.reviewPct}%.`,
+    `- Acciones abiertas: ${openActions.length}.`,
+    "",
+    "Proximo paso",
+    `- ${mvp.next.label}: ${mvp.next.detail}`,
+    "",
+    "Actividades que requieren datos",
+    ...(weakActivities.length ? weakActivities.map((row) => `- ${row.name}: ${row.pct}% listo. Faltan ${row.missing.join(", ")}. Proxima pregunta: ${row.nextQuestion}`) : ["- Las actividades no muestran faltantes principales de datos minimos."]),
+    "",
+    "Requisitos con menor soporte",
+    ...(evidencePackages.length ? evidencePackages.map((item) => `- ${item.req.code} ${item.req.title}: ${item.score}%. Falta: ${item.missing.length ? item.missing.join(", ") : "sin brecha visible"}.`) : ["- Sin requisitos evaluados."]),
+    "",
+    "Lectura ejecutiva",
+    mvp.score >= 90
+      ? "El MVP esta casi listo para piloto real. Enfocar la prueba en observaciones, eficacia de acciones y validacion humana."
+      : mvp.score >= 75
+        ? "El MVP ya es funcional para demo/piloto guiado. Falta cerrar evidencias, datos por actividad o revision por direccion."
+        : "El MVP aun requiere completar bases operativas antes de venderlo como piloto.",
+    "",
+    "Regla de gobierno",
+    "El agente prepara, prioriza y genera borradores/evidencias sugeridas. La empresa aprueba cumplimiento, documentos, cierres y eficacia."
+  ].join("\n");
+}
+
+function downloadMvpPilotReport() {
+  const blob = new Blob([mvpPilotReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "estado_mvp_piloto_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Estado MVP piloto descargado",
+    detail: "Se descargo reporte de porcentaje, metricas, brechas y proximo paso del MVP piloto.",
+    code: "4.4",
+    type: "mvp_piloto",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 function renderDemoScript(demo) {
