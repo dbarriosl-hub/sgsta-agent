@@ -3465,18 +3465,26 @@ function createActivityQuickAction(title, code, type, activityName) {
 function showActivityQuickResult(activityName, message, section) {
   state.selectedActivityName = activityName;
   state.actionFilterActivity = activityName;
+  const sectionLabels = {
+    package: "paquete documental",
+    risks: "riesgos",
+    equipment: "equipos",
+    people: "guias y personal",
+    participants: "participantes",
+    policies: "seguro"
+  };
   state.activityHelperNotice = {
     activity: activityName,
-    message,
+    message: `${message} Te lleve al bloque de ${sectionLabels[section] || "trabajo"}.`,
     section,
     date: today()
   };
-  addMessage("agent", `${message} Tambien deje una accion abierta vinculada a ${activityName}.`);
+  addMessage("agent", `${message} Te llevo al bloque de ${sectionLabels[section] || "trabajo"} y deje una accion abierta vinculada a ${activityName}.`);
   saveState();
   renderAll();
   window.setTimeout(() => {
-    const target = document.querySelector("[data-activity-quick-result]") || document.querySelector(`[data-activity-section="${section}"]`);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const target = document.querySelector(`[data-activity-section="${section}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 80);
 }
 
@@ -4334,7 +4342,7 @@ function renderActivities() {
           <span>${escapeHtml(state.activityHelperNotice.message)}</span>
         </div>` : ""}
       ${renderActivityIntakeGuide(selectedActivity)}
-      <div class="activity-package-status" data-activity-section="package">
+      <div class="activity-package-status ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "package" ? "activity-section-active" : ""}" data-activity-section="package">
         <div class="package-status-head">
           <div>
             <p class="eyebrow">Paquete para operar/ofertar</p>
@@ -4404,7 +4412,7 @@ function renderActivities() {
           <button id="saveActivityProfile" type="submit">Guardar actividad</button>
         </div>
       </form>
-      <div class="activity-risk-editor" data-activity-section="risks">
+      <div class="activity-risk-editor ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "risks" ? "activity-section-active" : ""}" data-activity-section="risks">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Riesgos de la actividad</p>
@@ -4414,7 +4422,7 @@ function renderActivities() {
         </div>
         ${activityRiskRows(selectedActivity.name)}
       </div>
-      <div class="activity-equipment-editor" data-activity-section="equipment">
+      <div class="activity-equipment-editor ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "equipment" ? "activity-section-active" : ""}" data-activity-section="equipment">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Equipos de la actividad</p>
@@ -4424,7 +4432,7 @@ function renderActivities() {
         </div>
         ${activityEquipmentRows(selectedActivity.name)}
       </div>
-      <div class="activity-people-editor" data-activity-section="people">
+      <div class="activity-people-editor ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "people" ? "activity-section-active" : ""}" data-activity-section="people">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Guias y personal de la actividad</p>
@@ -4434,7 +4442,7 @@ function renderActivities() {
         </div>
         ${activityPeopleRows(selectedActivity.name)}
       </div>
-      <div class="activity-policy-editor" data-activity-section="policies">
+      <div class="activity-policy-editor ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "policies" ? "activity-section-active" : ""}" data-activity-section="policies">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Seguro de la actividad</p>
@@ -4444,7 +4452,7 @@ function renderActivities() {
         </div>
         ${activityPolicyRows(selectedActivity.name)}
       </div>
-      <div class="activity-participant-editor" data-activity-section="participants">
+      <div class="activity-participant-editor ${state.activityHelperNotice?.activity === selectedActivity.name && state.activityHelperNotice?.section === "participants" ? "activity-section-active" : ""}" data-activity-section="participants">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Participantes de la actividad</p>

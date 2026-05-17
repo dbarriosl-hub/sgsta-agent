@@ -999,6 +999,11 @@ textarea {
   padding: 14px;
 }
 
+.activity-section-active {
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16), var(--shadow);
+}
+
 .activity-intake-card {
   border: 1px solid var(--line);
   border-radius: 8px;
