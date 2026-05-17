@@ -3337,6 +3337,19 @@ function createActivityGapAction(activityName, key) {
   renderAll();
 }
 
+function createSelectedActivityGapActions(activityName) {
+  let created = 0;
+  activityGapItems(activityName).forEach((gap) => {
+    if (!activityGapActionExists(gap)) {
+      state.actions.unshift(activityGapActionPayload(activityName, gap));
+      created += 1;
+    }
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) para preparar ${activityName} antes de operar.` : `Ya existen acciones abiertas para las brechas de ${activityName}.`);
+  saveState();
+  renderAll();
+}
+
 function createAllActivityGapActions() {
   let created = 0;
   state.activities.forEach((activity) => {
@@ -4459,16 +4472,7 @@ function renderActivities() {
   });
   container.querySelector("[data-create-selected-gap-actions]")?.addEventListener("click", (event) => {
     const activityName = event.currentTarget.dataset.createSelectedGapActions;
-    let created = 0;
-    activityGapItems(activityName).forEach((gap) => {
-      if (!activityGapActionExists(gap)) {
-        state.actions.unshift(activityGapActionPayload(activityName, gap));
-        created += 1;
-      }
-    });
-    addMessage("agent", created ? `Cree ${created} accion(es) para preparar ${activityName} antes de operar.` : `Ya existen acciones abiertas para las brechas de ${activityName}.`);
-    saveState();
-    renderAll();
+    createSelectedActivityGapActions(activityName);
   });
   container.querySelector("#activityEditForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -10187,6 +10191,40 @@ function showView(viewId) {
   const activeButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   activeButton?.closest(".nav-section")?.classList.remove("collapsed");
 }
+
+function handleRobustActivityClick(event) {
+  const button = event.target.closest("button");
+  if (!button) return;
+  const data = button.dataset;
+  const handlers = [
+    ["addRiskActivity", addRiskForActivity],
+    ["addEquipmentActivity", addEquipmentForActivity],
+    ["addGuideActivity", addGuideForActivity],
+    ["addParticipantActivity", addParticipantConditionForActivity],
+    ["addPolicyActivity", addPolicyForActivity],
+    ["prepareActivity", prepareActivityPackage],
+    ["prepareActivityPackage", prepareActivityPackage],
+    ["createDepartureActions", createDepartureChecklistActions],
+    ["operationCardActions", createDepartureChecklistActions],
+    ["activityIntakeActions", createActivityIntakeActions],
+    ["createSelectedGapActions", createSelectedActivityGapActions]
+  ];
+  const match = handlers.find(([key]) => data[key]);
+  if (match) {
+    event.preventDefault();
+    event.stopPropagation();
+    match[1](data[match[0]]);
+    return;
+  }
+  if (data.createActivityGap) {
+    event.preventDefault();
+    event.stopPropagation();
+    const [activityName, key] = data.createActivityGap.split(":");
+    createActivityGapAction(activityName, key);
+  }
+}
+
+document.addEventListener("click", handleRobustActivityClick, true);
 
 document.querySelectorAll(".nav-item").forEach((button) => {
   button.addEventListener("click", () => {
