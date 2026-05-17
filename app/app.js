@@ -3446,7 +3446,8 @@ function showActivityQuickResult(activityName, message, section) {
   saveState();
   renderAll();
   window.setTimeout(() => {
-    document.querySelector(`[data-activity-section="${section}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const target = document.querySelector("[data-activity-quick-result]") || document.querySelector(`[data-activity-section="${section}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, 80);
 }
 
@@ -4409,6 +4410,11 @@ function renderActivities() {
         <div class="simple-row"><strong>Seguro</strong><span>${selectedRelated.policies.map((item) => `${item.number} (${item.status})`).join(", ") || "Sin poliza por actividad"}</span></div>
         <div class="simple-row"><strong>Formularios actividad</strong><span>${selectedStats.approved} aprobados, ${selectedStats.draft} borrador/revision, ${selectedStats.pending} pendientes</span></div>
       </div>
+      ${state.activityHelperNotice?.activity === selectedActivity.name ? `
+        <div class="activity-helper-notice activity-helper-notice-bottom" data-activity-quick-result role="status">
+          <strong>Hecho:</strong>
+          <span>${escapeHtml(state.activityHelperNotice.message)}</span>
+        </div>` : ""}
       <div class="button-row">
         <button data-prepare-activity="${escapeHtml(selectedActivity.name)}" type="button">Preparar actividad con agente</button>
         <button class="secondary-button" data-add-risk-activity="${escapeHtml(selectedActivity.name)}" type="button">Riesgo</button>

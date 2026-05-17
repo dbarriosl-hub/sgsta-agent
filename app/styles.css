@@ -981,6 +981,10 @@ textarea {
   padding: 12px 14px;
 }
 
+.activity-helper-notice-bottom {
+  margin: 12px 0 10px;
+}
+
 .activity-package-status {
   border: 1px solid var(--line);
   border-radius: 8px;
