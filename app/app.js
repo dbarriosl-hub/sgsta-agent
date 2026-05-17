@@ -9414,7 +9414,14 @@ function evidencePackageLinkedItems(item) {
   actionReports.slice(0, 2).forEach((evidence) => {
     linked.push(`Reporte acciones: ${evidence.status || "sugerida"}${evidence.linkedActivity ? ` - ${evidence.linkedActivity}` : ""}`);
   });
-  item.evidences.filter((evidence) => evidence.source !== "reporte acciones").slice(0, 1).forEach((evidence) => linked.push(`Evidencia: ${evidence.status || "registrada"}`));
+  const mvpReports = item.evidences.filter((evidence) => evidence.source === "reporte mvp piloto");
+  mvpReports.slice(0, 2).forEach((evidence) => {
+    linked.push(`Estado MVP piloto: ${evidence.status || "sugerida"}`);
+  });
+  item.evidences
+    .filter((evidence) => !["reporte acciones", "reporte mvp piloto"].includes(evidence.source))
+    .slice(0, 1)
+    .forEach((evidence) => linked.push(`Evidencia: ${evidence.status || "registrada"}`));
   if (!linked.length) linked.push("Sin soportes enlazados todavia");
   return linked;
 }
