@@ -3473,18 +3473,27 @@ function showActivityQuickResult(activityName, message, section) {
     participants: "participantes",
     policies: "seguro"
   };
+  const sectionViews = {
+    package: "formularios",
+    risks: "riesgos",
+    equipment: "equipos",
+    people: "personal",
+    participants: "participantes",
+    policies: "seguros"
+  };
+  const targetView = sectionViews[section] || "actividades";
   state.activityHelperNotice = {
     activity: activityName,
-    message: `${message} Te lleve al bloque de ${sectionLabels[section] || "trabajo"}.`,
+    message: `${message} Te lleve al modulo de ${sectionLabels[section] || "trabajo"}.`,
     section,
     date: today()
   };
-  addMessage("agent", `${message} Te llevo al bloque de ${sectionLabels[section] || "trabajo"} y deje una accion abierta vinculada a ${activityName}.`);
+  addMessage("agent", `${message} Te llevo al modulo de ${sectionLabels[section] || "trabajo"} y deje una accion abierta vinculada a ${activityName}.`);
   saveState();
   renderAll();
   window.setTimeout(() => {
-    const target = document.querySelector(`[data-activity-section="${section}"]`);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    showView(targetView);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, 80);
 }
 
@@ -5654,19 +5663,39 @@ function detectParticipantGaps() {
 
 function renderRisks() {
   const container = document.querySelector("#risksTable");
-  container.innerHTML = state.risks.length
-    ? state.risks.map((risk, index) => {
+  if (!container) return;
+  if (!Array.isArray(state.risks)) state.risks = [];
+  const risksByActivity = state.risks.reduce((acc, risk) => {
+    const activity = itemActivityName(risk);
+    acc[activity] = (acc[activity] || 0) + 1;
+    return acc;
+  }, {});
+  container.innerHTML = `
+    <div class="report-summary">
+      <div class="report-card"><span>Total riesgos</span><strong>${state.risks.length}</strong></div>
+      <div class="report-card"><span>Altos</span><strong>${state.risks.filter((risk) => riskLevel(risk) >= 12).length}</strong></div>
+      <div class="report-card"><span>Actividades</span><strong>${Object.keys(risksByActivity).length}</strong></div>
+      <div class="report-card"><span>Seleccionada</span><strong>${escapeHtml(state.selectedActivityName || "General")}</strong></div>
+    </div>
+    ${state.risks.length
+      ? state.risks.map((risk, index) => {
       const level = riskLevel(risk);
       const badge = level >= 12 ? "no_cumple" : level >= 6 ? "en_proceso" : "cumple";
       return `
         <div class="simple-row module-row">
-          <div><strong>${risk.title}</strong><div class="muted">${risk.activity} - Control: ${risk.control}</div></div>
+          <div><strong>${escapeHtml(risk.title || "Riesgo sin titulo")}</strong><div class="muted">${escapeHtml(itemActivityName(risk))} - Control: ${escapeHtml(risk.control || "Por definir")}</div></div>
           <span class="badge ${badge}">${riskLabel(level)} (${level})</span>
-          <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
+          <div class="row-actions">
+            <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
+            <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
+          </div>
         </div>`;
     }).join("")
-    : `<div class="muted">No hay riesgos registrados.</div>`;
+      : `<div class="muted">No hay riesgos registrados.</div>`}`;
   bindRemoveButtons(container);
+  container.querySelectorAll("[data-open-risk-activity]").forEach((button) => {
+    button.addEventListener("click", () => openActivityFicha(button.dataset.openRiskActivity));
+  });
 }
 
 function renderDocuments() {
@@ -10238,8 +10267,29 @@ function runImplementationReview() {
 function showView(viewId) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
-  if (viewId === "actividades") renderActivities();
-  if (viewId === "acciones") renderActions();
+  const viewRenderers = {
+    actividades: renderActivities,
+    riesgos: renderRisks,
+    equipos: renderEquipment,
+    personal: renderPeople,
+    capacitacion: renderTraining,
+    seguros: renderPolicies,
+    participantes: renderParticipantEvidence,
+    documentos: renderDocuments,
+    incidentes: renderIncidents,
+    acciones: renderActions,
+    evidencias: renderEvidence,
+    brechas_actividad: renderActivityGaps,
+    formularios: renderForms,
+    reportes: () => {
+      renderExecutiveReport();
+      renderAuditReport();
+    },
+    revision: renderManagementReviews,
+    alertas: renderAlerts,
+    agenda: renderAgenda
+  };
+  viewRenderers[viewId]?.();
   const activeButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   activeButton?.closest(".nav-section")?.classList.remove("collapsed");
 }
