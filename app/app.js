@@ -3428,6 +3428,12 @@ function activityContext(activityName) {
 }
 
 function createActivityQuickAction(title, code, type, activityName) {
+  const existing = state.actions.find((action) =>
+    action.title === title &&
+    action.status !== "cerrada" &&
+    action.relatedActivity === activityName
+  );
+  if (existing) return existing;
   state.actions.unshift({
     title,
     code,
@@ -3453,6 +3459,7 @@ function createActivityQuickAction(title, code, type, activityName) {
     type: `accion_${type}`,
     actor: "agente"
   });
+  return state.actions[0];
 }
 
 function showActivityQuickResult(activityName, message, section) {
@@ -3474,42 +3481,66 @@ function showActivityQuickResult(activityName, message, section) {
 }
 
 function addRiskForActivity(activityName) {
-  state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
+  const existing = state.risks.find((risk) =>
+    risk.activity === activityName &&
+    String(risk.title || "").startsWith("Riesgo por evaluar")
+  );
+  if (!existing) state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
   state.compliance["6.1.2"] = "en_proceso";
   createActivityQuickAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", activityName);
-  showActivityQuickResult(activityName, "Riesgo agregado. Ahora edita el riesgo, probabilidad, impacto y control especifico.", "risks");
+  showActivityQuickResult(activityName, existing ? "Ya habia un riesgo pendiente. Te llevo a ese bloque para completarlo." : "Riesgo agregado. Ahora edita el riesgo, probabilidad, impacto y control especifico.", "risks");
 }
 
 function addEquipmentForActivity(activityName) {
+  const existing = state.equipment.find((equipment) =>
+    equipment.activity === activityName &&
+    String(equipment.name || "").startsWith("Equipo ") &&
+    equipment.status === "revision"
+  );
   const count = state.equipment.length + 1;
-  state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" });
+  if (!existing) state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createActivityQuickAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", activityName);
-  showActivityQuickResult(activityName, "Equipo agregado. Completa estado, inspeccion, mantenimiento, responsable y evidencia.", "equipment");
+  showActivityQuickResult(activityName, existing ? "Ya habia un equipo pendiente. Te llevo al inventario para completarlo." : "Equipo agregado. Completa estado, inspeccion, mantenimiento, responsable y evidencia.", "equipment");
 }
 
 function addGuideForActivity(activityName) {
+  const existing = state.people.find((person) =>
+    person.activity === activityName &&
+    String(person.name || "").startsWith("Guia ") &&
+    person.competence !== "cumple"
+  );
   const count = state.people.length + 1;
-  state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar" });
+  if (!existing) state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar" });
   state.compliance["7.2"] = "en_proceso";
   createActivityQuickAction(`Verificar guia competente para ${activityName}`, "7.2", "preventiva", activityName);
-  showActivityQuickResult(activityName, "Guia agregado. Completa nombre, competencia, capacitacion y certificado/evidencia.", "people");
+  showActivityQuickResult(activityName, existing ? "Ya habia un guia pendiente. Te llevo al bloque de competencia para completarlo." : "Guia agregado. Completa nombre, competencia, capacitacion y certificado/evidencia.", "people");
 }
 
 function addParticipantConditionForActivity(activityName) {
-  state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente", link: "", evidence: "" });
+  const existing = state.participantEvidence.find((item) =>
+    item.activity === activityName &&
+    item.kind === "Condiciones de participacion y consentimiento" &&
+    item.status !== "recibido"
+  );
+  if (!existing) state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente", link: "", evidence: "" });
   state.compliance["7.4.3"] = "en_proceso";
   createActivityQuickAction(`Definir condiciones de participacion para ${activityName}`, "7.4.3", "tarea", activityName);
-  showActivityQuickResult(activityName, "Registro de participantes agregado. Usa enlace externo o evidencia de consentimiento sin guardar datos sensibles.", "participants");
+  showActivityQuickResult(activityName, existing ? "Ya habia un registro de participacion pendiente. Te llevo al bloque para completarlo." : "Registro de participantes agregado. Usa enlace externo o evidencia de consentimiento sin guardar datos sensibles.", "participants");
 }
 
 function addPolicyForActivity(activityName) {
+  const existing = state.policies.find((policy) =>
+    policy.activity === activityName &&
+    policy.status !== "vigente" &&
+    String(policy.coverage || "").includes(activityName)
+  );
   const count = state.policies.length + 1;
-  state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente", document: "" });
+  if (!existing) state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente", document: "" });
   state.compliance["6.1.3"] = "en_proceso";
   createActivityQuickAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", activityName);
-  showActivityQuickResult(activityName, "Seguro agregado. Completa aseguradora, cobertura, vigencia, estado y documento soporte.", "policies");
+  showActivityQuickResult(activityName, existing ? "Ya habia una poliza pendiente. Te llevo al bloque de seguro para completarla." : "Seguro agregado. Completa aseguradora, cobertura, vigencia, estado y documento soporte.", "policies");
 }
 
 function generateFormDraftValuesForActivity(form, activityName) {
