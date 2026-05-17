@@ -1749,23 +1749,25 @@ function renderOperationReadinessSummary() {
             <span><strong>${item.status.high}</strong> criticas</span>
           </div>
           <div class="row-actions">
-            <button class="secondary-button" data-operation-card-open="${item.activity.name}" type="button">Ver ficha</button>
-            <button class="secondary-button" data-operation-card-export="${item.activity.name}" type="button">Ficha operativa</button>
-            ${item.status.gaps.length ? `<button data-operation-card-actions="${item.activity.name}" type="button">Crear acciones</button>` : ""}
+            <button class="secondary-button" data-operation-card-open="${escapeHtml(item.activity.name)}" type="button">Ver ficha</button>
+            <button class="secondary-button" data-operation-card-export="${escapeHtml(item.activity.name)}" type="button">Ficha operativa</button>
+            ${item.status.gaps.length ? `<button data-operation-card-actions="${escapeHtml(item.activity.name)}" type="button">Crear acciones</button>` : ""}
           </div>
         </article>`).join("") : `<div class="muted">No hay actividades registradas. Crea la primera actividad para que el agente pueda verificar riesgos, guias, equipos, seguros y participantes.</div>`}
     </div>`;
   container.querySelector("[data-operation-open]")?.addEventListener("click", () => {
-    if (priority) state.selectedActivityName = priority.activity.name;
-    showView("actividades");
+    if (priority) {
+      openActivityFicha(priority.activity.name);
+    } else {
+      showView("actividades");
+    }
   });
   container.querySelector("[data-operation-actions]")?.addEventListener("click", () => {
     if (priority) createDepartureChecklistActions(priority.activity.name);
   });
   container.querySelectorAll("[data-operation-card-open]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.selectedActivityName = button.dataset.operationCardOpen;
-      showView("actividades");
+      openActivityFicha(button.dataset.operationCardOpen);
     });
   });
   container.querySelectorAll("[data-operation-card-export]").forEach((button) => {
@@ -4092,6 +4094,58 @@ function renderActivityIntakeGuide(activity) {
     </div>`;
 }
 
+function activityListFallbackHtml() {
+  return `
+    <div class="simple-table">
+      ${state.activities.map((item, index) => `
+        <div class="simple-row module-row ${state.selectedActivityName === item.name ? "selected-row" : ""}">
+          <div>
+            <strong>${escapeHtml(item.name || `Actividad ${index + 1}`)}</strong>
+            <div class="muted">${escapeHtml(item.place || "Lugar por definir")} - Lider: ${escapeHtml(item.leader || "por definir")}</div>
+            <div class="muted">${escapeHtml(item.conditions || "Condiciones por definir")}</div>
+          </div>
+          <span class="badge en_proceso">Ficha</span>
+          <button class="secondary-button" data-select-activity="${escapeHtml(item.name || "")}" type="button">Ver ficha</button>
+        </div>`).join("")}
+    </div>`;
+}
+
+function bindActivitySelectionButtons(container) {
+  container.querySelectorAll("[data-select-activity]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedActivityName = button.dataset.selectActivity;
+      saveState();
+      renderActivities();
+    });
+  });
+}
+
+function ensureActivityRecord(activityName) {
+  const name = String(activityName || "").trim();
+  if (!name) return null;
+  let activity = state.activities.find((item) => item.name === name);
+  if (!activity) {
+    activity = {
+      name,
+      place: "Lugar por definir",
+      leader: state.ownerName || "Guia por definir",
+      status: "revision",
+      conditions: "Condiciones operacionales por definir.",
+      participantRequirements: "Condiciones de participacion por definir."
+    };
+    state.activities.unshift(activity);
+  }
+  return activity;
+}
+
+function openActivityFicha(activityName) {
+  const activity = ensureActivityRecord(activityName);
+  if (activity) state.selectedActivityName = activity.name;
+  saveState();
+  renderActivities();
+  showView("actividades");
+}
+
 function renderActivities() {
   const container = document.querySelector("#activitiesTable");
   if (!state.activities.length) {
@@ -4101,6 +4155,8 @@ function renderActivities() {
   if (!state.activities.some((item) => item.name === state.selectedActivityName)) {
     state.selectedActivityName = state.activities[0].name;
   }
+  container.innerHTML = activityListFallbackHtml();
+  bindActivitySelectionButtons(container);
   const selectedActivity = state.activities.find((item) => item.name === state.selectedActivityName) || state.activities[0];
   const selectedRelated = activityRelatedItems(selectedActivity.name);
   const selectedStats = activityFormStats(selectedActivity.name);
@@ -10067,6 +10123,7 @@ function runImplementationReview() {
 function showView(viewId) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
+  if (viewId === "actividades") renderActivities();
   const activeButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   activeButton?.closest(".nav-section")?.classList.remove("collapsed");
 }
