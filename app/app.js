@@ -312,6 +312,11 @@ function saveState() {
   queueBackendSync();
 }
 
+function syncOrganizationNameFromCompany() {
+  const legalName = String(state.company?.legalName || "").trim();
+  if (legalName) state.orgName = legalName;
+}
+
 function apiStateToAppState(apiState) {
   const organization = apiState.organizations?.[0];
   const normalized = {
@@ -331,14 +336,16 @@ function apiStateToAppState(apiState) {
 }
 
 function appStateToApiState() {
+  const organizationName = state.company.legalName || state.orgName || "Mi empresa de turismo";
   return {
     ...state,
+    orgName: organizationName,
     syncVersion: 1,
     syncedAt: new Date().toISOString(),
     organizations: [
       {
         id: "org-demo",
-        name: state.orgName || state.company.legalName || "Mi empresa de turismo",
+        name: organizationName,
         activeSystem: state.activeSystem || "iso21101",
         plan: state.currentPlan || "profesional"
       }
@@ -506,6 +513,7 @@ function today() {
 }
 
 function renderAll() {
+  syncOrganizationNameFromCompany();
   document.querySelector("#orgName").value = state.orgName;
   document.querySelector("#ownerName").value = state.ownerName;
   document.querySelector("#currentUserRole").value = state.currentUserRole || "direccion";
@@ -2818,6 +2826,7 @@ function renderCompanyImplementationProfile() {
 }
 
 function generateCompanyImplementationProfile(options = {}) {
+  syncOrganizationNameFromCompany();
   state.company.profileSummary = buildCompanyImplementationProfile();
   state.compliance["4.1"] = "en_proceso";
   state.compliance["4.2"] = state.company.stakeholders ? "en_proceso" : "pendiente";
@@ -2830,7 +2839,7 @@ function generateCompanyImplementationProfile(options = {}) {
     actor: "agente"
   });
   if (!options.silent) {
-    addMessage("agent", "Actualice el perfil de implementacion. Lo usare como contexto para formularios, documentos, riesgos y revision por direccion.");
+    addMessage("agent", `Actualice el perfil de implementacion para ${state.orgName}. Lo usare como contexto para formularios, documentos, riesgos y revision por direccion.`);
     saveState();
     renderAll();
   }
@@ -10076,11 +10085,17 @@ document.querySelectorAll(".nav-label").forEach((button) => {
   });
 });
 
-document.querySelector("#orgForm").addEventListener("input", () => {
+document.querySelector("#orgForm").addEventListener("input", (event) => {
   state.orgName = document.querySelector("#orgName").value;
+  if (event.target?.id === "orgName") {
+    state.company.legalName = state.orgName;
+    state.company.profileSummary = buildCompanyImplementationProfile();
+  }
   state.ownerName = document.querySelector("#ownerName").value;
   state.currentUserRole = document.querySelector("#currentUserRole").value;
   saveState();
+  fillCompanyForm();
+  renderCompanyImplementationProfile();
 });
 
 document.querySelector("#activeSystem").addEventListener("change", () => {
@@ -10111,9 +10126,11 @@ document.querySelector("#companyForm").addEventListener("input", () => {
   state.company.localContext = document.querySelector("#companyLocalContext").value;
   state.company.scope = document.querySelector("#companyScope").value;
   state.company.stakeholders = document.querySelector("#companyStakeholders").value;
+  syncOrganizationNameFromCompany();
   state.compliance["4.3"] = state.company.scope ? "en_proceso" : "pendiente";
   state.compliance["4.2"] = state.company.stakeholders ? "en_proceso" : "pendiente";
   saveState();
+  document.querySelector("#orgName").value = state.orgName;
   renderMetrics();
   renderChapterProgress();
   renderCompanyImplementationProfile();
