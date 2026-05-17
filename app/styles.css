@@ -969,6 +969,18 @@ textarea {
   font-size: 12px;
 }
 
+.activity-helper-notice {
+  align-items: center;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  color: #064e3b;
+  display: flex;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px 14px;
+}
+
 .activity-package-status {
   border: 1px solid var(--line);
   border-radius: 8px;

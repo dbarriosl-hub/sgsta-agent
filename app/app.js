@@ -234,6 +234,7 @@ const defaultState = {
   agentFindings: [],
   closurePackages: [],
   selectedActivityName: "Senderismo",
+  activityHelperNotice: null,
   actionFilterActivity: "",
   selectedFormActivity: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
@@ -294,6 +295,7 @@ function mergeState(base, current) {
     executiveReport: current.executiveReport || base.executiveReport,
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
+    activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
     selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
     selectedFormTable: current.selectedFormTable || base.selectedFormTable,
@@ -3404,10 +3406,55 @@ function activityContext(activityName) {
   };
 }
 
+function createActivityQuickAction(title, code, type, activityName) {
+  state.actions.unshift({
+    title,
+    code,
+    status: "abierta",
+    type,
+    origin: "actividad",
+    priority: type === "preventiva" || type === "correctiva" ? "alta" : "media",
+    responsible: state.ownerName || "Responsable SGSTA",
+    dueDate: "",
+    cause: `Pendiente operativo detectado en ${activityName}.`,
+    immediateCorrection: "",
+    followUp: "",
+    efficacyVerification: "",
+    efficacyStatus: "pendiente",
+    relatedActivity: activityName,
+    sourceDetail: "Boton rapido de ficha de actividad",
+    createdAt: today()
+  });
+  recordAuditEvent({
+    title: "Accion creada desde ficha de actividad",
+    detail: `${title}. Actividad: ${activityName}.`,
+    code,
+    type: `accion_${type}`,
+    actor: "agente"
+  });
+}
+
+function showActivityQuickResult(activityName, message, section) {
+  state.selectedActivityName = activityName;
+  state.activityHelperNotice = {
+    activity: activityName,
+    message,
+    section,
+    date: today()
+  };
+  addMessage("agent", `${message} Tambien deje una accion abierta vinculada a ${activityName}.`);
+  saveState();
+  renderAll();
+  window.setTimeout(() => {
+    document.querySelector(`[data-activity-section="${section}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 80);
+}
+
 function addRiskForActivity(activityName) {
   state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
   state.compliance["6.1.2"] = "en_proceso";
-  createAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", "actividad");
+  createActivityQuickAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", activityName);
+  showActivityQuickResult(activityName, "Riesgo agregado. Ahora edita el riesgo, probabilidad, impacto y control especifico.", "risks");
 }
 
 function addEquipmentForActivity(activityName) {
@@ -3415,27 +3462,31 @@ function addEquipmentForActivity(activityName) {
   state.equipment.unshift({ name: `Equipo ${count} para ${activityName}`, type: "Operacion", activity: activityName, status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
-  createAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", "actividad");
+  createActivityQuickAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", activityName);
+  showActivityQuickResult(activityName, "Equipo agregado. Completa estado, inspeccion, mantenimiento, responsable y evidencia.", "equipment");
 }
 
 function addGuideForActivity(activityName) {
   const count = state.people.length + 1;
   state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar" });
   state.compliance["7.2"] = "en_proceso";
-  createAction(`Verificar guia competente para ${activityName}`, "7.2", "preventiva", "actividad");
+  createActivityQuickAction(`Verificar guia competente para ${activityName}`, "7.2", "preventiva", activityName);
+  showActivityQuickResult(activityName, "Guia agregado. Completa nombre, competencia, capacitacion y certificado/evidencia.", "people");
 }
 
 function addParticipantConditionForActivity(activityName) {
   state.participantEvidence.unshift({ activity: activityName, kind: "Condiciones de participacion y consentimiento", consent: "pendiente", status: "pendiente", link: "", evidence: "" });
   state.compliance["7.4.3"] = "en_proceso";
-  createAction(`Definir condiciones de participacion para ${activityName}`, "7.4.3", "tarea", "actividad");
+  createActivityQuickAction(`Definir condiciones de participacion para ${activityName}`, "7.4.3", "tarea", activityName);
+  showActivityQuickResult(activityName, "Registro de participantes agregado. Usa enlace externo o evidencia de consentimiento sin guardar datos sensibles.", "participants");
 }
 
 function addPolicyForActivity(activityName) {
   const count = state.policies.length + 1;
   state.policies.unshift({ number: `POL-${String(count).padStart(3, "0")}`, insurer: "Aseguradora por definir", coverage: `Cobertura por definir para ${activityName}`, activity: activityName, due: "Por definir", status: "pendiente", document: "" });
   state.compliance["6.1.3"] = "en_proceso";
-  createAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", "actividad");
+  createActivityQuickAction(`Validar poliza para ${activityName}`, "6.1.3", "preventiva", activityName);
+  showActivityQuickResult(activityName, "Seguro agregado. Completa aseguradora, cobertura, vigencia, estado y documento soporte.", "policies");
 }
 
 function generateFormDraftValuesForActivity(form, activityName) {
@@ -3527,13 +3578,11 @@ function suggestActivityEvidence(activityName) {
 function prepareActivityPackage(activityName) {
   const created = activityPackageTables.map((table) => upsertActivityFormDraft(table, activityName)).filter(Boolean);
   suggestActivityEvidence(activityName);
-  createAction(`Revisar paquete operativo de ${activityName}`, "8.1", "tarea", "actividad");
+  createActivityQuickAction(`Revisar paquete operativo de ${activityName}`, "8.1", "tarea", activityName);
   state.selectedActivityName = activityName;
   state.selectedFormActivity = activityName;
   state.formFilters.search = activityName;
-  saveState();
-  addMessage("agent", `Prepare ${created.length} formulario(s) y evidencias sugeridas para ${activityName}. Quedan pendientes de revision humana.`);
-  renderAll();
+  showActivityQuickResult(activityName, `Prepare ${created.length} formulario(s) y evidencias sugeridas para ${activityName}. Quedan pendientes de revision humana.`, "package");
 }
 
 function updateActivityReferences(oldName, newName) {
@@ -4225,8 +4274,13 @@ function renderActivities() {
           <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
         </div>
       </div>
+      ${state.activityHelperNotice?.activity === selectedActivity.name ? `
+        <div class="activity-helper-notice">
+          <strong>Agente:</strong>
+          <span>${escapeHtml(state.activityHelperNotice.message)}</span>
+        </div>` : ""}
       ${renderActivityIntakeGuide(selectedActivity)}
-      <div class="activity-package-status">
+      <div class="activity-package-status" data-activity-section="package">
         <div class="package-status-head">
           <div>
             <p class="eyebrow">Paquete para operar/ofertar</p>
@@ -4296,7 +4350,7 @@ function renderActivities() {
           <button id="saveActivityProfile" type="submit">Guardar actividad</button>
         </div>
       </form>
-      <div class="activity-risk-editor">
+      <div class="activity-risk-editor" data-activity-section="risks">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Riesgos de la actividad</p>
@@ -4306,7 +4360,7 @@ function renderActivities() {
         </div>
         ${activityRiskRows(selectedActivity.name)}
       </div>
-      <div class="activity-equipment-editor">
+      <div class="activity-equipment-editor" data-activity-section="equipment">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Equipos de la actividad</p>
@@ -4316,7 +4370,7 @@ function renderActivities() {
         </div>
         ${activityEquipmentRows(selectedActivity.name)}
       </div>
-      <div class="activity-people-editor">
+      <div class="activity-people-editor" data-activity-section="people">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Guias y personal de la actividad</p>
@@ -4326,7 +4380,7 @@ function renderActivities() {
         </div>
         ${activityPeopleRows(selectedActivity.name)}
       </div>
-      <div class="activity-policy-editor">
+      <div class="activity-policy-editor" data-activity-section="policies">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Seguro de la actividad</p>
@@ -4336,7 +4390,7 @@ function renderActivities() {
         </div>
         ${activityPolicyRows(selectedActivity.name)}
       </div>
-      <div class="activity-participant-editor">
+      <div class="activity-participant-editor" data-activity-section="participants">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">Participantes de la actividad</p>
@@ -4356,12 +4410,12 @@ function renderActivities() {
         <div class="simple-row"><strong>Formularios actividad</strong><span>${selectedStats.approved} aprobados, ${selectedStats.draft} borrador/revision, ${selectedStats.pending} pendientes</span></div>
       </div>
       <div class="button-row">
-        <button data-prepare-activity="${selectedActivity.name}" type="button">Preparar actividad con agente</button>
-        <button class="secondary-button" data-add-risk-activity="${selectedActivity.name}" type="button">Riesgo</button>
-        <button class="secondary-button" data-add-equipment-activity="${selectedActivity.name}" type="button">Equipo</button>
-        <button class="secondary-button" data-add-guide-activity="${selectedActivity.name}" type="button">Guia</button>
-        <button class="secondary-button" data-add-participant-activity="${selectedActivity.name}" type="button">Participacion</button>
-        <button class="secondary-button" data-add-policy-activity="${selectedActivity.name}" type="button">Seguro</button>
+        <button data-prepare-activity="${escapeHtml(selectedActivity.name)}" type="button">Preparar actividad con agente</button>
+        <button class="secondary-button" data-add-risk-activity="${escapeHtml(selectedActivity.name)}" type="button">Riesgo</button>
+        <button class="secondary-button" data-add-equipment-activity="${escapeHtml(selectedActivity.name)}" type="button">Equipo</button>
+        <button class="secondary-button" data-add-guide-activity="${escapeHtml(selectedActivity.name)}" type="button">Guia</button>
+        <button class="secondary-button" data-add-participant-activity="${escapeHtml(selectedActivity.name)}" type="button">Participacion</button>
+        <button class="secondary-button" data-add-policy-activity="${escapeHtml(selectedActivity.name)}" type="button">Seguro</button>
       </div>
     </div>`;
   bindRemoveButtons(container);
