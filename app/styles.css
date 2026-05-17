@@ -2943,6 +2943,10 @@ textarea {
   margin-bottom: 10px;
 }
 
+.risk-edit-row-wide {
+  grid-template-columns: minmax(180px, 1.2fr) minmax(150px, 0.8fr) 92px 92px minmax(180px, 1.2fr) minmax(140px, 0.7fr) 140px 100px minmax(160px, auto);
+}
+
 .risk-edit-row textarea {
   min-height: 40px;
 }

@@ -5678,24 +5678,51 @@ function renderRisks() {
       <div class="report-card"><span>Seleccionada</span><strong>${escapeHtml(state.selectedActivityName || "General")}</strong></div>
     </div>
     ${state.risks.length
-      ? state.risks.map((risk, index) => {
-      const level = riskLevel(risk);
-      const badge = level >= 12 ? "no_cumple" : level >= 6 ? "en_proceso" : "cumple";
-      return `
-        <div class="simple-row module-row">
-          <div><strong>${escapeHtml(risk.title || "Riesgo sin titulo")}</strong><div class="muted">${escapeHtml(itemActivityName(risk))} - Control: ${escapeHtml(risk.control || "Por definir")}</div></div>
-          <span class="badge ${badge}">${riskLabel(level)} (${level})</span>
-          <div class="row-actions">
-            <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
-            <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
-          </div>
-        </div>`;
-    }).join("")
+      ? state.risks.map((risk, index) => riskEditRow(risk, index)).join("")
       : `<div class="muted">No hay riesgos registrados.</div>`}`;
   bindRemoveButtons(container);
+  container.querySelectorAll("[data-risk-field]").forEach((field) => {
+    field.addEventListener("change", () => updateActivityRiskField(field));
+  });
   container.querySelectorAll("[data-open-risk-activity]").forEach((button) => {
     button.addEventListener("click", () => openActivityFicha(button.dataset.openRiskActivity));
   });
+}
+
+function riskEditRow(risk, index) {
+  const level = riskLevel(risk);
+  const badge = level >= 12 ? "no_cumple" : level >= 6 ? "en_proceso" : "cumple";
+  return `
+    <div class="risk-edit-row risk-edit-row-wide">
+      <label>Riesgo / peligro<input data-risk-field="${index}:title" type="text" value="${escapeHtml(risk.title || "")}"></label>
+      <label>Actividad
+        <select data-risk-field="${index}:activity">
+          ${state.activities.map((activity) => `<option value="${escapeHtml(activity.name)}" ${itemActivityName(risk) === activity.name ? "selected" : ""}>${escapeHtml(activity.name)}</option>`).join("")}
+        </select>
+      </label>
+      <label>Probabilidad
+        <select data-risk-field="${index}:probability">
+          ${[1, 2, 3, 4, 5].map((value) => `<option value="${value}" ${Number(risk.probability) === value ? "selected" : ""}>${value}</option>`).join("")}
+        </select>
+      </label>
+      <label>Impacto
+        <select data-risk-field="${index}:impact">
+          ${[1, 2, 3, 4, 5].map((value) => `<option value="${value}" ${Number(risk.impact) === value ? "selected" : ""}>${value}</option>`).join("")}
+        </select>
+      </label>
+      <label>Control<textarea data-risk-field="${index}:control">${escapeHtml(risk.control || "")}</textarea></label>
+      <label>Responsable<input data-risk-field="${index}:responsible" type="text" value="${escapeHtml(risk.responsible || "")}"></label>
+      <label>Estado control
+        <select data-risk-field="${index}:controlStatus">
+          ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+        </select>
+      </label>
+      <span class="badge ${badge}">${riskLabel(level)} (${level})</span>
+      <div class="row-actions">
+        <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
+        <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
+      </div>
+    </div>`;
 }
 
 function renderDocuments() {
@@ -10076,7 +10103,17 @@ function addRisk() {
   const activity = primaryActivityName();
   state.risks.unshift({ title: "Riesgo por evaluar", activity, probability: 3, impact: 3, control: "Control por definir" });
   state.compliance["6.1.2"] = "en_proceso";
-  createAction("Completar tratamiento del nuevo riesgo", "6.1.2", "preventiva", "riesgo");
+  createActivityQuickAction(`Completar tratamiento del nuevo riesgo de ${activity}`, "6.1.2", "preventiva", activity);
+  state.selectedActivityName = activity;
+  state.actionFilterActivity = activity;
+  state.activityHelperNotice = {
+    activity,
+    message: "Riesgo creado. Puedes editar titulo, actividad, probabilidad, impacto, control y responsable en esta pantalla.",
+    section: "risks",
+    date: today()
+  };
+  saveState();
+  renderRisks();
 }
 
 function addDocument() {
@@ -10298,6 +10335,25 @@ function handleRobustActivityClick(event) {
   const button = event.target.closest("button");
   if (!button) return;
   const data = button.dataset;
+  if (button.id === "addRisk") {
+    event.preventDefault();
+    event.stopPropagation();
+    addRisk();
+    return;
+  }
+  if (data.remove) {
+    event.preventDefault();
+    event.stopPropagation();
+    const [collection, rawIndex] = data.remove.split(":");
+    if (Array.isArray(state[collection])) {
+      state[collection].splice(Number(rawIndex), 1);
+      saveState();
+      renderAll();
+      const activeView = document.querySelector(".view.active")?.id;
+      if (activeView) showView(activeView);
+    }
+    return;
+  }
   const handlers = [
     ["addRiskActivity", addRiskForActivity],
     ["addEquipmentActivity", addEquipmentForActivity],
