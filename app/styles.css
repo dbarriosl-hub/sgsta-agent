@@ -981,6 +981,10 @@ textarea {
   padding: 12px 14px;
 }
 
+.activity-helper-notice span {
+  flex: 1;
+}
+
 .activity-helper-notice-bottom {
   margin: 12px 0 10px;
 }

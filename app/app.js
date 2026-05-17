@@ -3345,6 +3345,14 @@ function createSelectedActivityGapActions(activityName) {
       created += 1;
     }
   });
+  state.selectedActivityName = activityName;
+  state.actionFilterActivity = activityName;
+  state.activityHelperNotice = {
+    activity: activityName,
+    message: created ? `Cree ${created} accion(es) para preparar ${activityName} antes de operar.` : `Ya existen acciones abiertas para las brechas de ${activityName}.`,
+    section: "actions",
+    date: today()
+  };
   addMessage("agent", created ? `Cree ${created} accion(es) para preparar ${activityName} antes de operar.` : `Ya existen acciones abiertas para las brechas de ${activityName}.`);
   saveState();
   renderAll();
@@ -3449,6 +3457,7 @@ function createActivityQuickAction(title, code, type, activityName) {
 
 function showActivityQuickResult(activityName, message, section) {
   state.selectedActivityName = activityName;
+  state.actionFilterActivity = activityName;
   state.activityHelperNotice = {
     activity: activityName,
     message,
@@ -4427,6 +4436,7 @@ function renderActivities() {
         <div class="activity-helper-notice activity-helper-notice-bottom" data-activity-quick-result role="status">
           <strong>Hecho:</strong>
           <span>${escapeHtml(state.activityHelperNotice.message)}</span>
+          <button class="secondary-button" data-open-activity-actions="${escapeHtml(selectedActivity.name)}" type="button">Ver acciones</button>
         </div>` : ""}
       <div class="button-row">
         <button data-prepare-activity="${escapeHtml(selectedActivity.name)}" type="button">Preparar actividad con agente</button>
@@ -8399,6 +8409,8 @@ function canRunAgent() {
 
 function renderActions() {
   const container = document.querySelector("#actionsTable");
+  if (!container) return;
+  if (!Array.isArray(state.actions)) state.actions = [];
   const summary = document.querySelector("#actionsSummary");
   const selectedActivity = state.selectedActivityName || state.activities[0]?.name || "";
   const activityActions = selectedActivity
@@ -10188,6 +10200,7 @@ function showView(viewId) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
   if (viewId === "actividades") renderActivities();
+  if (viewId === "acciones") renderActions();
   const activeButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   activeButton?.closest(".nav-section")?.classList.remove("collapsed");
 }
@@ -10207,7 +10220,13 @@ function handleRobustActivityClick(event) {
     ["createDepartureActions", createDepartureChecklistActions],
     ["operationCardActions", createDepartureChecklistActions],
     ["activityIntakeActions", createActivityIntakeActions],
-    ["createSelectedGapActions", createSelectedActivityGapActions]
+    ["createSelectedGapActions", createSelectedActivityGapActions],
+    ["openActivityActions", (activityName) => {
+      state.selectedActivityName = activityName;
+      state.actionFilterActivity = activityName;
+      saveState();
+      showView("acciones");
+    }]
   ];
   const match = handlers.find(([key]) => data[key]);
   if (match) {
