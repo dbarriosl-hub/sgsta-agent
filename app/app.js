@@ -3646,6 +3646,8 @@ function generateRiskMapWithAgent() {
         ...suggestion,
         activity: activity.name,
         controlStatus: "pendiente",
+        approvalStatus: "borrador",
+        requiresApproval: true,
         source: "agente",
         createdAt: today()
       };
@@ -3909,6 +3911,8 @@ function updateActivityRiskField(field) {
   const previousLevel = riskLevel(risk);
   risk[key] = ["probability", "impact"].includes(key) ? Number(field.value) : field.value;
   risk.updatedAt = today();
+  risk.approvalStatus = risk.approvalStatus === "aprobado" ? "revision" : (risk.approvalStatus || "revision");
+  risk.requiresApproval = true;
   state.compliance["6.1.2"] = "en_proceso";
   const activityName = itemActivityName(risk);
   const nextLevel = riskLevel(risk);
@@ -3941,6 +3945,36 @@ function updateActivityRiskField(field) {
   renderActivityGaps();
   renderActivities();
   renderActions();
+}
+
+function riskApprovalLabel(risk) {
+  if (risk.approvalStatus === "aprobado" || risk.requiresApproval === false) return "aprobado";
+  if (risk.approvalStatus === "revision") return "revision";
+  return "borrador";
+}
+
+function approveRisk(index) {
+  const risk = state.risks[index];
+  if (!risk) return;
+  const isApproved = riskApprovalLabel(risk) === "aprobado";
+  if (isApproved) {
+    risk.approvalStatus = "revision";
+    risk.requiresApproval = true;
+    risk.updatedAt = today();
+    addMessage("agent", `Reabri el riesgo "${risk.title}" para revision humana.`);
+  } else {
+    risk.approvalStatus = "aprobado";
+    risk.requiresApproval = false;
+    risk.approvedBy = state.ownerName || "Responsable SGSTA";
+    risk.approvedAt = today();
+    risk.updatedAt = today();
+    state.compliance["6.1.2"] = state.risks.length && state.risks.every((item) => riskApprovalLabel(item) === "aprobado") ? "cumple" : "en_proceso";
+    addMessage("agent", `Riesgo aprobado: "${risk.title}". Quedo trazabilidad de aprobacion humana.`);
+  }
+  saveState();
+  renderRisks();
+  renderMetrics();
+  renderChapterProgress();
 }
 
 function activityEquipmentRows(activityName) {
@@ -5843,14 +5877,16 @@ function renderRisks() {
     acc[activity] = (acc[activity] || 0) + 1;
     return acc;
   }, {});
+  const approvedRisks = state.risks.filter((risk) => riskApprovalLabel(risk) === "aprobado").length;
   container.innerHTML = `
     <div class="report-summary">
       <div class="report-card"><span>Total riesgos</span><strong>${state.risks.length}</strong></div>
       <div class="report-card"><span>Altos</span><strong>${state.risks.filter((risk) => riskLevel(risk) >= 12).length}</strong></div>
       <div class="report-card"><span>Actividades</span><strong>${Object.keys(risksByActivity).length}</strong></div>
+      <div class="report-card"><span>Aprobados</span><strong>${approvedRisks}/${state.risks.length}</strong></div>
       <div class="report-card"><span>Seleccionada</span><strong>${escapeHtml(state.selectedActivityName || "General")}</strong></div>
     </div>
-    <div class="muted risk-help">Nivel = probabilidad x impacto. Bajo: 1-5, Medio: 6-11, Alto: 12-25.</div>
+    <div class="muted risk-help">Nivel = probabilidad x impacto. Bajo: 1-5, Medio: 6-11, Alto: 12-25. El agente propone; la aprobacion es humana.</div>
     ${state.risks.length
       ? state.risks.map((risk, index) => riskEditRow(risk, index)).join("")
       : `<div class="muted">No hay riesgos registrados.</div>`}`;
@@ -5862,6 +5898,9 @@ function renderRisks() {
   });
   container.querySelectorAll("[data-open-risk-activity]").forEach((button) => {
     button.addEventListener("click", () => openActivityFicha(button.dataset.openRiskActivity));
+  });
+  container.querySelectorAll("[data-approve-risk]").forEach((button) => {
+    button.addEventListener("click", () => approveRisk(Number(button.dataset.approveRisk)));
   });
 }
 
@@ -5879,6 +5918,8 @@ function removeRisk(index) {
 function riskEditRow(risk, index) {
   const level = riskLevel(risk);
   const badge = riskBadgeClass(level);
+  const approval = riskApprovalLabel(risk);
+  const approvalBadge = approval === "aprobado" ? "cumple" : approval === "revision" ? "en_proceso" : "no_cumple";
   return `
     <div class="risk-edit-row risk-edit-row-wide">
       <label>Riesgo / peligro<input data-risk-field="${index}:title" type="text" value="${escapeHtml(risk.title || "")}"></label>
@@ -5905,7 +5946,9 @@ function riskEditRow(risk, index) {
         </select>
       </label>
       <span class="badge ${badge}" title="Nivel = probabilidad x impacto">${riskLabel(level)} (${level})</span>
+      <span class="badge ${approvalBadge}" title="Decision humana">${approval}</span>
       <div class="row-actions">
+        <button class="${approval === "aprobado" ? "secondary-button" : ""}" data-approve-risk="${index}" type="button">${approval === "aprobado" ? "Reabrir" : "Aprobar"}</button>
         <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
         <button class="secondary-button" data-remove-risk="${index}" type="button">Quitar</button>
       </div>
@@ -10288,7 +10331,7 @@ function addParticipantEvidence() {
 
 function addRisk() {
   const activity = primaryActivityName();
-  state.risks.unshift({ title: "Riesgo por evaluar", activity, probability: 3, impact: 3, control: "Control por definir" });
+  state.risks.unshift({ title: "Riesgo por evaluar", activity, probability: 3, impact: 3, control: "Control por definir", approvalStatus: "borrador", requiresApproval: true });
   state.compliance["6.1.2"] = "en_proceso";
   createActivityQuickAction(`Completar tratamiento del nuevo riesgo de ${activity}`, "6.1.2", "preventiva", activity);
   state.selectedActivityName = activity;
