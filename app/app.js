@@ -3544,6 +3544,138 @@ function openRisksFromActivity(activityName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function normalizedRiskKey(risk) {
+  return `${itemActivityName(risk)}:${risk.title || ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function suggestedRisksForActivity(activity) {
+  const name = activity.name || "Actividad";
+  const profile = `${name} ${activity.place || ""} ${activity.conditions || ""} ${activity.participantRequirements || ""}`.toLowerCase();
+  const leader = activity.leader || state.ownerName || "Responsable operativo";
+  const suggestions = [
+    {
+      title: `Condiciones del entorno no verificadas en ${name}`,
+      probability: 3,
+      impact: 4,
+      control: "Verificar clima, ruta/zona, condiciones del terreno o entorno antes de ofertar y antes de salir.",
+      responsible: leader
+    },
+    {
+      title: `Participante sin condiciones o informacion suficiente para ${name}`,
+      probability: 3,
+      impact: 3,
+      control: "Confirmar condiciones de participacion, restricciones, briefing, consentimiento y evidencia externa.",
+      responsible: leader
+    },
+    {
+      title: `Falla de comunicacion o coordinacion durante ${name}`,
+      probability: 2,
+      impact: 4,
+      control: "Definir canal de comunicacion, punto de encuentro, responsable de cierre y plan de emergencia.",
+      responsible: leader
+    }
+  ];
+  if (profile.includes("rafting") || profile.includes("rio") || profile.includes("cano") || profile.includes("agua")) {
+    suggestions.unshift(
+      {
+        title: `Caida al agua o golpe con roca en ${name}`,
+        probability: 3,
+        impact: 4,
+        control: "Briefing de seguridad, chaleco/casco revisado, guia competente, evaluacion de caudal y rescate preparado.",
+        responsible: leader
+      },
+      {
+        title: `Crecida subita o cambio de caudal en ${name}`,
+        probability: 2,
+        impact: 5,
+        control: "Revisar clima aguas arriba, nivel del rio, criterio de no salida y comunicacion de emergencia.",
+        responsible: leader
+      }
+    );
+  }
+  if (profile.includes("sender") || profile.includes("caminata") || profile.includes("trekking")) {
+    suggestions.unshift(
+      {
+        title: `Caida, resbalon o lesion en sendero durante ${name}`,
+        probability: 3,
+        impact: 3,
+        control: "Verificar ruta, calzado, ritmo del grupo, botiquin, puntos de descanso y briefing de marcha.",
+        responsible: leader
+      },
+      {
+        title: `Deshidratacion, agotamiento o perdida de ruta en ${name}`,
+        probability: 3,
+        impact: 4,
+        control: "Confirmar condicion fisica, hidratacion, guia de cierre, ruta definida y control de participantes.",
+        responsible: leader
+      }
+    );
+  }
+  if (profile.includes("cuatrimoto") || profile.includes("moto") || profile.includes("atv")) {
+    suggestions.unshift(
+      {
+        title: `Volcamiento o colision durante ${name}`,
+        probability: 3,
+        impact: 5,
+        control: "Briefing, casco, control de velocidad, distancia minima, guia lider y ruta autorizada.",
+        responsible: leader
+      },
+      {
+        title: `Falla mecanica de cuatrimoto en ${name}`,
+        probability: 2,
+        impact: 4,
+        control: "Inspeccion preoperacional, mantenimiento vigente, equipo de comunicacion y plan de remolque/rescate.",
+        responsible: leader
+      }
+    );
+  }
+  return suggestions;
+}
+
+function generateRiskMapWithAgent() {
+  if (!state.activities.length) {
+    addMessage("agent", "Primero crea al menos una actividad. Con eso puedo proponer riesgos por actividad.");
+    showView("actividades");
+    return;
+  }
+  const existing = new Set(state.risks.map((risk) => normalizedRiskKey(risk)));
+  let created = 0;
+  state.activities.forEach((activity) => {
+    suggestedRisksForActivity(activity).forEach((suggestion) => {
+      const risk = {
+        ...suggestion,
+        activity: activity.name,
+        controlStatus: "pendiente",
+        source: "agente",
+        createdAt: today()
+      };
+      const key = normalizedRiskKey(risk);
+      if (existing.has(key)) return;
+      existing.add(key);
+      state.risks.unshift(risk);
+      created += 1;
+      if (riskLevel(risk) >= 12) {
+        createActivityQuickAction(`Definir tratamiento preventivo para ${risk.title}`, "6.1.2", "preventiva", activity.name);
+      }
+    });
+  });
+  state.selectedActivityName = state.activities[0]?.name || state.selectedActivityName;
+  state.compliance["6.1.2"] = created ? "en_proceso" : state.compliance["6.1.2"];
+  state.activityHelperNotice = {
+    activity: state.selectedActivityName,
+    message: created ? `El agente sugirio ${created} riesgo(s). Revisa probabilidad, impacto, control y responsable antes de aprobar.` : "El mapa ya tenia esos riesgos sugeridos. Puedes editarlos o crear riesgos nuevos.",
+    section: "risks",
+    date: today()
+  };
+  addMessage("agent", state.activityHelperNotice.message);
+  saveState();
+  renderRisks();
+  renderMetrics();
+  renderActivityGaps();
+  renderActions();
+  showView("riesgos");
+}
+
 function addEquipmentForActivity(activityName) {
   const existing = state.equipment.find((equipment) =>
     equipment.activity === activityName &&
@@ -10396,6 +10528,12 @@ function handleRobustActivityClick(event) {
     addRisk();
     return;
   }
+  if (button.id === "generateRiskMapAgent") {
+    event.preventDefault();
+    event.stopPropagation();
+    generateRiskMapWithAgent();
+    return;
+  }
   if (data.remove) {
     event.preventDefault();
     event.stopPropagation();
@@ -10595,6 +10733,7 @@ document.querySelector("#detectPolicyGaps").addEventListener("click", detectPoli
 document.querySelector("#addParticipantEvidence").addEventListener("click", addParticipantEvidence);
 document.querySelector("#detectParticipantGaps").addEventListener("click", detectParticipantGaps);
 document.querySelector("#addRisk").addEventListener("click", addRisk);
+document.querySelector("#generateRiskMapAgent").addEventListener("click", generateRiskMapWithAgent);
 document.querySelector("#addDocument").addEventListener("click", addDocument);
 document.querySelector("#generateDocumentDraft").addEventListener("click", generateDocumentDraft);
 document.querySelector("#addIncident").addEventListener("click", addIncident);
