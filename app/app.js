@@ -3509,6 +3509,35 @@ function addRiskForActivity(activityName) {
   showActivityQuickResult(activityName, existing ? "Ya habia un riesgo pendiente. Te llevo a ese bloque para completarlo." : "Riesgo agregado. Ahora edita el riesgo, probabilidad, impacto y control especifico.", "risks");
 }
 
+function openRisksFromActivity(activityName) {
+  const existing = state.risks.find((risk) =>
+    risk.activity === activityName &&
+    String(risk.title || "").startsWith("Riesgo por evaluar")
+  );
+  if (!existing) {
+    state.risks.unshift({
+      title: `Riesgo por evaluar en ${activityName}`,
+      activity: activityName,
+      probability: 3,
+      impact: 3,
+      control: "Control especifico por definir"
+    });
+  }
+  state.selectedActivityName = activityName;
+  state.actionFilterActivity = activityName;
+  state.compliance["6.1.2"] = "en_proceso";
+  state.activityHelperNotice = {
+    activity: activityName,
+    message: existing ? "Ya habia un riesgo pendiente. Editalo en el mapa de riesgos." : "Riesgo creado. Editalo en el mapa de riesgos.",
+    section: "risks",
+    date: today()
+  };
+  createActivityQuickAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", activityName);
+  saveState();
+  showView("riesgos");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function addEquipmentForActivity(activityName) {
   const existing = state.equipment.find((equipment) =>
     equipment.activity === activityName &&
@@ -4489,7 +4518,7 @@ function renderActivities() {
         </div>` : ""}
       <div class="button-row">
         <button data-prepare-activity="${escapeHtml(selectedActivity.name)}" type="button">Preparar actividad con agente</button>
-        <button class="secondary-button" data-add-risk-activity="${escapeHtml(selectedActivity.name)}" type="button">Riesgo</button>
+        <button class="secondary-button" data-open-risks-module="${escapeHtml(selectedActivity.name)}" type="button">Riesgo</button>
         <button class="secondary-button" data-add-equipment-activity="${escapeHtml(selectedActivity.name)}" type="button">Equipo</button>
         <button class="secondary-button" data-add-guide-activity="${escapeHtml(selectedActivity.name)}" type="button">Guia</button>
         <button class="secondary-button" data-add-participant-activity="${escapeHtml(selectedActivity.name)}" type="button">Participacion</button>
@@ -10369,6 +10398,7 @@ function handleRobustActivityClick(event) {
     return;
   }
   const handlers = [
+    ["openRisksModule", openRisksFromActivity],
     ["addRiskActivity", addRiskForActivity],
     ["addEquipmentActivity", addEquipmentForActivity],
     ["addGuideActivity", addGuideForActivity],
