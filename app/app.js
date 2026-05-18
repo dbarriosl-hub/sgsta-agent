@@ -3491,10 +3491,11 @@ function showActivityQuickResult(activityName, message, section) {
   addMessage("agent", `${message} Te llevo al modulo de ${sectionLabels[section] || "trabajo"} y deje una accion abierta vinculada a ${activityName}.`);
   saveState();
   renderAll();
+  showView(targetView);
   window.setTimeout(() => {
     showView(targetView);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, 80);
+  }, 0);
 }
 
 function addRiskForActivity(activityName) {
