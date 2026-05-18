@@ -1493,6 +1493,24 @@ textarea {
   font-size: 30px;
 }
 
+.agent-result-card {
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ecfdf5;
+  display: grid;
+  gap: 8px;
+}
+
+.agent-result-card strong {
+  font-size: 18px;
+}
+
+.agent-result-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .implementation-roadmap {
   display: grid;
   gap: 12px;

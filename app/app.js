@@ -2125,9 +2125,18 @@ function renderImplementationRoadmap() {
 
 function renderImplementation() {
   const container = document.querySelector("#implementationSteps");
+  if (!container) return;
   const progress = implementationProgress();
   renderImplementationRoadmap();
+  const review = state.implementationReview;
   container.innerHTML = `
+    ${review ? `
+      <div class="agent-result-card">
+        <span class="badge en_proceso">revision</span>
+        <strong>${escapeHtml(review.title)}</strong>
+        <p>${escapeHtml(review.detail)}</p>
+      </div>
+    ` : ""}
     <div class="implementation-summary">
       <strong>${progress.pct}%</strong>
       <span>${progress.completed}/${progress.total} pasos completados</span>
@@ -2165,7 +2174,9 @@ function renderImplementation() {
   });
 
   const next = nextImplementationStep();
-  document.querySelector("#implementationGuide").innerHTML = `
+  const guide = document.querySelector("#implementationGuide");
+  if (!guide) return;
+  guide.innerHTML = `
     <div class="guide-callout">
       <span class="badge en_proceso">${next.stage}</span>
       <h3>${next.title}</h3>
@@ -10525,16 +10536,26 @@ function createImplementationWorkPlanActions(options = {}) {
 function runImplementationReview() {
   const progress = implementationProgress();
   const next = nextImplementationStep();
+  const created = createImplementationWorkPlanActions({ silent: true });
+  state.implementationReview = {
+    title: `Avance PHVA ${progress.pct}%`,
+    detail: `${progress.completed}/${progress.total} pasos completos. Siguiente paso recomendado: ${next.title}. ${created ? `Cree ${created} accion(es) de apoyo.` : "Las acciones principales ya estaban creadas."}`,
+    nextStepId: next.id,
+    updatedAt: today()
+  };
   state.agentFindings = buildAgentFindings();
-  addMessage("agent", `Revision de implementacion: ${progress.completed}/${progress.total} pasos completos (${progress.pct}%). Siguiente paso recomendado: ${next.title}.`);
+  addMessage("agent", `Revision de implementacion: ${state.implementationReview.detail}`);
   saveState();
-  renderAll();
+  renderImplementation();
+  renderActions();
+  renderMetrics();
 }
 
 function showView(viewId) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
   const viewRenderers = {
+    implementacion: renderImplementation,
     actividades: renderActivities,
     riesgos: renderRisks,
     equipos: renderEquipment,
