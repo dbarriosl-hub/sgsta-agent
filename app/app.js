@@ -510,6 +510,12 @@ function riskLabel(level) {
   return "Bajo";
 }
 
+function riskBadgeClass(level) {
+  if (level >= 12) return "no_cumple";
+  if (level >= 6) return "en_proceso";
+  return "cumple";
+}
+
 function today() {
   return new Date().toLocaleDateString("es-CO");
 }
@@ -3772,6 +3778,7 @@ function updateActivityRiskField(field) {
   risk[key] = ["probability", "impact"].includes(key) ? Number(field.value) : field.value;
   risk.updatedAt = today();
   state.compliance["6.1.2"] = "en_proceso";
+  const activityName = itemActivityName(risk);
   const nextLevel = riskLevel(risk);
   if (nextLevel >= 12 && previousLevel < 12) {
     const title = `Definir tratamiento para riesgo alto: ${risk.title}`;
@@ -3785,19 +3792,23 @@ function updateActivityRiskField(field) {
         priority: "alta",
         responsible: risk.responsible || "",
         dueDate: "",
-        cause: `Riesgo alto en ${risk.activity}: nivel ${nextLevel}`,
+        cause: `Riesgo alto en ${activityName}: nivel ${nextLevel}`,
         immediateCorrection: "",
         followUp: "",
         efficacyVerification: "",
         efficacyStatus: "pendiente",
-        relatedActivity: item.activity || state.selectedActivityName,
-        sourceDetail: "Participantes 7.4.3",
+        relatedActivity: activityName || state.selectedActivityName,
+        sourceDetail: "Riesgos 6.1.2",
         createdAt: today()
       });
     }
   }
   saveState();
-  renderAll();
+  renderRisks();
+  renderMetrics();
+  renderActivityGaps();
+  renderActivities();
+  renderActions();
 }
 
 function activityEquipmentRows(activityName) {
@@ -5707,6 +5718,7 @@ function renderRisks() {
       <div class="report-card"><span>Actividades</span><strong>${Object.keys(risksByActivity).length}</strong></div>
       <div class="report-card"><span>Seleccionada</span><strong>${escapeHtml(state.selectedActivityName || "General")}</strong></div>
     </div>
+    <div class="muted risk-help">Nivel = probabilidad x impacto. Bajo: 1-5, Medio: 6-11, Alto: 12-25.</div>
     ${state.risks.length
       ? state.risks.map((risk, index) => riskEditRow(risk, index)).join("")
       : `<div class="muted">No hay riesgos registrados.</div>`}`;
@@ -5734,7 +5746,7 @@ function removeRisk(index) {
 
 function riskEditRow(risk, index) {
   const level = riskLevel(risk);
-  const badge = level >= 12 ? "no_cumple" : level >= 6 ? "en_proceso" : "cumple";
+  const badge = riskBadgeClass(level);
   return `
     <div class="risk-edit-row risk-edit-row-wide">
       <label>Riesgo / peligro<input data-risk-field="${index}:title" type="text" value="${escapeHtml(risk.title || "")}"></label>
@@ -5760,7 +5772,7 @@ function riskEditRow(risk, index) {
           ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
         </select>
       </label>
-      <span class="badge ${badge}">${riskLabel(level)} (${level})</span>
+      <span class="badge ${badge}" title="Nivel = probabilidad x impacto">${riskLabel(level)} (${level})</span>
       <div class="row-actions">
         <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
         <button class="secondary-button" data-remove-risk="${index}" type="button">Quitar</button>
