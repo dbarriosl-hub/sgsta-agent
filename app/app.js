@@ -5680,13 +5680,26 @@ function renderRisks() {
     ${state.risks.length
       ? state.risks.map((risk, index) => riskEditRow(risk, index)).join("")
       : `<div class="muted">No hay riesgos registrados.</div>`}`;
-  bindRemoveButtons(container);
   container.querySelectorAll("[data-risk-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityRiskField(field));
+  });
+  container.querySelectorAll("[data-remove-risk]").forEach((button) => {
+    button.addEventListener("click", () => removeRisk(Number(button.dataset.removeRisk)));
   });
   container.querySelectorAll("[data-open-risk-activity]").forEach((button) => {
     button.addEventListener("click", () => openActivityFicha(button.dataset.openRiskActivity));
   });
+}
+
+function removeRisk(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= state.risks.length) return;
+  const removed = state.risks[index];
+  state.risks.splice(index, 1);
+  addMessage("agent", `Quite el riesgo "${removed?.title || "sin titulo"}" del mapa de riesgos.`);
+  saveState();
+  renderRisks();
+  renderMetrics();
+  renderActivityGaps();
 }
 
 function riskEditRow(risk, index) {
@@ -5720,7 +5733,7 @@ function riskEditRow(risk, index) {
       <span class="badge ${badge}">${riskLabel(level)} (${level})</span>
       <div class="row-actions">
         <button class="secondary-button" data-open-risk-activity="${escapeHtml(itemActivityName(risk))}" type="button">Ver actividad</button>
-        <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
+        <button class="secondary-button" data-remove-risk="${index}" type="button">Quitar</button>
       </div>
     </div>`;
 }
