@@ -5589,7 +5589,7 @@ function renderPolicies() {
     }).join("")
     : `<div class="muted">No hay polizas registradas.</div>`;
   container.querySelectorAll("[data-policy-main-field]").forEach((field) => {
-    field.addEventListener("change", () => {
+    field.addEventListener("input", () => {
       const [index, key] = field.dataset.policyMainField.split(":");
       const item = state.policies[Number(index)];
       if (!item) return;
@@ -5597,20 +5597,37 @@ function renderPolicies() {
       item.updatedAt = today();
       state.compliance["6.1.3"] = "en_proceso";
       saveState();
-      renderAll();
     });
+    field.addEventListener("change", () => renderPolicies());
   });
   container.querySelectorAll("[data-policy-action]").forEach((button) => {
     button.addEventListener("click", () => detectPolicyGaps());
   });
   container.querySelectorAll("[data-toggle-policy]").forEach((button) => {
     button.addEventListener("click", () => {
-      const item = state.policies[Number(button.dataset.togglePolicy)];
+      const index = Number(button.dataset.togglePolicy);
+      syncPolicyFieldsFromView(index);
+      const item = state.policies[index];
+      if (!item) return;
       item.status = item.status === "vigente" ? "pendiente" : "vigente";
-      if (item.status === "vigente") state.compliance["6.1.3"] = "en_proceso";
+      item.updatedAt = today();
+      state.compliance["6.1.3"] = policyCoverageRows().every((row) => !row.missing.length) ? "cumple" : "en_proceso";
+      addMessage("agent", `Poliza ${item.number || index + 1} marcada como ${item.status}. ${policyGapReason(item)}`);
       saveState();
-      renderAll();
+      renderPolicies();
+      renderMetrics();
+      renderActivityGaps();
+      renderActions();
     });
+  });
+}
+
+function syncPolicyFieldsFromView(index) {
+  document.querySelectorAll(`[data-policy-main-field^="${index}:"]`).forEach((field) => {
+    const [, key] = field.dataset.policyMainField.split(":");
+    const item = state.policies[index];
+    if (!item) return;
+    item[key] = field.value;
   });
 }
 
