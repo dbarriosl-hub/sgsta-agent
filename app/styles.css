@@ -2993,6 +2993,14 @@ textarea {
   margin-bottom: 10px;
 }
 
+.people-main-row {
+  grid-template-columns: minmax(150px, 1fr) minmax(140px, 0.9fr) minmax(150px, 0.9fr) 120px minmax(170px, 1.1fr) 120px minmax(150px, 0.9fr) 100px minmax(150px, auto);
+}
+
+.wide-row {
+  grid-column: 1 / -1;
+}
+
 .policy-edit-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.8fr) 120px 130px minmax(220px, 1.3fr) minmax(160px, 0.9fr) 90px 90px;

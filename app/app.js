@@ -4773,27 +4773,137 @@ function renderActivities() {
 
 function renderPeople() {
   const container = document.querySelector("#peopleTable");
-  container.innerHTML = state.people.length
-    ? state.people.map((person, index) => `
-      <div class="simple-row module-row">
-        <div><strong>${person.name}</strong><div class="muted">${person.role} - Actividad: ${itemActivityName(person)} - ${person.training}</div></div>
-        <span class="badge ${person.competence === "cumple" ? "cumple" : "no_cumple"}">${person.competence}</span>
-        <button class="secondary-button" data-toggle-person="${index}" type="button">${person.competence === "cumple" ? "Pendiente" : "Cumple"}</button>
-      </div>`).join("")
-    : `<div class="muted">No hay personal registrado.</div>`;
+  const summary = document.querySelector("#peopleSummary");
+  const rows = competencyMatrixRows();
+  const completePeople = state.people.filter(personIsComplete).length;
+  const activitiesWithCompetentGuide = rows.filter((row) => row.competentGuides.length).length;
+  if (summary) {
+    summary.innerHTML = `
+      <div class="report-card"><span>Personas registradas</span><strong>${state.people.length}</strong></div>
+      <div class="report-card"><span>Competentes completos</span><strong>${completePeople}</strong></div>
+      <div class="report-card"><span>Actividades cubiertas</span><strong>${activitiesWithCompetentGuide}/${state.activities.length}</strong></div>
+      <div class="report-card"><span>Brechas actividad</span><strong>${rows.filter((row) => row.missing.length).length}</strong></div>`;
+  }
+  container.innerHTML = `
+    <article class="competency-card">
+      <div class="competency-head">
+        <div>
+          <p class="eyebrow">Matriz por actividad</p>
+          <h3>Guia competente antes de operar</h3>
+          <p>Relaciona cada actividad con guia/persona, competencia, capacitacion, certificado y evidencia.</p>
+        </div>
+      </div>
+      <div class="competency-grid">
+        ${rows.map((row) => `
+          <article class="competency-row ${row.missing.length ? "pending" : "ready"}">
+            <div>
+              <span class="badge requisito">7.2</span>
+              <span class="badge ${row.missing.length ? "no_cumple" : "cumple"}">${row.score}%</span>
+            </div>
+            <strong>${escapeHtml(row.activity.name)}</strong>
+            <p>Guias completos: ${row.competentGuides.length}/${row.guides.length || 1}. Riesgos altos: ${row.highRisks}. Capacitaciones abiertas: ${row.openTraining.length}.</p>
+            <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Actividad cubierta con guia competente."}</small>
+            <div class="row-actions">
+              <button class="secondary-button" data-add-guide-activity="${escapeHtml(row.activity.name)}" type="button">Asignar guia</button>
+              <button data-person-need-activity="${escapeHtml(row.activity.name)}" type="button">Crear necesidad</button>
+            </div>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-people-download type="button">Descargar matriz</button>
+        <button data-people-create-needs type="button">Crear necesidades</button>
+      </div>
+    </article>
+    <div class="compact-heading">
+      <p class="eyebrow">Registro editable</p>
+      <h3>Personas, roles y evidencias</h3>
+    </div>
+    ${state.people.length
+      ? state.people.map((person, index) => personEditRow(person, index)).join("")
+      : `<div class="muted">No hay personal registrado. Crea una persona o asigna guias por actividad.</div>`}`;
+  container.querySelectorAll("[data-person-field]").forEach((field) => {
+    field.addEventListener("input", () => updatePersonField(field, false));
+    field.addEventListener("change", () => updatePersonField(field, true));
+  });
   container.querySelectorAll("[data-toggle-person]").forEach((button) => {
     button.addEventListener("click", () => {
       const person = state.people[Number(button.dataset.togglePerson)];
+      if (!person) return;
       person.competence = person.competence === "cumple" ? "pendiente" : "cumple";
       if (person.competence === "cumple") state.compliance["7.2"] = "en_proceso";
       saveState();
-      renderAll();
+      renderPeople();
+      renderMetrics();
+      renderActivityGaps();
     });
   });
+  container.querySelectorAll("[data-person-need-activity]").forEach((button) => {
+    button.addEventListener("click", () => createCompetencyNeedForActivity(button.dataset.personNeedActivity));
+  });
+  container.querySelector("[data-people-download]")?.addEventListener("click", downloadCompetencyMatrix);
+  container.querySelector("[data-people-create-needs]")?.addEventListener("click", createCompetencyTrainingNeeds);
+}
+
+function personEditRow(person, index) {
+  const missing = personMissingItems(person);
+  const complete = !missing.length;
+  return `
+    <div class="people-edit-row people-main-row">
+      <label>Nombre<input data-person-field="${index}:name" type="text" value="${escapeHtml(person.name || "")}"></label>
+      <label>Rol<input data-person-field="${index}:role" type="text" value="${escapeHtml(person.role || "")}"></label>
+      <label>Actividad
+        <select data-person-field="${index}:activity">
+          ${state.activities.map((activity) => `<option value="${escapeHtml(activity.name)}" ${itemActivityName(person) === activity.name ? "selected" : ""}>${escapeHtml(activity.name)}</option>`).join("")}
+        </select>
+      </label>
+      <label>Competencia
+        <select data-person-field="${index}:competence">
+          ${["pendiente", "cumple", "no_cumple", "vencida"].map((value) => `<option value="${value}" ${(person.competence || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
+        </select>
+      </label>
+      <label>Capacitacion / certificado<input data-person-field="${index}:training" type="text" value="${escapeHtml(person.training || "")}"></label>
+      <label>Vence<input data-person-field="${index}:certificateDue" type="text" value="${escapeHtml(person.certificateDue || "")}"></label>
+      <label>Evidencia<input data-person-field="${index}:evidence" type="text" value="${escapeHtml(person.evidence || "")}"></label>
+      <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "competente" : "brecha"}</span>
+      <div class="row-actions">
+        <button class="secondary-button" data-toggle-person="${index}" type="button">${person.competence === "cumple" ? "Pendiente" : "Cumple"}</button>
+        <button class="secondary-button" data-remove="people:${index}" type="button">Quitar</button>
+      </div>
+      <small class="muted wide-row">${missing.length ? `Falta: ${missing.join(", ")}` : `Completo para ${escapeHtml(itemActivityName(person))}`}</small>
+    </div>`;
+}
+
+function updatePersonField(field, rerender = false) {
+  const [rawIndex, key] = field.dataset.personField.split(":");
+  const person = state.people[Number(rawIndex)];
+  if (!person) return;
+  person[key] = field.value;
+  person.updatedAt = today();
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  saveState();
+  if (rerender) {
+    renderPeople();
+    renderActivityGaps();
+    renderMetrics();
+  }
 }
 
 function trainingNeedComplete(item) {
   return ["cerrada", "realizada"].includes(item.status) && item.evaluation && item.certificate && item.evidence;
+}
+
+function personMissingItems(person) {
+  const missing = [];
+  if (person.competence !== "cumple") missing.push("competencia");
+  if (!person.training || String(person.training).toLowerCase().includes("pendiente")) missing.push("capacitacion/certificado");
+  if (!person.certificateDue || String(person.certificateDue).toLowerCase().includes("por ")) missing.push("vencimiento");
+  if (!person.evidence || String(person.evidence).toLowerCase().includes("por ")) missing.push("evidencia");
+  return missing;
+}
+
+function personIsComplete(person) {
+  return personMissingItems(person).length === 0;
 }
 
 function competencyRequirementsForActivity(activityName) {
@@ -4819,7 +4929,7 @@ function competencyMatrixRows() {
   return state.activities.map((activity) => {
     const related = activityRelatedItems(activity.name);
     const guides = related.people;
-    const competentGuides = guides.filter((person) => person.competence === "cumple");
+    const competentGuides = guides.filter(personIsComplete);
     const openTraining = state.trainingNeeds.filter((item) => itemActivityName(item) === activity.name && !trainingNeedComplete(item));
     const requirements = competencyRequirementsForActivity(activity.name);
     const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12).length;
@@ -4914,6 +5024,36 @@ function createCompetencyTrainingNeeds() {
   addMessage("agent", created ? `Cree ${created} necesidad(es) de capacitacion desde la matriz de competencia.` : "La matriz no encontro nuevas necesidades o ya estaban abiertas.");
   saveState();
   renderAll();
+}
+
+function createCompetencyNeedForActivity(activityName) {
+  const row = competencyMatrixRows().find((item) => item.activity.name === activityName);
+  if (!row) return;
+  const topic = `Competencia operacional para ${activityName}`;
+  if (!state.trainingNeeds.some((item) => item.topic === topic && itemActivityName(item) === activityName && !trainingNeedComplete(item))) {
+    state.trainingNeeds.unshift({
+      topic,
+      activity: activityName,
+      person: row.guides[0]?.name || row.activity.leader || "Guia por definir",
+      objective: `Cerrar brechas: ${(row.missing.length ? row.missing : ["validar competencia"]).join(", ")}. Requisitos: ${row.requirements.join("; ")}.`,
+      origin: row.highRisks ? "riesgo alto/competencia" : "competencia",
+      priority: row.missing.some((item) => ["competencia vigente", "asignar guia"].includes(item)) ? "alta" : "media",
+      status: "pendiente",
+      code: "7.2",
+      date: "",
+      evaluation: "",
+      certificate: "",
+      evidence: ""
+    });
+    addMessage("agent", `Cree una necesidad de competencia para ${activityName}.`);
+  } else {
+    addMessage("agent", `La necesidad de competencia para ${activityName} ya estaba abierta.`);
+  }
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  saveState();
+  renderPeople();
+  renderTraining();
 }
 
 function renderCompetencyMatrix() {
@@ -10805,6 +10945,7 @@ document.querySelectorAll("[data-agent-action]").forEach((button) => {
 
 document.querySelector("#addActivity").addEventListener("click", addActivity);
 document.querySelector("#addPerson").addEventListener("click", addPerson);
+document.querySelector("#detectPeopleGaps").addEventListener("click", createCompetencyTrainingNeeds);
 document.querySelector("#addTrainingNeed").addEventListener("click", addTrainingNeed);
 document.querySelector("#detectTrainingNeeds").addEventListener("click", detectTrainingNeeds);
 document.querySelector("#addEquipment").addEventListener("click", addEquipment);
