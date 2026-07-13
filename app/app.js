@@ -1750,6 +1750,7 @@ function renderOperationReadinessSummary() {
             <span class="badge ${item.decision.badge}">${item.decision.label}</span>
             <h3>${item.activity.name}</h3>
             <p>${item.nextGap ? `${item.nextGap.label}: ${item.nextGap.detail}` : "Controles minimos completos. Mantener evidencias y vigencias."}</p>
+            <small>${escapeHtml(activityNextOperatingMove(item.activity.name).action)}</small>
           </div>
           <div class="operation-card-metrics">
             <span><strong>${item.status.score}%</strong> preparacion</span>
@@ -2988,6 +2989,23 @@ function activityOperationDecision(readiness) {
   };
 }
 
+function activityNextOperatingMove(activityName) {
+  const readiness = activityReadiness(activityName);
+  const decision = activityOperationDecision(readiness);
+  const firstCritical = readiness.gaps.find((gap) => gap.severity === "alta");
+  const firstGap = firstCritical || readiness.gaps[0];
+  const blockers = readiness.gaps
+    .filter((gap) => gap.severity === "alta")
+    .map((gap) => `${gap.label} (${gap.code})`);
+  return {
+    decision,
+    firstGap,
+    blockers,
+    action: firstGap ? firstGap.action : "Mantener controles, vigencias y evidencias al dia",
+    canOffer: decision.badge === "cumple"
+  };
+}
+
 function activityOperatingPackage(activityName) {
   const stats = activityFormStats(activityName);
   const forms = activityPackageTables.map((table) => {
@@ -3068,6 +3086,7 @@ function activityOperationalPackageText(activityName) {
   const related = activityRelatedItems(activityName);
   const readiness = activityReadiness(activityName);
   const decision = activityOperationDecision(readiness);
+  const nextMove = activityNextOperatingMove(activityName);
   const checklist = activityDepartureChecklist(activityName);
   const packageData = activityOperatingPackage(activityName);
   const openActions = state.actions.filter((item) => item.status !== "cerrada" && item.relatedActivity === activityName);
@@ -3088,9 +3107,12 @@ function activityOperationalPackageText(activityName) {
     "",
     "2. Decision operativa",
     `Resultado: ${decision.label}`,
+    `Autorizacion sugerida: ${nextMove.canOffer ? "Puede ofertarse con seguimiento normal" : "No ofertar hasta cerrar brechas indicadas"}`,
     `Preparacion: ${readiness.score}%`,
     `Brechas: ${readiness.gaps.length}; criticas: ${readiness.high}`,
     `Criterio: ${decision.summary}`,
+    `Siguiente accion: ${nextMove.action}`,
+    `Bloqueos criticos: ${nextMove.blockers.join(", ") || "sin bloqueos criticos"}`,
     "",
     "3. Lista antes de salir",
     ...checklist.map((item) => `- ${item.ok ? "OK" : "FALTA"} | ${item.label} | Requisito ${departureRequirementByKey(item.key)} | ${item.detail}`),
@@ -4510,6 +4532,7 @@ function renderActivities() {
   const selectedStats = activityFormStats(selectedActivity.name);
   const selectedReadiness = activityReadiness(selectedActivity.name);
   const selectedDecision = activityOperationDecision(selectedReadiness);
+  const selectedNextMove = activityNextOperatingMove(selectedActivity.name);
   const selectedPackage = activityOperatingPackage(selectedActivity.name);
   const selectedChecklist = activityDepartureChecklist(selectedActivity.name);
   container.innerHTML = `
@@ -4561,6 +4584,8 @@ function renderActivities() {
           <p class="eyebrow">Decision operativa</p>
           <h3>${selectedDecision.label}</h3>
           <p>${selectedDecision.summary}</p>
+          <p><strong>Siguiente:</strong> ${escapeHtml(selectedNextMove.action)}</p>
+          <p><strong>Bloqueos criticos:</strong> ${escapeHtml(selectedNextMove.blockers.join(", ") || "sin bloqueos criticos")}</p>
         </div>
         <div class="activity-readiness-meter">
           <strong>${selectedReadiness.score}%</strong>
