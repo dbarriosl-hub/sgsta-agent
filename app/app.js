@@ -4785,6 +4785,13 @@ function renderPeople() {
       <div class="report-card"><span>Brechas actividad</span><strong>${rows.filter((row) => row.missing.length).length}</strong></div>`;
   }
   container.innerHTML = `
+    ${state.activityHelperNotice?.section === "people" ? `
+      <div class="agent-result-card">
+        <span class="badge en_proceso">${escapeHtml(state.activityHelperNotice.activity || "actividad")}</span>
+        <strong>Resultado de personal</strong>
+        <p>${escapeHtml(state.activityHelperNotice.message)}</p>
+      </div>
+    ` : ""}
     <article class="competency-card">
       <div class="competency-head">
         <div>
