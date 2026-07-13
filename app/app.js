@@ -2424,7 +2424,7 @@ function renderClosurePackages() {
           <div class="closure-detail">
             <strong>Debe revisar:</strong>
             <ul>
-              ${item.nextSteps.map((step) => `<li>${step}</li>`).join("")}
+              ${(item.nextSteps || []).map((step) => `<li>${step}</li>`).join("")}
             </ul>
           </div>
           <div class="row-actions">
