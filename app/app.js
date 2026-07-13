@@ -237,6 +237,7 @@ const defaultState = {
   selectedActivityName: "Senderismo",
   activityHelperNotice: null,
   actionFilterActivity: "",
+  actionFocusMode: "all",
   selectedFormActivity: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
   formFilters: { search: "", phva: "todos", status: "todos" },
@@ -299,6 +300,7 @@ function mergeState(base, current) {
     evidencePackageNotice: current.evidencePackageNotice || base.evidencePackageNotice,
     activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
+    actionFocusMode: current.actionFocusMode || base.actionFocusMode,
     selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
     selectedFormTable: current.selectedFormTable || base.selectedFormTable,
     formFilters: { ...base.formFilters, ...(current.formFilters || {}) },
@@ -9027,11 +9029,13 @@ function renderActions() {
   renderActionClosureBoard();
   renderActionWorkQueue();
   const activeActivityFilter = state.actionFilterActivity || "";
-  const rows = state.actions
+  const focusMode = state.actionFocusMode || "all";
+  const allRows = state.actions
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !activeActivityFilter || item.relatedActivity === activeActivityFilter);
+  const rows = focusMode === "priority" ? priorityActionRows(allRows, 7) : allRows;
   container.innerHTML = `
-    ${renderActionFilterBar(selectedActivity, activeActivityFilter, activityActions.length)}
+    ${renderActionFilterBar(selectedActivity, activeActivityFilter, activityActions.length, focusMode, rows.length, allRows.length)}
     ${rows.length
       ? rows.map(({ item, index }) => actionCardTemplate(item, index)).join("")
       : `<div class="muted">No hay acciones para el filtro seleccionado.</div>`}`;
@@ -9039,18 +9043,19 @@ function renderActions() {
   bindActionControls(container);
 }
 
-function renderActionFilterBar(selectedActivity, activeActivityFilter, activityActionCount) {
+function renderActionFilterBar(selectedActivity, activeActivityFilter, activityActionCount, focusMode, visibleCount, totalCount) {
   const duplicateCount = actionDuplicateStats().duplicates;
   return `
     <div class="action-filter-bar">
       <div>
         <p class="eyebrow">Contexto</p>
-        <strong>${activeActivityFilter ? `Filtrando: ${escapeHtml(activeActivityFilter)}` : "Todas las acciones"}</strong>
-        <span>${selectedActivity ? `Actividad seleccionada: ${escapeHtml(selectedActivity)} (${activityActionCount} abierta(s))` : "Sin actividad seleccionada"}${duplicateCount ? ` - ${duplicateCount} duplicada(s) por compactar` : ""}</span>
+        <strong>${focusMode === "priority" ? "Prioridad 7 dias" : activeActivityFilter ? `Filtrando: ${escapeHtml(activeActivityFilter)}` : "Todas las acciones"}</strong>
+        <span>${selectedActivity ? `Actividad seleccionada: ${escapeHtml(selectedActivity)} (${activityActionCount} abierta(s))` : "Sin actividad seleccionada"} - Mostrando ${visibleCount}/${totalCount}${duplicateCount ? ` - ${duplicateCount} duplicada(s) por compactar` : ""}</span>
       </div>
       <div class="row-actions">
         <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
         <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
+        <button class="secondary-button ${focusMode === "priority" ? "button-done" : ""}" data-action-filter="priority" type="button">Prioridad 7 dias</button>
         <button class="secondary-button" data-action-filter="compact" type="button" ${duplicateCount ? "" : "disabled"}>Compactar duplicadas</button>
         <button class="secondary-button" data-action-filter="download" type="button">Descargar</button>
         <button class="secondary-button" data-action-filter="evidence" type="button">Enviar a evidencias</button>
@@ -9062,11 +9067,18 @@ function renderActionFilterBar(selectedActivity, activeActivityFilter, activityA
 function bindActionFilterControls(container) {
   container.querySelector("[data-action-filter='all']")?.addEventListener("click", () => {
     state.actionFilterActivity = "";
+    state.actionFocusMode = "all";
     saveState();
     renderAll();
   });
   container.querySelector("[data-action-filter='activity']")?.addEventListener("click", () => {
     state.actionFilterActivity = state.selectedActivityName || "";
+    state.actionFocusMode = "all";
+    saveState();
+    renderAll();
+  });
+  container.querySelector("[data-action-filter='priority']")?.addEventListener("click", () => {
+    state.actionFocusMode = "priority";
     saveState();
     renderAll();
   });
@@ -9169,19 +9181,32 @@ function compactDuplicateActions() {
   renderAll();
 }
 
+function priorityActionRows(rows, limit = 7) {
+  return [...rows]
+    .filter(({ item }) => item.status !== "cerrada")
+    .sort((a, b) => {
+      const stageDiff = actionClosureStage(b.item).priority - actionClosureStage(a.item).priority;
+      return stageDiff || actionPriorityScore(b.item) - actionPriorityScore(a.item);
+    })
+    .slice(0, limit);
+}
+
 function actionsReportRows() {
   const activeActivityFilter = state.actionFilterActivity || "";
-  return state.actions.filter((action) => !activeActivityFilter || action.relatedActivity === activeActivityFilter);
+  const rows = state.actions.filter((action) => !activeActivityFilter || action.relatedActivity === activeActivityFilter);
+  if ((state.actionFocusMode || "all") !== "priority") return rows;
+  return priorityActionRows(rows.map((item, index) => ({ item, index })), 7).map(({ item }) => item);
 }
 
 function actionsReportText() {
   const activeActivityFilter = state.actionFilterActivity || "";
+  const focusMode = state.actionFocusMode || "all";
   const rows = actionsReportRows();
   const open = rows.filter((action) => action.status !== "cerrada");
   const high = open.filter((action) => action.priority === "alta");
   const pendingEfficacy = rows.filter((action) => action.status === "pendiente_eficacia" || (action.status === "cerrada" && action.efficacyStatus !== "eficaz"));
   return [
-    activeActivityFilter ? `REPORTE DE ACCIONES - ${activeActivityFilter}` : "REPORTE DE ACCIONES DE GESTION",
+    focusMode === "priority" ? "REPORTE DE ACCIONES - PRIORIDAD 7 DIAS" : activeActivityFilter ? `REPORTE DE ACCIONES - ${activeActivityFilter}` : "REPORTE DE ACCIONES DE GESTION",
     "",
     `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
     `Sistema: ${activeSystem().name} (${activeSystem().code})`,
