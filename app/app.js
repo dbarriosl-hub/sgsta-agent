@@ -9040,16 +9040,18 @@ function renderActions() {
 }
 
 function renderActionFilterBar(selectedActivity, activeActivityFilter, activityActionCount) {
+  const duplicateCount = actionDuplicateStats().duplicates;
   return `
     <div class="action-filter-bar">
       <div>
         <p class="eyebrow">Contexto</p>
         <strong>${activeActivityFilter ? `Filtrando: ${escapeHtml(activeActivityFilter)}` : "Todas las acciones"}</strong>
-        <span>${selectedActivity ? `Actividad seleccionada: ${escapeHtml(selectedActivity)} (${activityActionCount} abierta(s))` : "Sin actividad seleccionada"}</span>
+        <span>${selectedActivity ? `Actividad seleccionada: ${escapeHtml(selectedActivity)} (${activityActionCount} abierta(s))` : "Sin actividad seleccionada"}${duplicateCount ? ` - ${duplicateCount} duplicada(s) por compactar` : ""}</span>
       </div>
       <div class="row-actions">
         <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
         <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
+        <button class="secondary-button" data-action-filter="compact" type="button" ${duplicateCount ? "" : "disabled"}>Compactar duplicadas</button>
         <button class="secondary-button" data-action-filter="download" type="button">Descargar</button>
         <button class="secondary-button" data-action-filter="evidence" type="button">Enviar a evidencias</button>
         <button data-action-filter="open-activity" type="button" ${selectedActivity ? "" : "disabled"}>Ver actividad</button>
@@ -9071,8 +9073,100 @@ function bindActionFilterControls(container) {
   container.querySelector("[data-action-filter='open-activity']")?.addEventListener("click", () => {
     showView("actividades");
   });
+  container.querySelector("[data-action-filter='compact']")?.addEventListener("click", compactDuplicateActions);
   container.querySelector("[data-action-filter='download']")?.addEventListener("click", downloadActionsReport);
   container.querySelector("[data-action-filter='evidence']")?.addEventListener("click", convertActionsReportToEvidence);
+}
+
+function normalizedActionKey(action) {
+  const title = String(action.title || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const activity = String(action.relatedActivity || action.activity || "").trim().toLowerCase();
+  const code = String(action.code || "").trim();
+  return [code, title, activity].join("|");
+}
+
+function actionDuplicateStats() {
+  const groups = new Map();
+  state.actions
+    .map((action, index) => ({ action, index }))
+    .filter(({ action }) => action.status !== "cerrada")
+    .forEach((entry) => {
+      const key = normalizedActionKey(entry.action);
+      if (!key.replaceAll("|", "")) return;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(entry);
+    });
+  const duplicatedGroups = [...groups.values()].filter((items) => items.length > 1);
+  return {
+    groups: duplicatedGroups,
+    duplicates: duplicatedGroups.reduce((total, items) => total + items.length - 1, 0)
+  };
+}
+
+function actionMergeScore(action) {
+  return [
+    action.responsible,
+    action.dueDate,
+    action.followUp,
+    action.evidence,
+    action.efficacyVerification,
+    action.efficacyStatus === "eficaz" ? "eficaz" : "",
+    action.cause,
+    action.immediateCorrection
+  ].filter(Boolean).length;
+}
+
+function mergeActionFields(target, source) {
+  [
+    "responsible",
+    "dueDate",
+    "owner",
+    "deadline",
+    "fechaLimite",
+    "followUp",
+    "evidence",
+    "efficacyVerification",
+    "cause",
+    "immediateCorrection",
+    "sourceDetail",
+    "gapKey"
+  ].forEach((key) => {
+    if (!target[key] && source[key]) target[key] = source[key];
+  });
+  if (actionPriorityScore(source) > actionPriorityScore(target)) target.priority = source.priority || target.priority;
+  if (source.efficacyStatus === "eficaz") target.efficacyStatus = "eficaz";
+  if (source.status === "pendiente_eficacia" && target.status !== "cerrada") target.status = "pendiente_eficacia";
+}
+
+function compactDuplicateActions() {
+  const stats = actionDuplicateStats();
+  if (!stats.duplicates) {
+    addMessage("agent", "No encontre acciones duplicadas abiertas para compactar.");
+    return;
+  }
+  const removeIndexes = new Set();
+  stats.groups.forEach((group) => {
+    const sorted = [...group].sort((a, b) => actionMergeScore(b.action) - actionMergeScore(a.action) || b.index - a.index);
+    const keeper = sorted[0];
+    sorted.slice(1).forEach((entry) => {
+      mergeActionFields(keeper.action, entry.action);
+      removeIndexes.add(entry.index);
+    });
+    keeper.action.updatedAt = today();
+    keeper.action.compactedCount = Number(keeper.action.compactedCount || 0) + sorted.length - 1;
+    keeper.action.compactedAt = today();
+  });
+  state.actions = state.actions.filter((_, index) => !removeIndexes.has(index));
+  recordAuditEvent({
+    title: "Acciones duplicadas compactadas",
+    detail: `Se compactaron ${stats.duplicates} accion(es) repetida(s) en ${stats.groups.length} grupo(s). Se conservaron datos utiles de responsable, seguimiento, evidencia y eficacia.`,
+    code: "10.1",
+    type: "accion_gestion",
+    actor: "agente"
+  });
+  addMessage("agent", `Compacte ${stats.duplicates} accion(es) duplicada(s). Quedaron acciones unicas con los datos mas completos.`);
+  saveState();
+  renderAll();
 }
 
 function actionsReportRows() {
@@ -9552,6 +9646,7 @@ function actionCardTemplate(item, index) {
           <span>Fuente: <strong>${escapeHtml(sourceDetail || item.origin || "accion")}</strong></span>
           ${item.origin === "brecha_actividad" ? `<button class="secondary-button" data-open-activity-gaps type="button">Ver brechas</button>` : ""}
         </div>` : ""}
+      ${item.compactedCount ? `<div class="compact-note">Compactada: absorbe ${item.compactedCount} accion(es) duplicada(s) de prueba.</div>` : ""}
       <label class="wide">
         Accion propuesta
         <input data-action-field="${index}:title" type="text" value="${escapeHtml(item.title || "")}">

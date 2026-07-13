@@ -1308,6 +1308,15 @@ textarea {
   font-size: 13px;
 }
 
+.compact-note {
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
 .action-card-head > div:first-child {
   display: flex;
   flex-wrap: wrap;
