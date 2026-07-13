@@ -4897,7 +4897,36 @@ function updatePersonField(field, rerender = false) {
 }
 
 function trainingNeedComplete(item) {
-  return ["cerrada", "realizada"].includes(item.status) && item.evaluation && item.certificate && item.evidence;
+  return ["cerrada", "realizada"].includes(item.status) && trainingEvidenceComplete(item);
+}
+
+function trainingEvidenceComplete(item) {
+  return Boolean(item.evaluation && item.certificate && item.certificateDue && item.evidence);
+}
+
+function trainingReadinessReason(item) {
+  const missing = [];
+  if (!item.date) missing.push("fecha");
+  if (!item.evaluation) missing.push("evaluacion");
+  if (!item.certificate) missing.push("certificado");
+  if (!item.certificateDue) missing.push("vencimiento del certificado");
+  if (!item.evidence) missing.push("evidencia");
+  return missing.length ? `Falta ${missing.join(", ")}.` : "Lista para cierre y actualizacion de competencia.";
+}
+
+function syncTrainingToPerson(item) {
+  const person = state.people.find((candidate) =>
+    candidate.name === item.person ||
+    (item.person && String(candidate.name || "").toLowerCase() === String(item.person).toLowerCase()) ||
+    (itemActivityName(candidate) === itemActivityName(item) && String(candidate.role || "").toLowerCase().includes("guia"))
+  );
+  if (!person) return false;
+  person.competence = "cumple";
+  person.training = item.topic || item.certificate || person.training;
+  person.certificateDue = item.certificateDue || person.certificateDue || "Por definir";
+  person.evidence = item.evidence || item.certificate || person.evidence;
+  person.updatedAt = today();
+  return true;
 }
 
 function personMissingItems(person) {
@@ -5172,6 +5201,7 @@ function renderTraining() {
   container.innerHTML = state.trainingNeeds.length
     ? state.trainingNeeds.map((item, index) => {
       const complete = trainingNeedComplete(item);
+      const readiness = trainingReadinessReason(item);
       return `
       <div class="training-card">
         <div class="action-card-head">
@@ -5187,18 +5217,20 @@ function renderTraining() {
         </div>
         <strong>${item.topic}</strong>
         <div class="muted">Actividad: ${itemActivityName(item)} - Persona: ${item.person || "por definir"} - Origen: ${item.origin}</div>
+        <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Capacitacion cerrada" : "Pendiente de cierre"}</strong><span>${readiness}</span></div>
         <div class="training-edit-grid">
           <label>Objetivo<input data-training-field="${index}:objective" type="text" value="${escapeHtml(item.objective || "")}"></label>
           <label>Fecha<input data-training-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
           <label>Evaluacion<input data-training-field="${index}:evaluation" type="text" value="${escapeHtml(item.evaluation || "")}"></label>
           <label>Certificado<input data-training-field="${index}:certificate" type="text" value="${escapeHtml(item.certificate || "")}"></label>
+          <label>Vence certificado<input data-training-field="${index}:certificateDue" type="text" value="${escapeHtml(item.certificateDue || "")}"></label>
           <label>Evidencia<input data-training-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || "")}"></label>
         </div>
       </div>`;
     }).join("")
     : `<div class="muted">No hay necesidades de capacitacion registradas.</div>`;
   container.querySelectorAll("[data-training-field]").forEach((field) => {
-    field.addEventListener("change", () => {
+    const updateTrainingField = (rerender = false) => {
       const [index, key] = field.dataset.trainingField.split(":");
       const item = state.trainingNeeds[Number(index)];
       if (!item) return;
@@ -5209,8 +5241,10 @@ function renderTraining() {
         state.compliance["7.3"] = "en_proceso";
       }
       saveState();
-      renderAll();
-    });
+      if (rerender) renderTraining();
+    };
+    field.addEventListener("input", () => updateTrainingField(false));
+    field.addEventListener("change", () => updateTrainingField(true));
   });
   container.querySelectorAll("[data-training-action]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -5226,15 +5260,17 @@ function renderTraining() {
   container.querySelectorAll("[data-close-training]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.trainingNeeds[Number(button.dataset.closeTraining)];
-      if (item.status !== "cerrada" && !trainingNeedComplete(item)) {
+      if (item.status !== "cerrada" && !trainingEvidenceComplete(item)) {
         item.status = "pendiente_evidencia";
-        addMessage("agent", `No cerre la capacitacion "${item.topic}" porque falta evaluacion, certificado o evidencia.`);
+        addMessage("agent", `No cerre la capacitacion "${item.topic}" porque ${trainingReadinessReason(item).toLowerCase()}`);
       } else {
         item.status = item.status === "cerrada" ? "pendiente" : "cerrada";
       }
       if (item.status === "cerrada") {
+        const personUpdated = syncTrainingToPerson(item);
         state.compliance["7.2"] = "en_proceso";
         state.compliance["7.3"] = "en_proceso";
+        addMessage("agent", `Capacitacion cerrada: "${item.topic}". ${personUpdated ? "Actualice la competencia de la persona relacionada." : "No encontre persona relacionada para actualizar automaticamente."}`);
       }
       saveState();
       renderAll();
