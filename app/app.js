@@ -233,6 +233,7 @@ const defaultState = {
   executiveReport: null,
   agentFindings: [],
   closurePackages: [],
+  evidencePackageNotice: null,
   selectedActivityName: "Senderismo",
   activityHelperNotice: null,
   actionFilterActivity: "",
@@ -295,6 +296,7 @@ function mergeState(base, current) {
     executiveReport: current.executiveReport || base.executiveReport,
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
+    evidencePackageNotice: current.evidencePackageNotice || base.evidencePackageNotice,
     activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
     selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
@@ -10093,7 +10095,21 @@ function renderEvidencePackages(container) {
     .map(evidencePackageForRequirement)
     .sort((a, b) => a.score - b.score || b.actions.length - a.actions.length)
     .slice(0, 6);
+  const notice = state.evidencePackageNotice;
   container.innerHTML = `
+    ${notice ? `
+      <div class="evidence-package-notice">
+        <div>
+          <span class="badge cumple">Hecho</span>
+          <strong>${escapeHtml(notice.title)}</strong>
+          <p>${escapeHtml(notice.detail)}</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button" data-evidence-notice-view="formularios" type="button">Ver formularios</button>
+          <button class="secondary-button" data-evidence-notice-view="acciones" type="button">Ver acciones</button>
+          <button data-evidence-notice-clear type="button">Entendido</button>
+        </div>
+      </div>` : ""}
     <div class="evidence-package-head">
       <div>
         <p class="eyebrow">Paquetes de evidencia</p>
@@ -10110,6 +10126,10 @@ function renderEvidencePackages(container) {
           </div>
           <strong>${escapeHtml(item.req.title)}</strong>
           <p>${item.missing.length ? `Falta: ${item.missing.join(", ")}.` : "Paquete sin brechas visibles."}</p>
+          <div class="evidence-next-step">
+            <span>Siguiente</span>
+            <strong>${escapeHtml(evidencePackageNextStep(item))}</strong>
+          </div>
           <div class="matrix-metrics">
             <span>Formularios ${item.stats.formsApproved}/${item.stats.formsTotal}</span>
             <span>Actividad ${item.stats.activityFormsApproved}/${activityFormTargetForRequirement(item.stats) || item.stats.activityFormsTotal}</span>
@@ -10125,6 +10145,23 @@ function renderEvidencePackages(container) {
           </div>
         </article>`).join("")}
     </div>`;
+  container.querySelectorAll("[data-evidence-notice-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const code = state.evidencePackageNotice?.code || "";
+      if (button.dataset.evidenceNoticeView === "formularios") {
+        state.formFilters.search = code;
+        state.formFilters.status = "todos";
+      }
+      showView(button.dataset.evidenceNoticeView);
+      saveState();
+      renderAll();
+    });
+  });
+  container.querySelector("[data-evidence-notice-clear]")?.addEventListener("click", () => {
+    state.evidencePackageNotice = null;
+    saveState();
+    renderAll();
+  });
   container.querySelectorAll("[data-evidence-open]").forEach((button) => {
     button.addEventListener("click", () => {
       state.formFilters.search = button.dataset.evidenceOpen;
@@ -10136,6 +10173,15 @@ function renderEvidencePackages(container) {
   container.querySelectorAll("[data-evidence-prepare]").forEach((button) => {
     button.addEventListener("click", () => prepareEvidencePackage(button.dataset.evidencePrepare));
   });
+}
+
+function evidencePackageNextStep(item) {
+  if (item.stats.formsPending > 0) return "Diligenciar formularios pendientes con el agente";
+  if (item.stats.formsDraft > 0 || item.stats.activityFormsDraft > 0) return "Revisar y aprobar formularios en borrador";
+  if (!item.stats.registeredEvidence && item.stats.suggestedEvidence > 0) return "Validar la evidencia sugerida o adjuntar soporte real";
+  if (!item.stats.registeredEvidence) return "Registrar evidencia real del requisito";
+  if (item.actions.length > 0) return "Cerrar acciones abiertas y verificar eficacia";
+  return "Mantener vigencia y trazabilidad";
 }
 
 function evidencePackageLinkedItems(item) {
@@ -10160,8 +10206,22 @@ function evidencePackageLinkedItems(item) {
 }
 
 async function prepareEvidencePackage(code) {
+  const beforeForms = state.formResponses.length;
+  const beforeActions = state.actions.length;
+  const beforeEvidence = state.evidence.length;
   await closeRequirementGap(code);
+  const req = requirements.find((item) => item.code === code);
+  const formsCreated = Math.max(0, state.formResponses.length - beforeForms);
+  const actionsCreated = Math.max(0, state.actions.length - beforeActions);
+  const evidenceCreated = Math.max(0, state.evidence.length - beforeEvidence);
+  state.evidencePackageNotice = {
+    code,
+    title: `Paquete preparado para ${code}`,
+    detail: `${req?.title || "Requisito"}: ${formsCreated} formulario(s), ${actionsCreated} accion(es) y ${evidenceCreated} evidencia(s) sugerida(s)/registrada(s). Ahora revisa, aprueba o adjunta soporte real.`
+  };
+  saveState();
   showView("evidencias");
+  renderAll();
 }
 
 function addEvidenceRecord(record) {
