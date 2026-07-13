@@ -4020,6 +4020,16 @@ function equipmentIsComplete(equipment) {
   return equipment.status === "operativo" && nextOk && equipment.inspectionDate && equipment.maintenanceDate && equipment.evidence;
 }
 
+function equipmentGapReason(equipment) {
+  const missing = [];
+  if (equipment.status !== "operativo") missing.push("estado operativo");
+  if (!equipment.nextCheck || String(equipment.nextCheck).toLowerCase().includes("por ")) missing.push("proxima revision");
+  if (!equipment.inspectionDate) missing.push("inspeccion");
+  if (!equipment.maintenanceDate) missing.push("mantenimiento");
+  if (!equipment.evidence) missing.push("evidencia");
+  return missing.length ? `Falta ${missing.join(", ")}.` : "Equipo completo para operar.";
+}
+
 function updateActivityEquipmentField(field) {
   const [rawIndex, key] = field.dataset.equipmentField.split(":");
   const equipment = state.equipment[Number(rawIndex)];
@@ -5489,6 +5499,7 @@ function renderEquipment() {
   container.innerHTML = state.equipment.length
     ? state.equipment.map((item, index) => {
       const complete = equipmentIsComplete(item);
+      const gapReason = equipmentGapReason(item);
       return `
       <div class="equipment-card">
         <div class="action-card-head">
@@ -5503,6 +5514,7 @@ function renderEquipment() {
         </div>
         <strong>${item.name}</strong>
         <div class="muted">${item.type} - Actividad: ${itemActivityName(item)} - Proxima revision: ${item.nextCheck || "Por programar"}</div>
+        <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Equipo listo" : "Equipo pendiente"}</strong><span>${gapReason}</span></div>
         <div class="training-edit-grid">
           <label>Estado
             <select data-equipment-main-field="${index}:status">
@@ -5519,7 +5531,7 @@ function renderEquipment() {
     }).join("")
     : `<div class="muted">No hay equipos registrados.</div>`;
   container.querySelectorAll("[data-equipment-main-field]").forEach((field) => {
-    field.addEventListener("change", () => {
+    const updateEquipmentField = (rerender = false) => {
       const [index, key] = field.dataset.equipmentMainField.split(":");
       const item = state.equipment[Number(index)];
       if (!item) return;
@@ -5528,8 +5540,10 @@ function renderEquipment() {
       state.compliance["7.1"] = "en_proceso";
       state.compliance["8.1"] = "en_proceso";
       saveState();
-      renderAll();
-    });
+      if (rerender) renderEquipment();
+    };
+    field.addEventListener("input", () => updateEquipmentField(false));
+    field.addEventListener("change", () => updateEquipmentField(true));
   });
   container.querySelectorAll("[data-equipment-action]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -5540,13 +5554,30 @@ function renderEquipment() {
   });
   container.querySelectorAll("[data-toggle-equipment]").forEach((button) => {
     button.addEventListener("click", () => {
-      const item = state.equipment[Number(button.dataset.toggleEquipment)];
+      const index = Number(button.dataset.toggleEquipment);
+      syncEquipmentFieldsFromView(index);
+      const item = state.equipment[index];
+      if (!item) return;
       item.status = item.status === "operativo" ? "revision" : "operativo";
+      item.updatedAt = today();
       state.compliance["7.1"] = "en_proceso";
       state.compliance["8.1"] = "en_proceso";
+      addMessage("agent", `Equipo ${item.name || index + 1} marcado como ${item.status}. ${equipmentGapReason(item)}`);
       saveState();
-      renderAll();
+      renderEquipment();
+      renderMetrics();
+      renderActivityGaps();
+      renderOperationReadinessSummary();
     });
+  });
+}
+
+function syncEquipmentFieldsFromView(index) {
+  document.querySelectorAll(`[data-equipment-main-field^="${index}:"]`).forEach((field) => {
+    const [, key] = field.dataset.equipmentMainField.split(":");
+    const item = state.equipment[index];
+    if (!item) return;
+    item[key] = field.value;
   });
 }
 
