@@ -3219,6 +3219,33 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 100px 110px minmax(230px, auto);
 }
 
+.review-filter-bar {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+.review-filter-bar .eyebrow,
+.review-filter-bar strong,
+.review-filter-bar span {
+  display: block;
+}
+
+.review-filter-bar .eyebrow {
+  margin: 0;
+}
+
+.review-filter-bar span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
 .finding-row > div:first-child {
   min-width: 0;
 }
@@ -3555,6 +3582,7 @@ textarea {
   .activity-intake-item,
   .action-form-grid,
   .action-filter-bar,
+  .review-filter-bar,
   .activity-operational-status,
   .activity-intake-grid,
   .form-filters,

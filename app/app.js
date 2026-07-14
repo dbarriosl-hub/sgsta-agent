@@ -238,6 +238,7 @@ const defaultState = {
   activityHelperNotice: null,
   actionFilterActivity: "",
   actionFocusMode: "all",
+  reviewFocusMode: "critical",
   selectedFormActivity: "Senderismo",
   selectedFormTable: "contexto_interno_externo",
   formFilters: { search: "", phva: "todos", status: "todos" },
@@ -301,6 +302,7 @@ function mergeState(base, current) {
     activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
     actionFocusMode: current.actionFocusMode || base.actionFocusMode,
+    reviewFocusMode: current.reviewFocusMode || base.reviewFocusMode,
     selectedFormActivity: current.selectedFormActivity || current.selectedActivityName || base.selectedFormActivity,
     selectedFormTable: current.selectedFormTable || base.selectedFormTable,
     formFilters: { ...base.formFilters, ...(current.formFilters || {}) },
@@ -8406,20 +8408,37 @@ function renderReviewInbox() {
   const summary = document.querySelector("#reviewInboxSummary");
   if (!container || !summary) return;
   const items = buildReviewItems();
+  const focusMode = state.reviewFocusMode || "critical";
+  const visibleItems = reviewVisibleItems(items, focusMode);
   const forms = items.filter((item) => item.kind === "form").length;
   const evidence = items.filter((item) => item.kind === "evidence").length;
   const actions = items.filter((item) => item.kind === "action").length;
   const efficacy = items.filter((item) => item.kind === "efficacy").length;
   const packages = items.filter((item) => item.kind === "package").length;
+  const high = items.filter((item) => item.priority === "alta").length;
   summary.innerHTML = `
     <div class="report-card"><span>Total pendiente</span><strong>${items.length}</strong></div>
+    <div class="report-card"><span>Criticos</span><strong>${high}</strong></div>
     <div class="report-card"><span>Formularios</span><strong>${forms}</strong></div>
     <div class="report-card"><span>Evidencias</span><strong>${evidence}</strong></div>
     <div class="report-card"><span>Acciones</span><strong>${actions}</strong></div>
     <div class="report-card"><span>Eficacia</span><strong>${efficacy}</strong></div>
     <div class="report-card"><span>Paquetes</span><strong>${packages}</strong></div>`;
-  container.innerHTML = items.length
-    ? items.map((item) => `
+  container.innerHTML = `
+    <div class="review-filter-bar">
+      <div>
+        <p class="eyebrow">Revision humana</p>
+        <strong>${focusMode === "critical" ? "Criticas primero" : "Todas las aprobaciones"}</strong>
+        <span>Mostrando ${visibleItems.length}/${items.length}. El agente no aprueba ni cierra por ti.</span>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button ${focusMode === "critical" ? "button-done" : ""}" data-review-focus="critical" type="button">Criticas primero</button>
+        <button class="secondary-button ${focusMode === "all" ? "button-done" : ""}" data-review-focus="all" type="button">Ver todo</button>
+        <button data-review-focus="actions" type="button">Ir a acciones</button>
+      </div>
+    </div>
+    ${visibleItems.length
+    ? visibleItems.map((item) => `
       <div class="simple-row review-row">
         <div>
           <strong>${item.title}</strong>
@@ -8435,8 +8454,34 @@ function renderReviewInbox() {
           ${reviewButtons(item)}
         </div>
       </div>`).join("")
-    : `<div class="muted">No hay elementos pendientes de revision humana.</div>`;
+    : `<div class="muted">No hay elementos pendientes de revision humana para este filtro.</div>`}`;
+  bindReviewFocusControls(container);
   bindReviewInboxButtons(container);
+}
+
+function reviewVisibleItems(items, focusMode) {
+  if (focusMode === "all") return items;
+  const critical = items.filter((item) => item.priority === "alta");
+  const source = critical.length ? critical : items;
+  return source.slice(0, 10);
+}
+
+function bindReviewFocusControls(container) {
+  container.querySelectorAll("[data-review-focus]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.reviewFocus;
+      if (mode === "actions") {
+        state.actionFocusMode = "priority";
+        state.actionFilterActivity = state.selectedActivityName || state.activities[0]?.name || "";
+        saveState();
+        showView("acciones");
+        return;
+      }
+      state.reviewFocusMode = mode;
+      saveState();
+      renderAll();
+    });
+  });
 }
 
 function reviewKindLabel(kind) {
