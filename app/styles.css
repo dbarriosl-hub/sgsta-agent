@@ -3447,6 +3447,84 @@ textarea {
   margin: 0;
 }
 
+.management-command-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(280px, 1fr) minmax(190px, auto);
+  padding: 14px;
+}
+
+.management-command-panel.no_cumple {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.management-command-panel.en_proceso {
+  background: #fffdf3;
+  border-color: #fde68a;
+}
+
+.management-command-panel.cumple {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.management-command-panel h3,
+.management-command-panel p,
+.management-command-panel .eyebrow {
+  margin: 0;
+}
+
+.management-command-panel p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.management-command-status {
+  align-content: start;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+}
+
+.management-command-status strong {
+  overflow-wrap: anywhere;
+}
+
+.management-command-grid {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.management-command-grid div {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.management-command-grid span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.management-command-grid strong {
+  font-size: 22px;
+}
+
+.management-command-panel .row-actions {
+  grid-column: 1 / -1;
+  justify-content: end;
+}
+
 .training-card,
 .equipment-card,
 .policy-card,
@@ -3760,6 +3838,8 @@ textarea {
   .evidence-workspace-head,
   .evidence-workspace-grid,
   .evidence-workspace-detail,
+  .management-command-panel,
+  .management-command-grid,
   .activity-operational-status,
   .activity-intake-grid,
   .form-filters,

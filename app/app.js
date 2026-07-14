@@ -6718,7 +6718,7 @@ function managementReviewActivityRows() {
 function renderManagementReviews() {
   const container = document.querySelector("#managementReviewTable");
   const inputs = managementReviewInputs();
-  container.innerHTML = state.managementReviews.length
+  const reviewCards = state.managementReviews.length
     ? state.managementReviews.map((item, index) => `
       <article class="management-review-card">
         <div class="action-card-head">
@@ -6798,6 +6798,12 @@ function renderManagementReviews() {
         </div>
       </article>`).join("")
     : `<div class="muted">No hay revisiones por la direccion preparadas.</div>`;
+  container.innerHTML = `
+    ${renderManagementReviewCommandPanel(inputs)}
+    ${reviewCards}`;
+  container.querySelectorAll("[data-review-command]").forEach((button) => {
+    button.addEventListener("click", () => handleManagementReviewCommand(button.dataset.reviewCommand));
+  });
   container.querySelectorAll("[data-toggle-review]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.managementReviews[Number(button.dataset.toggleReview)];
@@ -6813,6 +6819,91 @@ function renderManagementReviews() {
   container.querySelectorAll("[data-refresh-review]").forEach((button) => {
     button.addEventListener("click", () => refreshManagementReview(Number(button.dataset.refreshReview)));
   });
+}
+
+function managementReviewCommand(inputs = managementReviewInputs()) {
+  const highDecision = managementReviewOperationalDecisions()[0];
+  if (inputs.activitiesBlocked || inputs.highRisks || inputs.policiesPending) {
+    return {
+      label: "Direccion requerida",
+      badge: "no_cumple",
+      title: "Decidir antes de ofertar",
+      detail: highDecision?.detail || "Hay bloqueos criticos que requieren decision humana antes de operar.",
+      next: highDecision?.title || "Priorizar decisiones criticas"
+    };
+  }
+  if (inputs.activitiesInReview || inputs.pendingEfficacy || inputs.formsPending || inputs.trainingOpen || inputs.equipmentPending) {
+    return {
+      label: "Operar con revision",
+      badge: "en_proceso",
+      title: "Aprobar condiciones y recursos",
+      detail: highDecision?.detail || "El sistema puede avanzar, pero hay soportes, acciones o recursos por cerrar.",
+      next: highDecision?.title || "Cerrar pendientes de direccion"
+    };
+  }
+  return {
+    label: "Seguimiento",
+    badge: "cumple",
+    title: "Mantener vigilancia",
+    detail: "No hay bloqueos criticos visibles. Mantener revision periodica y evidencias vigentes.",
+    next: "Mantener seguimiento del SGSTA"
+  };
+}
+
+function renderManagementReviewCommandPanel(inputs) {
+  const command = managementReviewCommand(inputs);
+  return `
+    <section class="management-command-panel ${command.badge}">
+      <div>
+        <p class="eyebrow">Direccion decide</p>
+        <h3>${escapeHtml(command.title)}</h3>
+        <p>${escapeHtml(command.detail)}</p>
+      </div>
+      <div class="management-command-status">
+        <span class="badge ${command.badge}">${escapeHtml(command.label)}</span>
+        <strong>${escapeHtml(command.next)}</strong>
+      </div>
+      <div class="management-command-grid">
+        <div><span>No ofertar</span><strong>${inputs.activitiesBlocked}</strong></div>
+        <div><span>Con revision</span><strong>${inputs.activitiesInReview}</strong></div>
+        <div><span>Acciones abiertas</span><strong>${inputs.openActions}</strong></div>
+        <div><span>Eficacia pendiente</span><strong>${inputs.pendingEfficacy}</strong></div>
+        <div><span>Riesgos altos</span><strong>${inputs.highRisks}</strong></div>
+        <div><span>Polizas pendientes</span><strong>${inputs.policiesPending}</strong></div>
+      </div>
+      <div class="row-actions">
+        <button data-review-command="prepare" type="button">${state.managementReviews.length ? "Actualizar 9.3" : "Preparar 9.3"}</button>
+        <button class="secondary-button" data-review-command="actions" type="button" ${state.managementReviews.length ? "" : "disabled"}>Crear acciones</button>
+        <button class="secondary-button" data-review-command="evidence" type="button">Ver evidencias</button>
+        <button class="secondary-button" data-review-command="human" type="button">Revision humana</button>
+      </div>
+    </section>`;
+}
+
+function handleManagementReviewCommand(command) {
+  if (command === "prepare") {
+    if (state.managementReviews.length) refreshManagementReview(0);
+    else addManagementReview();
+    return;
+  }
+  if (command === "actions") {
+    createManagementReviewActions(0);
+    showView("acciones");
+    return;
+  }
+  if (command === "evidence") {
+    state.selectedEvidenceCode = "9.3";
+    saveState();
+    showView("evidencias");
+    renderAll();
+    return;
+  }
+  if (command === "human") {
+    state.reviewFocusMode = "critical";
+    saveState();
+    showView("revision_humana");
+    renderAll();
+  }
 }
 
 function managementReviewInputs() {
