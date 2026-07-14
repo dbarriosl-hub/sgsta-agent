@@ -2095,6 +2095,36 @@ function activityHasStarterControls(activityName) {
   );
 }
 
+function renderStartupApprovalGate(done, total) {
+  if (done < total) return "";
+  const health = systemHealthStatus();
+  const activities = state.activities.map((activity) => {
+    const readiness = activityReadiness(activity.name);
+    return { activity, readiness, decision: activityOperationDecision(readiness) };
+  });
+  const blocked = activities.filter((item) => item.decision.badge === "no_cumple");
+  const review = activities.filter((item) => item.decision.badge === "en_proceso");
+  const nextLabel = blocked[0]?.activity.name || review[0]?.activity.name || state.selectedActivityName || state.activities[0]?.name || "";
+  return `
+    <div class="startup-approval-gate ${health.tone}">
+      <div>
+        <p class="eyebrow">Despues del arranque</p>
+        <h3>${escapeHtml(health.label)}</h3>
+        <p>${escapeHtml(health.summary)}</p>
+      </div>
+      <div class="startup-gate-metrics">
+        <span><strong>${health.openActions}</strong> acciones</span>
+        <span><strong>${health.highRisks}</strong> riesgos altos</span>
+        <span><strong>${health.humanPending}</strong> aprobaciones</span>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-startup-gate="actions" type="button">Prioridad 7 dias</button>
+        <button class="secondary-button" data-startup-gate="review" type="button">Revision humana</button>
+        <button data-startup-gate="activity" data-startup-gate-activity="${escapeHtml(nextLabel)}" type="button" ${nextLabel ? "" : "disabled"}>Ver actividad</button>
+      </div>
+    </div>`;
+}
+
 function renderStartupPilotGuide() {
   const steps = startupPilotSteps();
   const done = steps.filter((step) => step.done).length;
@@ -2130,6 +2160,7 @@ function renderStartupPilotGuide() {
             </div>
           </article>`).join("")}
       </div>
+      ${renderStartupApprovalGate(done, steps.length)}
     </div>`;
 }
 
@@ -2288,6 +2319,22 @@ function renderImplementationRoadmap() {
   });
   container.querySelectorAll("[data-startup-run]").forEach((button) => {
     button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
+  });
+  container.querySelector("[data-startup-gate='actions']")?.addEventListener("click", () => {
+    state.actionFocusMode = "priority";
+    state.actionFilterActivity = state.selectedActivityName || state.activities[0]?.name || "";
+    saveState();
+    showView("acciones");
+  });
+  container.querySelector("[data-startup-gate='review']")?.addEventListener("click", () => {
+    renderReviewInbox();
+    showView("revision_humana");
+  });
+  container.querySelector("[data-startup-gate='activity']")?.addEventListener("click", (event) => {
+    const activityName = event.currentTarget.dataset.startupGateActivity;
+    if (activityName) state.selectedActivityName = activityName;
+    saveState();
+    showView("actividades");
   });
   container.querySelector("[data-startup-reset]")?.addEventListener("click", resetPrototypeForNewCompany);
   container.querySelector("[data-startup-demo]")?.addEventListener("click", loadPilotExampleData);

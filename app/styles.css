@@ -1644,6 +1644,64 @@ textarea {
   margin: 0;
 }
 
+.startup-approval-gate {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  padding: 12px;
+}
+
+.startup-approval-gate.blocked {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.startup-approval-gate.review {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.startup-approval-gate.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.startup-approval-gate h3,
+.startup-approval-gate p,
+.startup-approval-gate .eyebrow {
+  margin: 0;
+}
+
+.startup-approval-gate p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.startup-gate-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(80px, auto));
+  gap: 8px;
+}
+
+.startup-gate-metrics span {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.startup-gate-metrics strong {
+  color: var(--text);
+  font-size: 20px;
+}
+
 .phase-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3487,6 +3545,8 @@ textarea {
   .phase-grid,
   .startup-guide-head,
   .startup-step-grid,
+  .startup-approval-gate,
+  .startup-gate-metrics,
   .documents-layout,
   .forms-layout,
   .org-form,
