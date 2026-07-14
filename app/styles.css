@@ -1574,6 +1574,72 @@ textarea {
   gap: 10px;
 }
 
+.startup-guide {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.startup-guide-head {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 14px;
+}
+
+.startup-guide-head h3,
+.startup-guide-head p,
+.startup-guide-head .eyebrow {
+  margin: 0;
+}
+
+.startup-guide-head p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.startup-step-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.startup-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.startup-step.active {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.startup-step.done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.startup-step-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.startup-step p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
 .phase-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3415,6 +3481,8 @@ textarea {
   .implementation-layout,
   .onboarding-card,
   .phase-grid,
+  .startup-guide-head,
+  .startup-step-grid,
   .documents-layout,
   .forms-layout,
   .org-form,

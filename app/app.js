@@ -2019,6 +2019,127 @@ function implementationPhaseProgress(phase) {
   };
 }
 
+function startupPilotSteps() {
+  const selectedActivity = state.selectedActivityName || state.activities[0]?.name || "";
+  const selectedReadiness = selectedActivity ? activityReadiness(selectedActivity) : null;
+  const evidenceWithSupport = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length;
+  return [
+    {
+      id: "empresa",
+      label: "1",
+      title: "Empresa y alcance",
+      detail: "Nombre, ubicacion, zona de operacion, actividades y partes interesadas.",
+      view: "empresa",
+      done: Boolean((state.company.scope || "").trim() && (state.company.stakeholders || "").trim()),
+      action: "Completar perfil"
+    },
+    {
+      id: "actividades",
+      label: "2",
+      title: "Actividades reales",
+      detail: "Registrar cada servicio por separado: rafting, senderismo, cuatrimotos u otros.",
+      view: "actividades",
+      done: state.activities.length > 0,
+      action: "Crear actividad"
+    },
+    {
+      id: "riesgos",
+      label: "3",
+      title: "Mapa de riesgos",
+      detail: selectedActivity ? `Generar y revisar riesgos de ${selectedActivity}.` : "Primero registra una actividad.",
+      view: "riesgos",
+      done: state.activities.length > 0 && state.activities.every((activity) => state.risks.some((risk) => risk.activity === activity.name)),
+      action: "Generar riesgos"
+    },
+    {
+      id: "controles",
+      label: "4",
+      title: "Controles antes de ofertar",
+      detail: selectedReadiness ? `${selectedActivity}: ${selectedReadiness.score}% listo; ${selectedReadiness.gaps.length} brecha(s).` : "Verificar guia, equipo, seguro y participantes por actividad.",
+      view: "brechas_actividad",
+      done: state.activities.length > 0 && state.activities.every((activity) => activityReadiness(activity.name).gaps.length === 0),
+      action: "Crear controles"
+    },
+    {
+      id: "evidencias",
+      label: "5",
+      title: "Evidencias por requisito",
+      detail: `${evidenceWithSupport}/${requirements.length} requisito(s) tienen soporte inicial.`,
+      view: "evidencias",
+      done: evidenceWithSupport >= 8,
+      action: "Preparar evidencias"
+    },
+    {
+      id: "acciones",
+      label: "6",
+      title: "Plan de 7 dias",
+      detail: "Trabajar solo las acciones prioritarias para no abrumarse.",
+      view: "acciones",
+      done: state.actions.some((action) => action.status !== "cerrada"),
+      action: "Priorizar acciones"
+    }
+  ];
+}
+
+function renderStartupPilotGuide() {
+  const steps = startupPilotSteps();
+  const done = steps.filter((step) => step.done).length;
+  const next = steps.find((step) => !step.done) || steps[steps.length - 1];
+  return `
+    <div class="startup-guide">
+      <div class="startup-guide-head">
+        <div>
+          <p class="eyebrow">Empresa nueva</p>
+          <h3>Arranque guiado para llegar al primer valor</h3>
+          <p>Completa esta ruta antes de preocuparte por toda la norma. El agente va convirtiendo datos simples en riesgos, evidencias y acciones.</p>
+        </div>
+        <div class="onboarding-score">
+          <strong>${Math.round((done / steps.length) * 100)}%</strong>
+          <span>${done}/${steps.length} listo</span>
+        </div>
+      </div>
+      <div class="startup-step-grid">
+        ${steps.map((step) => `
+          <article class="startup-step ${step.id === next.id ? "active" : ""} ${step.done ? "done" : ""}">
+            <div class="startup-step-title">
+              <span class="badge ${step.done ? "cumple" : step.id === next.id ? "en_proceso" : "pendiente"}">${step.label}</span>
+              <strong>${escapeHtml(step.title)}</strong>
+            </div>
+            <p>${escapeHtml(step.detail)}</p>
+            <div class="row-actions">
+              <button class="secondary-button" data-startup-open="${step.id}" type="button">Abrir</button>
+              <button data-startup-run="${step.id}" type="button">${escapeHtml(step.action)}</button>
+            </div>
+          </article>`).join("")}
+      </div>
+    </div>`;
+}
+
+async function runStartupPilotStep(id) {
+  const step = startupPilotSteps().find((item) => item.id === id);
+  if (!step) return;
+  if (step.view) showView(step.view);
+  if (id === "empresa") {
+    await fillRequirementForms("4.3");
+    createAction("Completar alcance, partes interesadas y contexto de la empresa", "4.3", "tarea", "arranque empresa");
+  }
+  if (id === "actividades") addActivity();
+  if (id === "riesgos") generateRiskMapWithAgent();
+  if (id === "controles") {
+    const activityName = state.selectedActivityName || state.activities[0]?.name;
+    if (activityName) createSelectedActivityGapActions(activityName);
+  }
+  if (id === "evidencias") await prepareEvidencePackage(lowestRequirementCodes(1)[0] || "4.3");
+  if (id === "acciones") {
+    state.actionFocusMode = "priority";
+    state.actionFilterActivity = state.selectedActivityName || "";
+    showView("acciones");
+  }
+  addMessage("agent", `Arranque empresa nueva: avance el paso ${step.title}.`);
+  saveState();
+  renderAll();
+}
+
 function implementationWorkPlan() {
   const pendingSteps = implementationSteps.filter((step) => !step.check(state));
   const weeks = [
@@ -2112,6 +2233,7 @@ function renderImplementationRoadmap() {
         <button id="roadmapRunNext" type="button">Hacer con agente</button>
       </div>
     </div>
+    ${renderStartupPilotGuide()}
     <div class="phase-grid">
       ${phases.map((phase) => `
         <article class="phase-card ${phase.id === currentPhase.id ? "active" : ""}">
@@ -2126,6 +2248,15 @@ function renderImplementationRoadmap() {
     </div>`;
   document.querySelector("#roadmapOpenNext")?.addEventListener("click", () => showView(next.view));
   document.querySelector("#roadmapRunNext")?.addEventListener("click", () => handleImplementationStep(next));
+  container.querySelectorAll("[data-startup-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const step = startupPilotSteps().find((item) => item.id === button.dataset.startupOpen);
+      if (step?.view) showView(step.view);
+    });
+  });
+  container.querySelectorAll("[data-startup-run]").forEach((button) => {
+    button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
+  });
 }
 
 function renderImplementation() {
