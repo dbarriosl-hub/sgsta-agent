@@ -2023,6 +2023,7 @@ function startupPilotSteps() {
   const selectedActivity = state.selectedActivityName || state.activities[0]?.name || "";
   const selectedReadiness = selectedActivity ? activityReadiness(selectedActivity) : null;
   const evidenceWithSupport = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length;
+  const starterControlsReady = state.activities.length > 0 && state.activities.every((activity) => activityHasStarterControls(activity.name));
   return [
     {
       id: "empresa",
@@ -2055,9 +2056,9 @@ function startupPilotSteps() {
       id: "controles",
       label: "4",
       title: "Controles antes de ofertar",
-      detail: selectedReadiness ? `${selectedActivity}: ${selectedReadiness.score}% listo; ${selectedReadiness.gaps.length} brecha(s).` : "Verificar guia, equipo, seguro y participantes por actividad.",
+      detail: selectedReadiness ? `${selectedActivity}: ${starterControlsReady ? "controles base preparados" : `${selectedReadiness.score}% listo; ${selectedReadiness.gaps.length} brecha(s)`}.` : "Verificar guia, equipo, seguro y participantes por actividad.",
       view: "brechas_actividad",
-      done: state.activities.length > 0 && state.activities.every((activity) => activityReadiness(activity.name).gaps.length === 0),
+      done: starterControlsReady,
       action: "Crear controles"
     },
     {
@@ -2079,6 +2080,19 @@ function startupPilotSteps() {
       action: "Priorizar acciones"
     }
   ];
+}
+
+function activityHasStarterControls(activityName) {
+  const related = activityRelatedItems(activityName);
+  const forms = activityFormStats(activityName);
+  return Boolean(
+    related.risks.length &&
+    related.equipment.length &&
+    related.people.length &&
+    related.policies.length &&
+    related.participants.length &&
+    forms.responses.length
+  );
 }
 
 function renderStartupPilotGuide() {
@@ -2131,9 +2145,23 @@ async function runStartupPilotStep(id) {
   if (id === "riesgos") generateRiskMapWithAgent();
   if (id === "controles") {
     const activityName = state.selectedActivityName || state.activities[0]?.name;
-    if (activityName) createSelectedActivityGapActions(activityName);
+    if (activityName) {
+      addEquipmentForActivity(activityName);
+      addGuideForActivity(activityName);
+      addParticipantConditionForActivity(activityName);
+      addPolicyForActivity(activityName);
+      prepareActivityPackage(activityName);
+      createSelectedActivityGapActions(activityName);
+      showView("brechas_actividad");
+    }
   }
-  if (id === "evidencias") await prepareEvidencePackage(lowestRequirementCodes(1)[0] || "4.3");
+  if (id === "evidencias") {
+    const codes = lowestRequirementCodes(3);
+    for (const code of codes) {
+      await prepareEvidencePackage(code);
+    }
+    showView("evidencias");
+  }
   if (id === "acciones") {
     state.actionFocusMode = "priority";
     state.actionFilterActivity = state.selectedActivityName || "";
