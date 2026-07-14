@@ -9591,6 +9591,8 @@ function renderActionClosureBoard() {
     .filter((item) => item.stage.key !== "ready")
     .sort((a, b) => b.stage.priority - a.stage.priority || actionPriorityScore(b.action) - actionPriorityScore(a.action))
     .slice(0, 3);
+  const primaryItem = [...open]
+    .sort((a, b) => b.stage.priority - a.stage.priority || actionPriorityScore(b.action) - actionPriorityScore(a.action))[0];
   container.innerHTML = `
     <div class="closure-board-head">
       <div>
@@ -9606,6 +9608,7 @@ function renderActionClosureBoard() {
       <div><span>Eficacia</span><strong>${stageCounts.efficacy}</strong></div>
       <div><span>Listas cierre</span><strong>${stageCounts.ready}</strong></div>
     </div>
+    ${primaryItem ? actionGuidanceTemplate(primaryItem.action, primaryItem.index, primaryItem.stage) : ""}
     ${nextItems.length ? `
       <div class="closure-next-grid">
         ${nextItems.map(({ action, index, stage }) => `
@@ -9632,6 +9635,51 @@ function renderActionClosureBoard() {
   container.querySelectorAll("[data-action-focus]").forEach((button) => {
     button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionFocus)));
   });
+  container.querySelectorAll("[data-action-guided-advance]").forEach((button) => {
+    button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionGuidedAdvance)));
+  });
+  container.querySelectorAll("[data-action-guided-close]").forEach((button) => {
+    button.addEventListener("click", () => toggleActionClosed(Number(button.dataset.actionGuidedClose)));
+  });
+  container.querySelectorAll("[data-action-guided-review]").forEach((button) => {
+    button.addEventListener("click", () => showView("revision_humana"));
+  });
+  container.querySelectorAll("[data-action-guided-focus]").forEach((button) => {
+    button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionGuidedFocus)));
+  });
+}
+
+function actionGuidanceTemplate(action, index, stage) {
+  const canClose = actionReadyToClose(action);
+  const activity = action.relatedActivity || action.activity || "General";
+  const responsible = action.responsible || action.owner || "por asignar";
+  const due = action.dueDate || action.deadline || action.fechaLimite || "por definir";
+  return `
+    <section class="action-guidance-panel">
+      <div>
+        <p class="eyebrow">Trabajo guiado</p>
+        <h3>${canClose ? "Lista para cierre humano" : "Resolver esta accion ahora"}</h3>
+        <strong>${escapeHtml(action.title || "Accion sin titulo")}</strong>
+        <p>${escapeHtml(simpleActionNextStep(action))}</p>
+      </div>
+      <div class="action-guidance-meta">
+        <span class="badge requisito">${action.code || "10.1"}</span>
+        <span class="badge ${action.priority === "alta" ? "no_cumple" : "en_proceso"}">${action.priority || "media"}</span>
+        <span class="badge ${canClose ? "cumple" : "pendiente"}">${stage.label}</span>
+      </div>
+      <div class="action-guidance-facts">
+        <div><span>Actividad</span><strong>${escapeHtml(activity)}</strong></div>
+        <div><span>Responsable</span><strong>${escapeHtml(responsible)}</strong></div>
+        <div><span>Fecha limite</span><strong>${escapeHtml(due)}</strong></div>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-action-guided-focus="${index}" type="button">Editar campos</button>
+        ${canClose
+          ? `<button data-action-guided-close="${index}" type="button">Cerrar con validacion</button>`
+          : `<button data-action-guided-advance="${index}" type="button">Completar siguiente paso</button>`}
+        <button class="secondary-button" data-action-guided-review type="button">Ver revision humana</button>
+      </div>
+    </section>`;
 }
 
 function advanceActionClosure(index) {
@@ -10007,6 +10055,40 @@ function actionClosureMessage(action) {
   return missing.length ? `Completa: ${missing.join(", ")}.` : "Tiene seguimiento, evidencia y eficacia verificada.";
 }
 
+function toggleActionClosed(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  const closing = action.status !== "cerrada";
+  if (closing && !actionReadyToClose(action)) {
+    action.status = "pendiente_eficacia";
+    action.closedAt = "";
+    action.efficacyStatus = action.efficacyStatus || "pendiente";
+    addMessage("agent", `No cerre la accion "${action.title}" porque falta seguimiento, evidencia o eficacia. La deje como pendiente_eficacia.`);
+    recordAuditEvent({
+      title: "Cierre de accion bloqueado",
+      detail: `${action.title}: ${actionClosureMessage(action)}`,
+      code: action.code,
+      type: "accion_gestion",
+      actor: "agente"
+    });
+    saveState();
+    renderAll();
+    return;
+  }
+  action.status = closing ? "cerrada" : "abierta";
+  action.closedAt = closing ? today() : "";
+  if (closing) action.efficacyStatus = "eficaz";
+  recordAuditEvent({
+    title: closing ? "Accion cerrada" : "Accion reabierta",
+    detail: `${action.title} cambio a estado ${action.status}.`,
+    code: action.code,
+    type: "accion_gestion",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function bindActionControls(container) {
   container.querySelectorAll("[data-open-activity-gaps]").forEach((button) => {
     button.addEventListener("click", () => showView("brechas_actividad"));
@@ -10019,6 +10101,7 @@ function bindActionControls(container) {
       action[key] = field.value;
       action.updatedAt = today();
       saveState();
+      renderActions();
       renderMetrics();
       renderReviewInbox();
       renderAgenda();
@@ -10044,39 +10127,7 @@ function bindActionControls(container) {
     button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionAdvance)));
   });
   container.querySelectorAll("[data-close-action]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = state.actions[Number(button.dataset.closeAction)];
-      if (!action) return;
-      const closing = action.status !== "cerrada";
-      if (closing && !actionReadyToClose(action)) {
-        action.status = "pendiente_eficacia";
-        action.closedAt = "";
-        action.efficacyStatus = action.efficacyStatus || "pendiente";
-        addMessage("agent", `No cerre la accion "${action.title}" porque falta seguimiento, evidencia o eficacia. La deje como pendiente_eficacia.`);
-        recordAuditEvent({
-          title: "Cierre de accion bloqueado",
-          detail: `${action.title}: ${actionClosureMessage(action)}`,
-          code: action.code,
-          type: "accion_gestion",
-          actor: "agente"
-        });
-        saveState();
-        renderAll();
-        return;
-      }
-      action.status = closing ? "cerrada" : "abierta";
-      action.closedAt = closing ? today() : "";
-      if (closing) action.efficacyStatus = "eficaz";
-      recordAuditEvent({
-        title: closing ? "Accion cerrada" : "Accion reabierta",
-        detail: `${action.title} cambio a estado ${action.status}.`,
-        code: action.code,
-        type: "accion_gestion",
-        actor: "humano"
-      });
-      saveState();
-      renderAll();
-    });
+    button.addEventListener("click", () => toggleActionClosed(Number(button.dataset.closeAction)));
   });
 }
 

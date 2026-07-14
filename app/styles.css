@@ -3246,6 +3246,72 @@ textarea {
   margin-top: 3px;
 }
 
+.action-guidance-panel {
+  align-items: start;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 1fr) minmax(160px, auto);
+  margin: 12px 0;
+  padding: 14px;
+}
+
+.action-guidance-panel h3,
+.action-guidance-panel p {
+  margin: 0;
+}
+
+.action-guidance-panel strong,
+.action-guidance-panel p {
+  display: block;
+  margin-top: 6px;
+}
+
+.action-guidance-panel p {
+  color: var(--muted);
+}
+
+.action-guidance-meta {
+  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: end;
+}
+
+.action-guidance-facts {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-guidance-facts div {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.action-guidance-facts span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.action-guidance-facts strong {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.action-guidance-panel .row-actions {
+  grid-column: 1 / -1;
+  justify-content: end;
+}
+
 .finding-row > div:first-child {
   min-width: 0;
 }
@@ -3583,6 +3649,7 @@ textarea {
   .action-form-grid,
   .action-filter-bar,
   .review-filter-bar,
+  .action-guidance-panel,
   .activity-operational-status,
   .activity-intake-grid,
   .form-filters,
