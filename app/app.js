@@ -2097,6 +2097,10 @@ function renderStartupPilotGuide() {
           <strong>${Math.round((done / steps.length) * 100)}%</strong>
           <span>${done}/${steps.length} listo</span>
         </div>
+        <div class="row-actions startup-guide-actions">
+          <button class="secondary-button" data-startup-reset type="button">Empezar limpio</button>
+          <button class="secondary-button" data-startup-demo type="button">Cargar ejemplo</button>
+        </div>
       </div>
       <div class="startup-step-grid">
         ${steps.map((step) => `
@@ -2257,6 +2261,8 @@ function renderImplementationRoadmap() {
   container.querySelectorAll("[data-startup-run]").forEach((button) => {
     button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
   });
+  container.querySelector("[data-startup-reset]")?.addEventListener("click", resetPrototypeForNewCompany);
+  container.querySelector("[data-startup-demo]")?.addEventListener("click", loadPilotExampleData);
 }
 
 function renderImplementation() {
@@ -10494,6 +10500,63 @@ function addEvidenceRecord(record) {
   renderAll();
 }
 
+function cleanNewCompanyState() {
+  const next = clone(defaultState);
+  next.orgName = "Mi empresa de turismo";
+  next.ownerName = state.ownerName || defaultState.ownerName;
+  next.currentUserRole = state.currentUserRole || defaultState.currentUserRole;
+  next.currentPlan = state.currentPlan || defaultState.currentPlan;
+  next.company = {
+    legalName: "Mi empresa de turismo",
+    nit: "",
+    country: "Colombia",
+    region: "",
+    city: "",
+    phone: "",
+    operatingArea: "",
+    activityDescription: "",
+    localContext: "",
+    scope: "",
+    stakeholders: "",
+    profileSummary: ""
+  };
+  next.activities = [];
+  next.people = [];
+  next.trainingNeeds = [];
+  next.equipment = [];
+  next.policies = [];
+  next.participantEvidence = [];
+  next.risks = [];
+  next.documents = [];
+  next.formResponses = [];
+  next.actions = [];
+  next.evidence = [];
+  next.incidents = [];
+  next.audits = [];
+  next.managementReviews = [];
+  next.pilotObservations = [];
+  next.agentFindings = [];
+  next.closurePackages = [];
+  next.selectedActivityName = "";
+  next.actionFilterActivity = "";
+  next.actionFocusMode = "all";
+  next.selectedFormActivity = "";
+  next.selectedDocumentIndex = 0;
+  next.compliance = {};
+  return next;
+}
+
+function resetPrototypeForNewCompany() {
+  const shouldReset = window.confirm("Esto reinicia los datos del prototipo en esta organizacion. Usa esto para probar una empresa desde cero. ¿Continuar?");
+  if (!shouldReset) return;
+  state = cleanNewCompanyState();
+  saveState();
+  document.querySelector("#chatLog").innerHTML = "";
+  addMessage("agent", "Reinicie el prototipo. Empieza por Implementacion > Arranque guiado o por Empresa y alcance.");
+  renderAll();
+  showView("implementacion");
+}
+
 function convertSelectedDocumentToEvidence() {
   const doc = state.documents[state.selectedDocumentIndex];
   if (!doc) return;
@@ -11404,13 +11467,7 @@ document.querySelector("#addEvidence").addEventListener("click", () => {
   addEvidenceRecord({ title: pending.evidence, code: pending.code, source: "manual" });
 });
 
-document.querySelector("#resetData").addEventListener("click", () => {
-  state = clone(defaultState);
-  saveState();
-  document.querySelector("#chatLog").innerHTML = "";
-  addMessage("agent", "Reinicie el prototipo. Podemos empezar el diagnostico otra vez.");
-  renderAll();
-});
+document.querySelector("#resetData").addEventListener("click", resetPrototypeForNewCompany);
 
 addMessage("agent", "Hola. Soy el agente SGSTA. Ahora puedo ayudarte con PHVA, monitor de brechas, capacitacion, seguros, participantes, acciones y revision por la direccion.");
 renderAll();

@@ -1586,7 +1586,7 @@ textarea {
 .startup-guide-head {
   align-items: center;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
   gap: 14px;
 }
 
@@ -1606,6 +1606,10 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.startup-guide-actions {
+  justify-content: end;
 }
 
 .startup-step {
