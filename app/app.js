@@ -3435,6 +3435,25 @@ function createDepartureChecklistActions(activityName) {
   renderAll();
 }
 
+function createActivityGapActionByKey(activityName, gapKey) {
+  const gap = activityGapItems(activityName).find((item) => item.key === gapKey);
+  if (!gap) return;
+  if (activityGapActionExists(gap)) {
+    addMessage("agent", `La accion para "${gap.label}" de ${activityName} ya existe y sigue abierta.`);
+    state.actionFocusMode = "priority";
+    state.actionFilterActivity = activityName;
+    saveState();
+    showView("acciones");
+    return;
+  }
+  state.actions.unshift(activityGapActionPayload(activityName, gap));
+  addMessage("agent", `Cree una accion para cerrar "${gap.label}" en ${activityName}.`);
+  state.actionFocusMode = "priority";
+  state.actionFilterActivity = activityName;
+  saveState();
+  showView("acciones");
+}
+
 const activityPackageTables = [
   "contexto_actividades",
   "mapa_riesgos",
@@ -3497,6 +3516,10 @@ function activityReadiness(activityName) {
 
 function activityGapActionExists(gap) {
   return state.actions.some((action) => action.title === gap.action && action.status !== "cerrada");
+}
+
+function activityGapActionExistsForActivity(activityName, gap) {
+  return state.actions.some((action) => action.title === gap.action && action.relatedActivity === activityName && action.status !== "cerrada");
 }
 
 function activityGapActionPayload(activityName, gap) {
@@ -4755,6 +4778,9 @@ function renderActivities() {
   const selectedNextMove = activityNextOperatingMove(selectedActivity.name);
   const selectedPackage = activityOperatingPackage(selectedActivity.name);
   const selectedChecklist = activityDepartureChecklist(selectedActivity.name);
+  const selectedPriorityGaps = selectedReadiness.gaps
+    .sort((a, b) => (a.severity === "alta" ? -1 : 1) - (b.severity === "alta" ? -1 : 1))
+    .slice(0, 3);
   container.innerHTML = `
     <div class="simple-table">
       ${state.activities.map((item, index) => {
@@ -4816,6 +4842,33 @@ function renderActivities() {
           <button class="secondary-button" data-open-selected-gaps="${selectedActivity.name}" type="button">Ver brechas</button>
           <button class="secondary-button" data-download-operational-package="${selectedActivity.name}" type="button">Descargar ficha operativa</button>
           <button data-create-selected-gap-actions="${selectedActivity.name}" type="button">Crear acciones</button>
+        </div>
+      </div>
+      <div class="activity-offer-guide ${selectedDecision.badge}">
+        <div>
+          <p class="eyebrow">Para poder ofertar</p>
+          <h3>${selectedNextMove.canOffer ? "Actividad lista con vigilancia" : "Cierra primero este control"}</h3>
+          <p>${escapeHtml(selectedNextMove.firstGap?.detail || selectedDecision.summary)}</p>
+        </div>
+        <div class="activity-offer-next">
+          <span class="badge ${selectedDecision.badge}">${selectedDecision.label}</span>
+          <strong>${escapeHtml(selectedNextMove.firstGap?.label || "Mantener controles")}</strong>
+          <small>${escapeHtml(selectedNextMove.firstGap ? `Requisito ${selectedNextMove.firstGap.code}` : "Sin brecha visible")}</small>
+        </div>
+        <div class="activity-offer-grid">
+          ${selectedPriorityGaps.length ? selectedPriorityGaps.map((gap) => `
+            <article>
+              <span class="badge ${gap.severity === "alta" ? "no_cumple" : "en_proceso"}">${gap.code}</span>
+              <strong>${escapeHtml(gap.label)}</strong>
+              <small>${escapeHtml(gap.detail)}</small>
+              <button class="secondary-button" onclick="createActivityGapActionByKey('${escapeJsString(selectedActivity.name)}', '${escapeJsString(gap.key)}')" type="button">${activityGapActionExistsForActivity(selectedActivity.name, gap) ? "Ver accion" : "Crear accion"}</button>
+            </article>`).join("") : `
+            <article>
+              <span class="badge cumple">OK</span>
+              <strong>Sin brechas criticas</strong>
+              <small>Mantener vigencias, evidencias y revision periodica antes de cada salida.</small>
+              <button class="secondary-button" data-download-operational-package="${selectedActivity.name}" type="button">Descargar ficha</button>
+            </article>`}
         </div>
       </div>
       ${state.activityHelperNotice?.activity === selectedActivity.name ? `
@@ -5005,6 +5058,14 @@ function renderActivities() {
     const activityName = event.currentTarget.dataset.createSelectedGapActions;
     createSelectedActivityGapActions(activityName);
   });
+  if (!container.dataset.activityGapDelegateBound) {
+    container.dataset.activityGapDelegateBound = "true";
+    container.addEventListener("click", (event) => {
+      const gapButton = event.target.closest("[data-create-activity-gap]");
+      if (!gapButton || !container.contains(gapButton)) return;
+      createActivityGapActionByKey(gapButton.dataset.gapActivity, gapButton.dataset.createActivityGap);
+    });
+  }
   container.querySelector("#activityEditForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     saveSelectedActivity();
@@ -11001,6 +11062,14 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeJsString(value) {
+  return String(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "\\'")
+    .replaceAll("\n", "\\n")
+    .replaceAll("\r", "\\r");
 }
 
 function bindRemoveButtons(container) {

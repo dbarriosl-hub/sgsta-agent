@@ -969,6 +969,76 @@ textarea {
   font-size: 12px;
 }
 
+.activity-offer-guide {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, auto);
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.activity-offer-guide.no_cumple {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.activity-offer-guide.en_proceso {
+  background: #fffdf3;
+  border-color: #fde68a;
+}
+
+.activity-offer-guide.cumple {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.activity-offer-guide h3,
+.activity-offer-guide p,
+.activity-offer-guide .eyebrow {
+  margin: 0;
+}
+
+.activity-offer-guide p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.activity-offer-next {
+  align-content: start;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  text-align: right;
+}
+
+.activity-offer-next small {
+  color: var(--muted);
+}
+
+.activity-offer-grid {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.activity-offer-grid article {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.activity-offer-grid small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .activity-helper-notice {
   align-items: center;
   background: #ecfdf5;
@@ -3841,6 +3911,8 @@ textarea {
   .management-command-panel,
   .management-command-grid,
   .activity-operational-status,
+  .activity-offer-guide,
+  .activity-offer-grid,
   .activity-intake-grid,
   .form-filters,
   .activity-form-tools,
