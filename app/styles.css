@@ -2801,6 +2801,113 @@ textarea {
   font-size: 13px;
 }
 
+.evidence-workspace {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.evidence-workspace-head {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.evidence-workspace-head h3,
+.evidence-workspace-head p,
+.evidence-workspace-head .eyebrow {
+  margin: 0;
+}
+
+.evidence-workspace-head p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.evidence-score-box {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  min-width: 120px;
+  padding: 12px;
+  text-align: center;
+}
+
+.evidence-score-box strong {
+  color: var(--accent);
+  display: block;
+  font-size: 28px;
+}
+
+.evidence-score-box span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.evidence-workspace-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.evidence-workspace-grid > div,
+.evidence-workspace-detail > div {
+  background: #fbfcfe;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.evidence-workspace-grid span,
+.evidence-workspace-grid small {
+  color: var(--muted);
+  display: block;
+}
+
+.evidence-workspace-grid strong {
+  display: block;
+  font-size: 22px;
+  margin: 4px 0;
+}
+
+.evidence-workspace-grid small {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.evidence-workspace-detail {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence-workspace-detail strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.evidence-workspace-detail span {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+}
+
+.evidence-workspace .row-actions {
+  justify-content: end;
+}
+
 .gap-closure-guide {
   display: grid;
   gap: 12px;
@@ -3650,6 +3757,9 @@ textarea {
   .action-filter-bar,
   .review-filter-bar,
   .action-guidance-panel,
+  .evidence-workspace-head,
+  .evidence-workspace-grid,
+  .evidence-workspace-detail,
   .activity-operational-status,
   .activity-intake-grid,
   .form-filters,

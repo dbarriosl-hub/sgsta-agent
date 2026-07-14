@@ -234,6 +234,7 @@ const defaultState = {
   agentFindings: [],
   closurePackages: [],
   evidencePackageNotice: null,
+  selectedEvidenceCode: "6.1.2",
   selectedActivityName: "Senderismo",
   activityHelperNotice: null,
   actionFilterActivity: "",
@@ -299,6 +300,7 @@ function mergeState(base, current) {
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
     evidencePackageNotice: current.evidencePackageNotice || base.evidencePackageNotice,
+    selectedEvidenceCode: current.selectedEvidenceCode || base.selectedEvidenceCode,
     activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
     actionFocusMode: current.actionFocusMode || base.actionFocusMode,
@@ -10519,11 +10521,13 @@ function renderEvidenceSummary(container) {
 }
 
 function renderEvidencePackages(container) {
-  const packages = requirements
-    .map(evidencePackageForRequirement)
+  const allPackages = requirements.map(evidencePackageForRequirement);
+  const packages = allPackages
     .sort((a, b) => a.score - b.score || b.actions.length - a.actions.length)
     .slice(0, 6);
   const notice = state.evidencePackageNotice;
+  const activeCode = notice?.code || state.selectedEvidenceCode || packages[0]?.req.code || requirements[0]?.code;
+  const activePackage = allPackages.find((item) => item.req.code === activeCode) || packages[0];
   container.innerHTML = `
     ${notice ? `
       <div class="evidence-package-notice">
@@ -10538,6 +10542,7 @@ function renderEvidencePackages(container) {
           <button data-evidence-notice-clear type="button">Entendido</button>
         </div>
       </div>` : ""}
+    ${activePackage ? renderEvidenceWorkspace(activePackage) : ""}
     <div class="evidence-package-head">
       <div>
         <p class="eyebrow">Paquetes de evidencia</p>
@@ -10568,7 +10573,7 @@ function renderEvidencePackages(container) {
             ${evidencePackageLinkedItems(item).map((linked) => `<span>${escapeHtml(linked)}</span>`).join("")}
           </div>
           <div class="row-actions">
-            <button class="secondary-button" data-evidence-open="${item.req.code}" type="button">Ver requisito</button>
+            <button class="secondary-button" data-evidence-select="${item.req.code}" type="button">Ver paquete</button>
             <button data-evidence-prepare="${item.req.code}" type="button">Preparar paquete</button>
           </div>
         </article>`).join("")}
@@ -10598,9 +10603,154 @@ function renderEvidencePackages(container) {
       renderAll();
     });
   });
+  container.querySelectorAll("[data-evidence-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedEvidenceCode = button.dataset.evidenceSelect;
+      state.evidencePackageNotice = null;
+      saveState();
+      renderAll();
+    });
+  });
   container.querySelectorAll("[data-evidence-prepare]").forEach((button) => {
     button.addEventListener("click", () => prepareEvidencePackage(button.dataset.evidencePrepare));
   });
+  container.querySelectorAll("[data-evidence-workspace]").forEach((button) => {
+    button.addEventListener("click", () => handleEvidenceWorkspaceAction(button.dataset.evidenceWorkspace, button.dataset.evidenceCode));
+  });
+}
+
+function renderEvidenceWorkspace(item) {
+  const suggested = item.evidences.filter((evidence) => evidence.status === "sugerida").length;
+  const real = item.evidences.filter((evidence) => evidence.status !== "sugerida").length;
+  return `
+    <section class="evidence-workspace">
+      <div class="evidence-workspace-head">
+        <div>
+          <p class="eyebrow">Paquete activo</p>
+          <h3>${item.req.code} ${escapeHtml(item.req.title)}</h3>
+          <p>${escapeHtml(item.req.evidence)}</p>
+        </div>
+        <div class="evidence-score-box">
+          <strong>${item.score}%</strong>
+          <span>${item.missing.length ? `Falta: ${item.missing.join(", ")}` : item.status === "cumple" ? "completo" : "en revision"}</span>
+        </div>
+      </div>
+      <div class="evidence-workspace-grid">
+        <div>
+          <span>Formularios</span>
+          <strong>${item.stats.formsApproved}/${item.stats.formsTotal}</strong>
+          <small>${item.stats.formsPending} pendiente(s), ${item.stats.formsDraft} borrador/revision.</small>
+        </div>
+        <div>
+          <span>Formularios por actividad</span>
+          <strong>${item.stats.activityFormsApproved}/${activityFormTargetForRequirement(item.stats) || item.stats.activityFormsTotal}</strong>
+          <small>Rafting, senderismo u otras actividades cuentan separado cuando aplica.</small>
+        </div>
+        <div>
+          <span>Evidencias</span>
+          <strong>${real} reales / ${suggested} sugeridas</strong>
+          <small>Las sugeridas no cierran cumplimiento hasta validacion humana.</small>
+        </div>
+        <div>
+          <span>Acciones abiertas</span>
+          <strong>${item.actions.length}</strong>
+          <small>${item.actions.length ? "Deben cerrarse con seguimiento, evidencia y eficacia." : "Sin acciones abiertas para este requisito."}</small>
+        </div>
+      </div>
+      <div class="evidence-workspace-detail">
+        ${renderEvidenceWorkspaceList("Formularios", evidenceWorkspaceFormRows(item))}
+        ${renderEvidenceWorkspaceList("Evidencias", evidenceWorkspaceEvidenceRows(item))}
+        ${renderEvidenceWorkspaceList("Acciones", evidenceWorkspaceActionRows(item))}
+      </div>
+      <div class="row-actions">
+        <button data-evidence-workspace="prepare" data-evidence-code="${item.req.code}" type="button">Preparar paquete</button>
+        <button class="secondary-button" data-evidence-workspace="forms" data-evidence-code="${item.req.code}" type="button">Abrir formularios</button>
+        <button class="secondary-button" data-evidence-workspace="actions" data-evidence-code="${item.req.code}" type="button">Abrir acciones</button>
+        <button class="secondary-button" data-evidence-workspace="review" data-evidence-code="${item.req.code}" type="button">Revision humana</button>
+        <button class="secondary-button" data-evidence-workspace="validate" data-evidence-code="${item.req.code}" type="button" ${suggested ? "" : "disabled"}>Validar sugeridas</button>
+      </div>
+    </section>`;
+}
+
+function renderEvidenceWorkspaceList(title, rows) {
+  return `
+    <div>
+      <strong>${title}</strong>
+      ${rows.length
+        ? rows.slice(0, 4).map((row) => `<span>${escapeHtml(row)}</span>`).join("")
+        : `<span>Sin registros enlazados.</span>`}
+    </div>`;
+}
+
+function evidenceWorkspaceFormRows(item) {
+  return [...item.forms, ...item.activityForms].map((form) => {
+    const activity = form.activity ? ` - ${form.activity}` : "";
+    return `${form.title}${activity}: ${form.status}`;
+  });
+}
+
+function evidenceWorkspaceEvidenceRows(item) {
+  return item.evidences.map((evidence) => `${evidence.title || evidence.linkedDocument || "Evidencia"}: ${evidence.status || "registrada"}`);
+}
+
+function evidenceWorkspaceActionRows(item) {
+  return item.actions.map((action) => `${action.title || "Accion"}: ${action.status || "abierta"}`);
+}
+
+function handleEvidenceWorkspaceAction(action, code) {
+  state.selectedEvidenceCode = code;
+  if (action === "prepare") {
+    prepareEvidencePackage(code);
+    return;
+  }
+  if (action === "forms") {
+    state.formFilters.search = code;
+    state.formFilters.status = "todos";
+    saveState();
+    showView("formularios");
+    renderAll();
+    return;
+  }
+  if (action === "actions") {
+    state.actionFocusMode = "priority";
+    state.actionFilterActivity = "";
+    saveState();
+    showView("acciones");
+    renderAll();
+    return;
+  }
+  if (action === "review") {
+    state.reviewFocusMode = "critical";
+    saveState();
+    showView("revision_humana");
+    renderAll();
+    return;
+  }
+  if (action === "validate") {
+    validateSuggestedEvidenceForRequirement(code);
+  }
+}
+
+function validateSuggestedEvidenceForRequirement(code) {
+  let count = 0;
+  state.evidence.forEach((evidence) => {
+    if (evidence.code !== code || evidence.status !== "sugerida") return;
+    evidence.status = "registrada";
+    evidence.validatedBy = `${state.ownerName || "Responsable"} (${roleLabel(state.currentUserRole)})`;
+    evidence.validatedAt = today();
+    count += 1;
+  });
+  if (!count) return;
+  recordAuditEvent({
+    title: "Evidencias sugeridas validadas",
+    detail: `Se validaron ${count} evidencia(s) sugerida(s) para el requisito ${code}.`,
+    code,
+    type: "validacion_evidencia",
+    actor: "humano"
+  });
+  addMessage("agent", `Valide ${count} evidencia(s) sugerida(s) para ${code}. Revisa si aun quedan formularios o acciones abiertas.`);
+  saveState();
+  renderAll();
 }
 
 function evidencePackageNextStep(item) {
@@ -10634,6 +10784,7 @@ function evidencePackageLinkedItems(item) {
 }
 
 async function prepareEvidencePackage(code) {
+  state.selectedEvidenceCode = code;
   const beforeForms = state.formResponses.length;
   const beforeActions = state.actions.length;
   const beforeEvidence = state.evidence.length;
