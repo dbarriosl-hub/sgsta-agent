@@ -10668,7 +10668,8 @@ function refreshAlerts() {
 
 function buildAgendaItems() {
   const items = [];
-  state.actions.filter((item) => item.status !== "cerrada").forEach((action) => {
+  state.actions.forEach((action, actionIndex) => {
+    if (action.status === "cerrada") return;
     items.push({
       title: action.title,
       detail: `Accion ${action.type || "tarea"} abierta. Origen: ${action.origin || "manual"}.`,
@@ -10676,7 +10677,8 @@ function buildAgendaItems() {
       date: action.dueDate || action.deadline || action.fechaLimite || action.due || "Por programar",
       priority: action.type === "correctiva" || action.type === "preventiva" ? "alta" : "media",
       origin: "acciones",
-      actionTitle: `Programar seguimiento: ${action.title}`
+      actionTitle: `Programar seguimiento: ${action.title}`,
+      actionIndex
     });
   });
   state.equipment.forEach((equipment) => {
@@ -10766,10 +10768,12 @@ function renderAgenda() {
   const items = buildAgendaItems();
   const high = items.filter((item) => item.priority === "alta" || item.priority === "critica").length;
   const unscheduled = items.filter((item) => String(item.date).toLowerCase().includes("por")).length;
+  const weeklyPlan = buildAgendaWeeklyPlan(items);
   summary.innerHTML = `
     <div class="report-card"><span>Total pendientes</span><strong>${items.length}</strong></div>
     <div class="report-card"><span>Alta prioridad</span><strong>${high}</strong></div>
-    <div class="report-card"><span>Sin fecha</span><strong>${unscheduled}</strong></div>`;
+    <div class="report-card"><span>Sin fecha</span><strong>${unscheduled}</strong></div>
+    ${weeklyPlan}`;
   table.innerHTML = items.length
     ? items.map((item, index) => `
       <div class="simple-row agenda-row">
@@ -10777,15 +10781,142 @@ function renderAgenda() {
         <span class="badge ${item.priority === "alta" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
         <span class="badge requisito">${item.code}</span>
         <div><strong>${item.date}</strong><div class="muted">${item.origin}</div></div>
-        <button class="secondary-button" data-agenda-action="${index}" type="button">Crear accion</button>
+        <div class="row-actions">
+          <button class="secondary-button" data-agenda-open="${index}" type="button">Abrir</button>
+          <button class="secondary-button" data-agenda-action="${index}" type="button">Crear accion</button>
+        </div>
       </div>`).join("")
     : `<div class="muted">No hay pendientes en agenda.</div>`;
   table.querySelectorAll("[data-agenda-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = items[Number(button.dataset.agendaAction)];
-      createAction(item.actionTitle, item.code, item.priority === "alta" ? "preventiva" : "tarea", item.origin);
+      createAgendaAction(item);
     });
   });
+  table.querySelectorAll("[data-agenda-open]").forEach((button) => {
+    button.addEventListener("click", () => openAgendaItem(items[Number(button.dataset.agendaOpen)]));
+  });
+  summary.querySelectorAll("[data-agenda-plan-action]").forEach((button) => {
+    button.addEventListener("click", () => createAgendaAction(items[Number(button.dataset.agendaPlanAction)]));
+  });
+  summary.querySelectorAll("[data-agenda-plan-open]").forEach((button) => {
+    button.addEventListener("click", () => openAgendaItem(items[Number(button.dataset.agendaPlanOpen)]));
+  });
+}
+
+function buildAgendaWeeklyPlan(items) {
+  if (!items.length) {
+    return `
+      <section class="agenda-plan-card">
+        <div>
+          <p class="eyebrow">Plan semanal sugerido</p>
+          <h3>Sin pendientes criticos</h3>
+          <p>El sistema queda en vigilancia. Ejecuta el monitor cuando registres nuevas actividades, riesgos, equipos, polizas o formularios.</p>
+        </div>
+      </section>`;
+  }
+  const planItems = items.slice(0, 3);
+  const primary = planItems[0];
+  return `
+    <section class="agenda-plan-card">
+      <div class="agenda-plan-main">
+        <p class="eyebrow">Plan semanal sugerido</p>
+        <h3>${escapeHtml(primary.title)}</h3>
+        <p>${escapeHtml(primary.detail)}</p>
+        <div class="matrix-metrics">
+          <span>${escapeHtml(primary.code || "SG")}</span>
+          <span>${escapeHtml(primary.priority || "media")}</span>
+          <span>${escapeHtml(primary.date || "Por programar")}</span>
+        </div>
+      </div>
+      <div class="agenda-plan-steps">
+        ${planItems.map((item, index) => `
+          <article>
+            <span class="badge ${item.priority === "alta" ? "no_cumple" : "en_proceso"}">${index + 1}</span>
+            <strong>${escapeHtml(agendaStepLabel(item))}</strong>
+            <small>${escapeHtml(item.origin)} - ${escapeHtml(item.code || "SG")}</small>
+            <div class="row-actions">
+              <button class="secondary-button" data-agenda-plan-open="${index}" type="button">Abrir</button>
+              <button data-agenda-plan-action="${index}" type="button">Accion</button>
+            </div>
+          </article>`).join("")}
+      </div>
+    </section>`;
+}
+
+function agendaStepLabel(item) {
+  if (item.origin === "acciones") return "Cerrar accion abierta";
+  if (item.origin === "seguros") return "Validar seguro";
+  if (item.origin === "equipos") return "Programar equipo";
+  if (item.origin === "capacitacion") return "Programar capacitacion";
+  if (item.origin === "formularios") return "Aprobar formularios";
+  if (item.origin === "revision direccion") return "Preparar direccion";
+  return "Revisar pendiente";
+}
+
+function createAgendaAction(item) {
+  if (!item) return;
+  if (item.origin === "acciones" && Number.isInteger(item.actionIndex) && state.actions[item.actionIndex]) {
+    const action = state.actions[item.actionIndex];
+    assignActionDefaults(action);
+    action.followUp = action.followUp || "Seguimiento programado desde la agenda del sistema.";
+    action.updatedAt = today();
+    recordAuditEvent({
+      title: "Accion programada desde agenda",
+      detail: `${action.title} quedo con responsable, fecha y seguimiento inicial.`,
+      code: action.code,
+      type: "agenda",
+      actor: "agente"
+    });
+    addMessage("agent", `Programe seguimiento para "${action.title}".`);
+    saveState();
+    focusActionCard(item.actionIndex);
+    return;
+  }
+  const existing = state.actions.find((action) => action.status !== "cerrada" && action.title === item.actionTitle && action.code === item.code);
+  if (existing) {
+    assignActionDefaults(existing);
+    existing.priority = item.priority === "alta" || item.priority === "critica" ? "alta" : existing.priority || "media";
+    addMessage("agent", `Ya existia la accion "${existing.title}". La deje asignada y con fecha si faltaba.`);
+  } else {
+    createAction(item.actionTitle, item.code, item.priority === "alta" || item.priority === "critica" ? "preventiva" : "tarea", item.origin);
+    const action = state.actions[0];
+    assignActionDefaults(action);
+    action.priority = item.priority === "alta" || item.priority === "critica" ? "alta" : "media";
+    action.cause = item.detail;
+    action.sourceDetail = `Agenda: ${item.title}`;
+  }
+  recordAuditEvent({
+    title: "Pendiente de agenda convertido en accion",
+    detail: `${item.title} quedo trazado como accion de gestion.`,
+    code: item.code,
+    type: "agenda",
+    actor: "agente"
+  });
+  saveState();
+  showView("acciones");
+}
+
+function openAgendaItem(item) {
+  if (!item) return;
+  if (item.origin === "acciones" && Number.isInteger(item.actionIndex) && state.actions[item.actionIndex]) {
+    focusActionCard(item.actionIndex);
+    return;
+  }
+  const originView = {
+    acciones: "acciones",
+    seguros: "seguros",
+    equipos: "equipos",
+    capacitacion: "capacitacion",
+    auditoria: "auditorias",
+    formularios: "formularios",
+    "revision direccion": "revision",
+    documentos: "documentos"
+  }[item.origin] || "acciones";
+  if (item.code) {
+    state.formFilters.search = item.code;
+  }
+  showView(originView);
 }
 
 function refreshAgenda() {

@@ -3488,7 +3488,65 @@ textarea {
 }
 
 .agenda-row {
-  grid-template-columns: minmax(0, 1fr) 120px 90px minmax(140px, 0.35fr) 130px;
+  grid-template-columns: minmax(0, 1fr) 120px 90px minmax(140px, 0.35fr) minmax(180px, auto);
+}
+
+.agenda-plan-card {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+  padding: 14px;
+}
+
+.agenda-plan-card h3,
+.agenda-plan-card p,
+.agenda-plan-card .eyebrow {
+  margin: 0;
+}
+
+.agenda-plan-card p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.agenda-plan-main {
+  min-width: 0;
+}
+
+.agenda-plan-steps {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agenda-plan-steps article {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.agenda-plan-steps strong,
+.agenda-plan-steps small {
+  overflow-wrap: anywhere;
+}
+
+.agenda-plan-steps small {
+  color: var(--muted);
+}
+
+.agenda-plan-steps .row-actions {
+  justify-content: stretch;
+}
+
+.agenda-plan-steps .row-actions button {
+  flex: 1 1 80px;
 }
 
 .review-row {
@@ -4001,6 +4059,8 @@ textarea {
   .form-guide-card,
   .monitor-summary-card,
   .monitor-summary-metrics,
+  .agenda-plan-card,
+  .agenda-plan-steps,
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,
