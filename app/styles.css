@@ -3580,6 +3580,44 @@ textarea {
   margin-top: 3px;
 }
 
+.review-decision-panel {
+  align-items: start;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(280px, 1fr) minmax(230px, auto);
+  padding: 14px;
+}
+
+.review-decision-panel.critical {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.review-decision-panel h3,
+.review-decision-panel p,
+.review-decision-panel .eyebrow {
+  margin: 0;
+}
+
+.review-decision-panel p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.review-decision-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.review-decision-actions button {
+  width: 100%;
+}
+
 .action-guidance-panel {
   align-items: start;
   background: #f0fdfa;
@@ -4061,6 +4099,7 @@ textarea {
   .monitor-summary-metrics,
   .agenda-plan-card,
   .agenda-plan-steps,
+  .review-decision-panel,
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,

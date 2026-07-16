@@ -8757,6 +8757,7 @@ function renderReviewInbox() {
   const efficacy = items.filter((item) => item.kind === "efficacy").length;
   const packages = items.filter((item) => item.kind === "package").length;
   const high = items.filter((item) => item.priority === "alta").length;
+  const decisionPanel = buildReviewDecisionPanel(items);
   summary.innerHTML = `
     <div class="report-card"><span>Total pendiente</span><strong>${items.length}</strong></div>
     <div class="report-card"><span>Criticos</span><strong>${high}</strong></div>
@@ -8764,7 +8765,9 @@ function renderReviewInbox() {
     <div class="report-card"><span>Evidencias</span><strong>${evidence}</strong></div>
     <div class="report-card"><span>Acciones</span><strong>${actions}</strong></div>
     <div class="report-card"><span>Eficacia</span><strong>${efficacy}</strong></div>
-    <div class="report-card"><span>Paquetes</span><strong>${packages}</strong></div>`;
+    <div class="report-card"><span>Paquetes</span><strong>${packages}</strong></div>
+    ${decisionPanel}`;
+  bindReviewDecisionPanel(summary, items);
   container.innerHTML = `
     <div class="review-filter-bar">
       <div>
@@ -8798,6 +8801,152 @@ function renderReviewInbox() {
     : `<div class="muted">No hay elementos pendientes de revision humana para este filtro.</div>`}`;
   bindReviewFocusControls(container);
   bindReviewInboxButtons(container);
+}
+
+function buildReviewDecisionPanel(items) {
+  if (!items.length) {
+    return `
+      <section class="review-decision-panel">
+        <div>
+          <p class="eyebrow">Decision humana</p>
+          <h3>Sin aprobaciones pendientes</h3>
+          <p>El agente puede seguir monitoreando, pero no hay borradores, evidencias o cierres esperando autorizacion.</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button" data-review-decision="monitor" type="button">Ejecutar monitor</button>
+        </div>
+      </section>`;
+  }
+  const first = items[0];
+  const formDrafts = items.filter((item) => item.kind === "form" && item.status === "borrador").length;
+  const suggestedEvidence = items.filter((item) => item.kind === "evidence").length;
+  return `
+    <section class="review-decision-panel ${first.priority === "alta" ? "critical" : ""}">
+      <div>
+        <p class="eyebrow">Decision humana recomendada</p>
+        <h3>${escapeHtml(reviewDecisionTitle(first))}</h3>
+        <p>${escapeHtml(first.detail)} El agente prepara y ordena; la aprobacion, evidencia real y eficacia quedan en manos de la empresa.</p>
+        <div class="matrix-metrics">
+          <span>Requisito ${escapeHtml(first.code || "SG")}</span>
+          <span>${escapeHtml(reviewKindLabel(first.kind))}</span>
+          <span>${escapeHtml(first.priority || "media")}</span>
+        </div>
+      </div>
+      <div class="review-decision-actions">
+        <button data-review-decision="first" type="button">Atender primero</button>
+        <button class="secondary-button" data-review-decision="forms" type="button" ${formDrafts ? "" : "disabled"}>Enviar formularios a revision</button>
+        <button class="secondary-button" data-review-decision="evidence" type="button" ${suggestedEvidence ? "" : "disabled"}>Acciones para evidencias</button>
+      </div>
+    </section>`;
+}
+
+function reviewDecisionTitle(item) {
+  if (item.kind === "form") return `Revisar formulario: ${item.title}`;
+  if (item.kind === "evidence") return `Validar evidencia: ${item.title}`;
+  if (item.kind === "efficacy") return `Verificar eficacia: ${item.title}`;
+  if (item.kind === "action") return `Asignar accion: ${item.title}`;
+  if (item.kind === "package") return `Revisar paquete: ${item.code}`;
+  return item.title;
+}
+
+function bindReviewDecisionPanel(container, items) {
+  container.querySelectorAll("[data-review-decision]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const command = button.dataset.reviewDecision;
+      if (command === "monitor") {
+        showView("monitor");
+        return;
+      }
+      if (command === "first") {
+        openReviewItem(items[0]);
+        return;
+      }
+      if (command === "forms") {
+        await sendDraftFormsToReview(items);
+        return;
+      }
+      if (command === "evidence") {
+        createSuggestedEvidenceActions(items);
+      }
+    });
+  });
+}
+
+function openReviewItem(item) {
+  if (!item) return;
+  if (item.kind === "form") {
+    const response = state.formResponses[item.index];
+    if (response) {
+      state.selectedFormTable = response.table;
+      if (response.activity) {
+        state.selectedFormActivity = response.activity;
+        state.selectedActivityName = response.activity;
+      }
+      state.formFilters.search = response.code || "";
+    }
+    showView("formularios");
+    renderAll();
+    return;
+  }
+  if (item.kind === "evidence") {
+    showView("evidencias");
+    return;
+  }
+  if (item.kind === "action" || item.kind === "efficacy") {
+    focusActionCard(item.index);
+    return;
+  }
+  if (item.kind === "package") {
+    const pkg = (state.closurePackages || [])[item.index];
+    state.formFilters.search = pkg?.code || item.code || "";
+    state.formFilters.status = "todos";
+    showView("formularios");
+  }
+}
+
+async function sendDraftFormsToReview(items) {
+  const draftForms = items.filter((item) => item.kind === "form" && item.status === "borrador").slice(0, 10);
+  for (const item of draftForms) {
+    const response = state.formResponses[item.index];
+    if (response) await setFormReviewStatus(response.table, response.activity || "");
+  }
+  recordAuditEvent({
+    title: "Formularios enviados a revision",
+    detail: `${draftForms.length} formulario(s) fueron enviados a revision humana desde la bandeja.`,
+    code: "7.5",
+    type: "revision_formulario",
+    actor: "humano"
+  });
+  addMessage("agent", `Envie ${draftForms.length} formulario(s) a revision. Falta aprobacion humana para que cuenten como evidencia completa.`);
+  saveState();
+  renderAll();
+}
+
+function createSuggestedEvidenceActions(items) {
+  const evidences = items.filter((item) => item.kind === "evidence").slice(0, 10);
+  let created = 0;
+  evidences.forEach((item) => {
+    const evidence = state.evidence[item.index];
+    if (!evidence) return;
+    const title = `Validar soporte de evidencia: ${evidence.title}`;
+    const exists = state.actions.some((action) => action.status !== "cerrada" && action.title === title && action.code === (evidence.code || "7.5"));
+    if (exists) return;
+    createAction(title, evidence.code || "7.5", "tarea", "revision humana");
+    const action = state.actions[0];
+    assignActionDefaults(action);
+    action.cause = `Evidencia sugerida pendiente de soporte real o validacion: ${evidence.title}.`;
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Acciones para evidencias sugeridas",
+    detail: `${created} accion(es) creadas para validar evidencias sugeridas por el agente.`,
+    code: "7.5",
+    type: "revision_evidencia",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Cree ${created} accion(es) para validar evidencias sugeridas.` : "No cree acciones nuevas: las evidencias sugeridas ya tenian acciones abiertas.");
+  saveState();
+  showView("acciones");
 }
 
 function reviewVisibleItems(items, focusMode) {
