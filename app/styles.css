@@ -1590,6 +1590,56 @@ textarea {
   color: var(--muted);
 }
 
+.monitor-summary-card {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 0.6fr);
+  padding: 14px;
+}
+
+.monitor-summary-card h3,
+.monitor-summary-card p,
+.monitor-summary-card .eyebrow {
+  margin: 0;
+}
+
+.monitor-summary-card p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.monitor-summary-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.monitor-summary-metrics div {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.monitor-summary-metrics span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.monitor-summary-metrics strong {
+  font-size: 22px;
+}
+
+.monitor-summary-card .row-actions {
+  grid-column: 1 / -1;
+  justify-content: end;
+}
+
 .implementation-roadmap {
   display: grid;
   gap: 12px;
@@ -3949,6 +3999,8 @@ textarea {
   .org-form,
   .form-grid,
   .form-guide-card,
+  .monitor-summary-card,
+  .monitor-summary-metrics,
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,

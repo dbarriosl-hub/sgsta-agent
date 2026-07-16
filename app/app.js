@@ -8566,8 +8566,32 @@ function activeSystem() {
 
 function renderAgentFindings() {
   const container = document.querySelector("#agentFindings");
-  container.innerHTML = state.agentFindings.length
-    ? state.agentFindings.map((item, index) => `
+  if (!state.agentFindings.length) {
+    container.innerHTML = `<div class="muted">Ejecuta el monitor para que el agente detecte brechas y sugiera acciones.</div>`;
+    return;
+  }
+  const high = state.agentFindings.filter((item) => item.priority === "critica" || item.priority === "alta").length;
+  const formFindings = state.agentFindings.filter((item) => item.origin === "formularios").length;
+  const topFinding = state.agentFindings[0];
+  container.innerHTML = `
+    <section class="monitor-summary-card">
+      <div>
+        <p class="eyebrow">Vigilancia del agente</p>
+        <h3>${high ? "Brechas criticas por atender" : "Brechas de seguimiento"}</h3>
+        <p>${escapeHtml(topFinding.detail || "El agente encontro oportunidades de cierre PHVA.")}</p>
+      </div>
+      <div class="monitor-summary-metrics">
+        <div><span>Total</span><strong>${state.agentFindings.length}</strong></div>
+        <div><span>Altas</span><strong>${high}</strong></div>
+        <div><span>Formularios</span><strong>${formFindings}</strong></div>
+      </div>
+      <div class="row-actions">
+        <button data-monitor-priority-actions type="button">Crear acciones prioritarias</button>
+        <button class="secondary-button" data-monitor-open-alerts type="button">Ver alertas</button>
+        <button class="secondary-button" data-monitor-open-review type="button">Revision humana</button>
+      </div>
+    </section>
+    ${state.agentFindings.map((item, index) => `
       <div class="simple-row finding-row">
         <div><strong>${item.title}</strong><div class="muted">${item.detail}</div></div>
         <span class="badge ${item.priority === "critica" || item.priority === "alta" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
@@ -8576,7 +8600,10 @@ function renderAgentFindings() {
           <button class="secondary-button" data-finding-action="${index}" type="button">Crear accion</button>
         </div>
       </div>`).join("")
-    : `<div class="muted">Ejecuta el monitor para que el agente detecte brechas y sugiera acciones.</div>`;
+    }`;
+  container.querySelector("[data-monitor-priority-actions]")?.addEventListener("click", createPriorityActionsFromFindings);
+  container.querySelector("[data-monitor-open-alerts]")?.addEventListener("click", () => showView("alertas"));
+  container.querySelector("[data-monitor-open-review]")?.addEventListener("click", () => showView("revision_humana"));
   container.querySelectorAll("[data-finding-forms]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = state.agentFindings[Number(button.dataset.findingForms)];
@@ -8597,6 +8624,49 @@ function renderAgentFindings() {
       }
     });
   });
+}
+
+function findingActionExists(finding) {
+  return state.actions.some((action) => action.status !== "cerrada" && action.title === finding.actionTitle && action.code === finding.code);
+}
+
+function createPriorityActionsFromFindings() {
+  const priorityFindings = [...state.agentFindings]
+    .sort((a, b) => priorityWeight(b.priority) - priorityWeight(a.priority))
+    .slice(0, 5);
+  let created = 0;
+  priorityFindings.forEach((finding) => {
+    if (findingActionExists(finding)) return;
+    state.actions.unshift({
+      title: finding.actionTitle,
+      code: finding.code,
+      status: "abierta",
+      type: finding.actionType || (finding.priority === "alta" || finding.priority === "critica" ? "preventiva" : "tarea"),
+      origin: finding.origin || "monitor",
+      priority: finding.priority === "critica" ? "alta" : finding.priority || "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: futureDate(finding.priority === "critica" || finding.priority === "alta" ? 7 : 15),
+      cause: finding.detail,
+      immediateCorrection: "",
+      followUp: "",
+      evidence: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      sourceDetail: `Monitor: ${finding.title}`,
+      createdAt: today()
+    });
+    created += 1;
+  });
+  state.agentFindings = state.agentFindings.filter((finding) => !priorityFindings.includes(finding) || !findingActionExists(finding));
+  recordAuditEvent({
+    title: "Hallazgos del monitor convertidos en acciones",
+    detail: `${created} accion(es) prioritaria(s) creadas desde el monitor del agente. Las acciones quedan pendientes de seguimiento, evidencia y eficacia humana.`,
+    type: "monitor",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Converti ${created} hallazgo(s) prioritario(s) en acciones auditables.` : "No cree acciones nuevas: los hallazgos prioritarios ya tenian acciones abiertas.");
+  saveState();
+  showView("acciones");
 }
 
 function buildReviewItems() {
