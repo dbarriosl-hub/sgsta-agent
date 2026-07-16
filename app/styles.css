@@ -2136,6 +2136,55 @@ textarea {
   margin-bottom: 14px;
 }
 
+.form-work-guide {
+  margin-bottom: 14px;
+}
+
+.form-guide-card {
+  align-items: start;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) minmax(130px, auto);
+  padding: 14px;
+}
+
+.form-guide-card h3,
+.form-guide-card p,
+.form-guide-card .eyebrow {
+  margin: 0;
+}
+
+.form-guide-card strong,
+.form-guide-card p {
+  display: block;
+  margin-top: 5px;
+}
+
+.form-guide-card p,
+.form-guide-card small {
+  color: var(--muted);
+}
+
+.form-guide-status {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  text-align: right;
+}
+
+.form-guide-status strong {
+  font-size: 28px;
+  margin: 0;
+}
+
+.form-guide-card .row-actions {
+  grid-column: 1 / -1;
+  justify-content: end;
+}
+
 .activity-form-tools {
   align-items: end;
   display: grid;
@@ -3899,6 +3948,7 @@ textarea {
   .forms-layout,
   .org-form,
   .form-grid,
+  .form-guide-card,
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,

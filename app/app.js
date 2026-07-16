@@ -7481,6 +7481,7 @@ function renderForms() {
       <span>formularios pendientes</span>
     </div>`;
 
+  renderFormWorkGuide(document.querySelector("#formWorkGuide"), catalog);
   bindFormFilters();
   bindFormActivityTools();
   renderFormRequirementCoverage();
@@ -7526,6 +7527,122 @@ function renderForms() {
     button.addEventListener("click", () => fillActivityCatalogForm(button.dataset.fillActivityForm));
   });
   renderFormPreview();
+}
+
+function formEvidenceExists(response) {
+  if (!response) return false;
+  const linkedDocument = response.activity ? `${response.table}:${response.activity}` : response.table;
+  return state.evidence.some((item) => item.linkedDocument === linkedDocument);
+}
+
+function nextFormWorkItem(catalog) {
+  const forms = filteredCatalogForms(catalog);
+  const candidates = (forms.length ? forms : catalog).map((form) => {
+    const response = selectedFormResponse(form);
+    const status = normalizedFormStatus(response?.status);
+    const requirement = getFormRequirement(form);
+    const relation = getFormMatrixItem(form.table);
+    let rank = 5;
+    let action = "open";
+    let next = "Revisar formulario";
+    if (status === "revision") {
+      rank = 1;
+      action = "approve";
+      next = "Aprobar humano para que cuente como evidencia";
+    } else if (status === "borrador") {
+      rank = 2;
+      action = "review";
+      next = "Enviar a revision";
+    } else if (status === "sin llenar") {
+      rank = 3;
+      action = "draft";
+      next = "Diligenciar con agente";
+    } else if (!formEvidenceExists(response)) {
+      rank = 4;
+      action = "evidence";
+      next = "Enviar formulario aprobado a evidencias";
+    }
+    return { form, response, status, requirement, relation, rank, action, next };
+  });
+  return candidates.sort((a, b) => a.rank - b.rank || a.requirement.code.localeCompare(b.requirement.code, "es", { numeric: true }))[0];
+}
+
+function renderFormWorkGuide(container, catalog) {
+  if (!container) return;
+  const item = nextFormWorkItem(catalog);
+  if (!item) {
+    container.innerHTML = "";
+    return;
+  }
+  const activity = item.response?.activity || (activityPackageTables.includes(item.form.table) ? state.selectedFormActivity : "");
+  const fillStats = formFillStats(item.form, item.response);
+  const canApprove = canCurrentUserApprove();
+  container.innerHTML = `
+    <section class="form-guide-card">
+      <div>
+        <p class="eyebrow">Trabajo recomendado</p>
+        <h3>${escapeHtml(item.next)}</h3>
+        <strong>${escapeHtml(item.form.title)}</strong>
+        <p>${escapeHtml(item.requirement.code)} - ${escapeHtml(item.requirement.title)}${activity ? ` - Actividad: ${escapeHtml(activity)}` : ""}</p>
+      </div>
+      <div class="form-guide-status">
+        <span class="badge requisito">${item.requirement.code}</span>
+        <span class="badge ${formStatusBadge(item.status)}">${item.status}</span>
+        <strong>${item.response ? `${fillStats.pct}%` : "0%"}</strong>
+        <small>${item.response ? `${fillStats.filled}/${fillStats.total} campos` : `${item.form.fields.length} campos`}</small>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-form-guide-action="open" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Ver</button>
+        ${item.action === "draft" ? `<button data-form-guide-action="draft" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Diligenciar</button>` : ""}
+        ${item.action === "review" ? `<button data-form-guide-action="review" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Enviar a revision</button>` : ""}
+        ${item.action === "approve" ? `<button data-form-guide-action="approve" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button" ${canApprove ? "" : "disabled"}>Aprobar humano</button>` : ""}
+        ${item.action === "evidence" ? `<button data-form-guide-action="evidence" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Enviar a evidencias</button>` : ""}
+        <button class="secondary-button" data-form-guide-action="requirement" data-form-guide-code="${item.requirement.code}" type="button">Ver requisito</button>
+      </div>
+    </section>`;
+  container.querySelectorAll("[data-form-guide-action]").forEach((button) => {
+    button.addEventListener("click", () => handleFormGuideAction(button));
+  });
+}
+
+async function handleFormGuideAction(button) {
+  const action = button.dataset.formGuideAction;
+  const table = button.dataset.formGuideTable || "";
+  const activity = button.dataset.formGuideActivity || "";
+  if (action === "requirement") {
+    state.formFilters.search = button.dataset.formGuideCode || "";
+    state.formFilters.phva = "todos";
+    state.formFilters.status = "todos";
+    saveState();
+    renderForms();
+    return;
+  }
+  if (table) state.selectedFormTable = table;
+  if (activity) {
+    state.selectedFormActivity = activity;
+    state.selectedActivityName = activity;
+  }
+  if (action === "open") {
+    saveState();
+    renderForms();
+    return;
+  }
+  if (action === "draft") {
+    if (activity) await fillActivityCatalogForm(table);
+    else await fillCatalogForm(table);
+    return;
+  }
+  if (action === "review") {
+    await setFormReviewStatus(table, activity);
+    return;
+  }
+  if (action === "approve") {
+    await approveFormResponse(table, activity);
+    return;
+  }
+  if (action === "evidence") {
+    convertFormResponseToEvidence(table, activity);
+  }
 }
 
 function ensureSelectedFormActivity() {
