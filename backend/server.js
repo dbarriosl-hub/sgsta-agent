@@ -88,6 +88,7 @@ function serializeError(error) {
 }
 
 function saveState() {
+  if (suppressSave) return;
   if (!storageReady) {
     console.warn("Estado aun no persistido: almacenamiento no esta listo.");
     return;
@@ -114,6 +115,7 @@ let storage;
 let state = clone(defaultState);
 let storageReady = false;
 let storageError = null;
+let suppressSave = false;
 
 function readWindowPayload(file, globalName) {
   const text = fs.readFileSync(path.join(ROOT, "app", file), "utf8").trim();
@@ -1222,6 +1224,22 @@ async function handle(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/agent/forms/draft") {
     const body = await parseBody(req);
+    if (body.dryRun) {
+      const previousState = clone(state);
+      try {
+        suppressSave = true;
+        if (body.state) {
+          Object.keys(state).forEach((key) => delete state[key]);
+          Object.assign(state, mergeSavedState(body.state));
+        }
+        const result = await draftFormsWithAi(body);
+        return send(res, 200, { ...result, dryRun: true, state: previousState });
+      } finally {
+        Object.keys(state).forEach((key) => delete state[key]);
+        Object.assign(state, previousState);
+        suppressSave = false;
+      }
+    }
     if (body.state) {
       Object.keys(state).forEach((key) => delete state[key]);
       Object.assign(state, mergeSavedState(body.state));
