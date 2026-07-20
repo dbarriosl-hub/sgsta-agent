@@ -7484,6 +7484,7 @@ function renderForms() {
   renderFormWorkGuide(document.querySelector("#formWorkGuide"), catalog);
   bindFormFilters();
   bindFormActivityTools();
+  renderAiFormTestResult();
   renderFormRequirementCoverage();
 
   container.innerHTML = visibleForms.length
@@ -7786,6 +7787,7 @@ function bindFormFilters() {
 function bindFormActivityTools() {
   const select = document.querySelector("#formActivitySelect");
   const button = document.querySelector("#fillActivityFormPackage");
+  const testButton = document.querySelector("#testAiFormDraft");
   if (!select || !button) return;
   ensureSelectedFormActivity();
   const options = state.activities.map((activity) => `<option value="${escapeHtml(activity.name)}" ${activity.name === state.selectedFormActivity ? "selected" : ""}>${activity.name}</option>`).join("");
@@ -7798,6 +7800,31 @@ function bindFormActivityTools() {
     renderForms();
   };
   button.onclick = () => fillSelectedActivityPackage();
+  if (testButton) testButton.onclick = testAiFormDraftFromUi;
+}
+
+function renderAiFormTestResult() {
+  const container = document.querySelector("#aiFormTestResult");
+  if (!container) return;
+  const result = state.aiFormTestResult;
+  if (!result) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `
+    <section class="ai-test-card ${result.ok ? "ok" : "error"}">
+      <div>
+        <p class="eyebrow">Prueba IA sin guardar</p>
+        <h3>${result.ok ? "DeepSeek respondio correctamente" : "No se pudo generar con IA"}</h3>
+        <p>${escapeHtml(result.message || "")}</p>
+        ${result.sample ? `<small>${escapeHtml(result.sample)}</small>` : ""}
+      </div>
+      <div class="ai-test-meta">
+        <span class="badge ${result.ok ? "cumple" : "no_cumple"}">${result.ok ? "ok" : "error"}</span>
+        <span class="badge phva">${escapeHtml(result.provider || "IA")}</span>
+        <span class="badge requisito">${escapeHtml(result.model || "modelo")}</span>
+      </div>
+    </section>`;
 }
 
 function selectedCatalogForm() {
@@ -8124,6 +8151,77 @@ async function createFormDraftsInBackend(payload) {
     backendOnline = false;
     updateBackendStatus("Modo local: borrador sin backend", false);
     return false;
+  }
+}
+
+async function testAiFormDraftFromUi() {
+  if (!backendOnline) {
+    state.aiFormTestResult = {
+      ok: false,
+      provider: "backend",
+      model: "sin conexion",
+      message: "No hay backend conectado. Abre la version desplegada o revisa la conexion antes de probar IA.",
+      sample: ""
+    };
+    renderForms();
+    return;
+  }
+  const form = selectedCatalogForm();
+  if (!form) return;
+  const activity = state.selectedFormActivity || primaryActivityName();
+  const testButton = document.querySelector("#testAiFormDraft");
+  if (testButton) testButton.disabled = true;
+  state.aiFormTestResult = {
+    ok: true,
+    provider: "probando",
+    model: "dryRun",
+    message: `Probando ${form.title}${activity ? ` para ${activity}` : ""}. No se guardaran datos.`,
+    sample: ""
+  };
+  renderAiFormTestResult();
+  try {
+    updateBackendStatus("Backend conectado: probando IA sin guardar", true);
+    const response = await fetch(`${apiBaseUrl}/api/agent/forms/draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dryRun: true,
+        table: form.table,
+        activity,
+        state: appStateToApiState()
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || result.error || "No se pudo probar IA");
+    const generated = result.responses?.[0];
+    const sample = generated?.values
+      ? Object.entries(generated.values).slice(0, 4).map(([key, value]) => `${key}: ${value}`).join(" | ")
+      : "";
+    state.aiFormTestResult = {
+      ok: Boolean(result.ai?.used),
+      provider: result.ai?.provider || "reglas",
+      model: generated?.aiModel || "sin modelo",
+      message: result.ai?.used
+        ? `La IA genero un borrador de "${generated?.form || form.title}" sin guardarlo en la base de datos.`
+        : `El backend respondio, pero uso reglas locales. ${result.ai?.errors?.[0]?.error?.message || ""}`.trim(),
+      sample
+    };
+    updateBackendStatus(result.ai?.used ? "Backend conectado: IA probada sin guardar" : "Backend conectado: prueba sin IA", true);
+    addMessage("agent", state.aiFormTestResult.message);
+  } catch (error) {
+    state.aiFormTestResult = {
+      ok: false,
+      provider: "deepseek",
+      model: "error",
+      message: error.message || "La prueba IA fallo.",
+      sample: ""
+    };
+    updateBackendStatus("Backend conectado: prueba IA fallo", true);
+    addMessage("agent", `La prueba IA fallo: ${state.aiFormTestResult.message}`);
+  } finally {
+    if (testButton) testButton.disabled = false;
+    persistLocalState();
+    renderForms();
   }
 }
 

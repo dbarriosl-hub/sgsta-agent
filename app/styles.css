@@ -2238,7 +2238,7 @@ textarea {
 .activity-form-tools {
   align-items: end;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -2248,6 +2248,52 @@ textarea {
   display: grid;
   font-size: 12px;
   gap: 6px;
+}
+
+.ai-test-result {
+  margin-bottom: 14px;
+}
+
+.ai-test-card {
+  align-items: start;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, auto);
+  padding: 14px;
+}
+
+.ai-test-card.error {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.ai-test-card h3,
+.ai-test-card p,
+.ai-test-card .eyebrow {
+  margin: 0;
+}
+
+.ai-test-card p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.ai-test-card small {
+  color: var(--ink);
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.ai-test-meta {
+  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: end;
 }
 
 .coverage-list {
@@ -4095,6 +4141,7 @@ textarea {
   .org-form,
   .form-grid,
   .form-guide-card,
+  .ai-test-card,
   .monitor-summary-card,
   .monitor-summary-metrics,
   .agenda-plan-card,
