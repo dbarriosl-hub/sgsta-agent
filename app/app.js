@@ -2023,6 +2023,177 @@ function implementationPhaseProgress(phase) {
   };
 }
 
+function mvpLaunchStatus() {
+  const demo = demoReadinessStatus();
+  const mvp = mvpPilotStatus(demo);
+  const activities = state.activities.map((activity) => {
+    const readiness = activityReadiness(activity.name);
+    return { activity, readiness, decision: activityOperationDecision(readiness) };
+  });
+  const offerableActivities = activities.filter((item) => item.decision.badge === "cumple").length;
+  const reviewActivities = activities.filter((item) => item.decision.badge === "en_proceso").length;
+  const evidenceWithSupport = requirements.map(evidencePackageForRequirement).filter((item) => item.score > 0).length;
+  const reviewItems = buildReviewItems();
+  const openActions = state.actions.filter((action) => action.status !== "cerrada");
+  const actionsWithClosurePath = openActions.filter((action) => action.followUp || action.evidence || action.efficacyVerification || actionReadyToClose(action)).length;
+  const pilot = pilotObservationSummary();
+  const gates = [
+    {
+      id: "activities",
+      label: "Actividad piloto",
+      done: offerableActivities > 0 || reviewActivities > 0,
+      detail: offerableActivities
+        ? `${offerableActivities} actividad(es) listas para mostrar.`
+        : reviewActivities
+          ? `${reviewActivities} actividad(es) en revision; explicar brechas antes de ofertar.`
+          : "Falta una actividad con controles minimos.",
+      view: "brechas_actividad"
+    },
+    {
+      id: "evidence",
+      label: "Evidencia minima",
+      done: evidenceWithSupport >= 8,
+      detail: `${evidenceWithSupport}/${requirements.length} requisitos tienen soporte inicial.`,
+      view: "evidencias"
+    },
+    {
+      id: "review",
+      label: "Revision humana",
+      done: state.managementReviews.length > 0 && reviewItems.length > 0,
+      detail: state.managementReviews.length
+        ? `${reviewItems.length} decision(es) humanas visibles para aprobar o revisar.`
+        : "Falta preparar revision por direccion 9.3.",
+      view: "revision_humana"
+    },
+    {
+      id: "actions",
+      label: "Mejora trazable",
+      done: openActions.length > 0 && actionsWithClosurePath > 0,
+      detail: `${openActions.length} accion(es) abiertas; ${actionsWithClosurePath} con seguimiento/evidencia/eficacia iniciada.`,
+      view: "acciones"
+    },
+    {
+      id: "pilot",
+      label: "Aprendizaje piloto",
+      done: pilot.total > 0,
+      detail: pilot.total ? `${pilot.total} observacion(es) registradas; ${pilot.open} abiertas.` : "Falta registrar al menos una observacion de prueba piloto.",
+      view: "panel"
+    }
+  ];
+  const done = gates.filter((gate) => gate.done).length;
+  const score = Math.round((done / gates.length) * 100);
+  const next = gates.find((gate) => !gate.done) || gates[gates.length - 1];
+  const label = score >= 100 ? "Listo para piloto MVP" : score >= 80 ? "Piloto casi listo" : score >= 60 ? "MVP demostrable con guia" : "MVP en preparacion";
+  return { demo, mvp, gates, done, total: gates.length, score, label, next, offerableActivities, reviewActivities, evidenceWithSupport, reviewItems, openActions, pilot };
+}
+
+function renderMvpLaunchPanel() {
+  const launch = mvpLaunchStatus();
+  return `
+    <div class="mvp-launch-panel ${launch.score >= 80 ? "ready" : launch.score >= 60 ? "review" : "blocked"}">
+      <div class="mvp-launch-head">
+        <div>
+          <p class="eyebrow">MVP piloto</p>
+          <h3>${escapeHtml(launch.label)}</h3>
+          <p>Siguiente puerta: ${escapeHtml(launch.next.label)}. ${escapeHtml(launch.next.detail)}</p>
+        </div>
+        <div class="mvp-launch-score">
+          <strong>${launch.score}%</strong>
+          <span>${launch.done}/${launch.total} puertas</span>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button" data-mvp-launch-open="${launch.next.view}" type="button">Abrir pendiente</button>
+          <button data-mvp-launch-run="${launch.next.id}" type="button">Preparar pendiente</button>
+        </div>
+      </div>
+      <div class="mvp-launch-gates">
+        ${launch.gates.map((gate) => `
+          <article class="mvp-launch-gate ${gate.done ? "done" : ""}">
+            <span class="badge ${gate.done ? "cumple" : "pendiente"}">${gate.done ? "ok" : "falta"}</span>
+            <strong>${escapeHtml(gate.label)}</strong>
+            <p>${escapeHtml(gate.detail)}</p>
+            <div class="row-actions">
+              <button class="secondary-button" data-mvp-launch-open="${gate.view}" type="button">Abrir</button>
+              <button class="secondary-button" data-mvp-launch-run="${gate.id}" type="button">Preparar</button>
+            </div>
+          </article>`).join("")}
+      </div>
+      <div class="mvp-launch-metrics">
+        <span>Demo <strong>${launch.demo.score}%</strong></span>
+        <span>Hito MVP <strong>${launch.mvp.score}%</strong></span>
+        <span>Evidencias <strong>${launch.evidenceWithSupport}/${requirements.length}</strong></span>
+        <span>Acciones abiertas <strong>${launch.openActions.length}</strong></span>
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-mvp-launch-report type="button">Descargar estado MVP</button>
+        <button class="secondary-button" data-mvp-launch-evidence type="button">Enviar estado a evidencias</button>
+        <button data-mvp-launch-run="all" type="button">Preparar paquete MVP</button>
+      </div>
+    </div>`;
+}
+
+async function runMvpLaunchAction(id) {
+  if (id === "activities") {
+    const activityName = state.selectedActivityName || state.activities[0]?.name || "";
+    if (!activityName) addActivity();
+    else {
+      prepareActivityPackage(activityName);
+      createSelectedActivityGapActions(activityName);
+      showView("brechas_actividad");
+    }
+  }
+  if (id === "evidence") {
+    const codes = lowestRequirementCodes(4);
+    for (const code of codes) await prepareEvidencePackage(code);
+    showView("evidencias");
+  }
+  if (id === "review") {
+    if (!state.managementReviews.length) addManagementReview({ silent: true });
+    await sendDraftFormsToReview(buildReviewItems());
+    showView("revision_humana");
+  }
+  if (id === "actions") {
+    createImplementationWorkPlanActions({ silent: true });
+    const firstOpen = state.actions.findIndex((action) => action.status !== "cerrada");
+    if (firstOpen >= 0) advanceActionClosure(firstOpen);
+    state.actionFocusMode = "priority";
+    showView("acciones");
+  }
+  if (id === "pilot") {
+    if (!state.pilotObservations?.length) {
+      state.pilotObservations = state.pilotObservations || [];
+      state.pilotObservations.unshift({
+        text: "Validar con empresa piloto si el flujo empresa -> actividad -> evidencia -> accion se entiende sin acompanamiento tecnico.",
+        area: "comercial",
+        activity: "General",
+        source: state.ownerName || "Responsable SGSTA",
+        priority: "media",
+        status: "abierta",
+        createdAt: today()
+      });
+      recordAuditEvent({
+        title: "Observacion piloto inicial creada",
+        detail: "Se creo una observacion base para iniciar aprendizaje de MVP.",
+        code: "10.2",
+        type: "piloto",
+        actor: "agente"
+      });
+    }
+    showView("panel");
+  }
+  if (id === "all") {
+    prepareDemoPackage();
+    const codes = lowestRequirementCodes(4);
+    for (const code of codes) await prepareEvidencePackage(code);
+    createImplementationWorkPlanActions({ silent: true });
+    if (!state.managementReviews.length) addManagementReview({ silent: true });
+    addMessage("agent", "Prepare paquete MVP: demo, evidencias, revision por direccion y acciones prioritarias.");
+    showView("implementacion");
+  }
+  saveState();
+  renderAll();
+}
+
 function startupPilotSteps() {
   const selectedActivity = state.selectedActivityName || state.activities[0]?.name || "";
   const selectedReadiness = selectedActivity ? activityReadiness(selectedActivity) : null;
@@ -2300,6 +2471,7 @@ function renderImplementationRoadmap() {
         <button id="roadmapRunNext" type="button">Hacer con agente</button>
       </div>
     </div>
+    ${renderMvpLaunchPanel()}
     ${renderStartupPilotGuide()}
     <div class="phase-grid">
       ${phases.map((phase) => `
@@ -2342,6 +2514,14 @@ function renderImplementationRoadmap() {
   });
   container.querySelector("[data-startup-reset]")?.addEventListener("click", resetPrototypeForNewCompany);
   container.querySelector("[data-startup-demo]")?.addEventListener("click", loadPilotExampleData);
+  container.querySelectorAll("[data-mvp-launch-open]").forEach((button) => {
+    button.addEventListener("click", () => showView(button.dataset.mvpLaunchOpen));
+  });
+  container.querySelectorAll("[data-mvp-launch-run]").forEach((button) => {
+    button.addEventListener("click", () => runMvpLaunchAction(button.dataset.mvpLaunchRun));
+  });
+  container.querySelector("[data-mvp-launch-report]")?.addEventListener("click", downloadMvpPilotReport);
+  container.querySelector("[data-mvp-launch-evidence]")?.addEventListener("click", convertMvpPilotReportToEvidence);
 }
 
 function renderImplementation() {

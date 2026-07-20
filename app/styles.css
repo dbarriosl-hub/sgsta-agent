@@ -1789,6 +1789,118 @@ textarea {
   border-color: #bbf7d0;
 }
 
+.mvp-launch-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.mvp-launch-panel.ready {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.mvp-launch-panel.review {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.mvp-launch-panel.blocked {
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.mvp-launch-head {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+}
+
+.mvp-launch-head h3,
+.mvp-launch-head p,
+.mvp-launch-head .eyebrow {
+  margin: 0;
+}
+
+.mvp-launch-head p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.mvp-launch-score {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: center;
+}
+
+.mvp-launch-score strong {
+  font-size: 28px;
+}
+
+.mvp-launch-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mvp-launch-gates {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.mvp-launch-gate {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.mvp-launch-gate.done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.mvp-launch-gate strong,
+.mvp-launch-gate p {
+  margin: 0;
+}
+
+.mvp-launch-gate p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.mvp-launch-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mvp-launch-metrics span {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 8px 10px;
+}
+
+.mvp-launch-metrics strong {
+  color: var(--text);
+}
+
 .startup-approval-gate h3,
 .startup-approval-gate p,
 .startup-approval-gate .eyebrow {
@@ -4249,6 +4361,9 @@ textarea {
   .startup-step-grid,
   .startup-approval-gate,
   .startup-gate-metrics,
+  .mvp-launch-head,
+  .mvp-launch-gates,
+  .mvp-launch-metrics,
   .documents-layout,
   .forms-layout,
   .org-form,
