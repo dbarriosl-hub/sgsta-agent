@@ -2127,9 +2127,70 @@ function renderMvpLaunchPanel() {
       <div class="row-actions">
         <button class="secondary-button" data-mvp-launch-report type="button">Descargar estado MVP</button>
         <button class="secondary-button" data-mvp-launch-evidence type="button">Enviar estado a evidencias</button>
+        <button class="secondary-button" data-mvp-launch-validate type="button">Registrar validacion MVP</button>
         <button data-mvp-launch-run="all" type="button">Preparar paquete MVP</button>
       </div>
     </div>`;
+}
+
+function mvpValidationSummaryText() {
+  const launch = mvpLaunchStatus();
+  return [
+    `Estado MVP: ${launch.score}% - ${launch.label}`,
+    `Puertas listas: ${launch.done}/${launch.total}`,
+    `Siguiente puerta: ${launch.next.label} - ${launch.next.detail}`,
+    `Demo: ${launch.demo.score}% (${launch.demo.label})`,
+    `Hito MVP: ${launch.mvp.score}% (${launch.mvp.label})`,
+    `Evidencias: ${launch.evidenceWithSupport}/${requirements.length}`,
+    `Acciones abiertas: ${launch.openActions.length}`,
+    `Observaciones piloto: ${launch.pilot.total} total, ${launch.pilot.open} abiertas`
+  ].join("\n");
+}
+
+function registerMvpValidation() {
+  const launch = mvpLaunchStatus();
+  const content = [
+    "VALIDACION MVP PILOTO - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Fecha: ${today()}`,
+    "",
+    mvpValidationSummaryText(),
+    "",
+    "Puertas de salida",
+    ...launch.gates.map((gate) => `- ${gate.done ? "[ok]" : "[falta]"} ${gate.label}: ${gate.detail}`),
+    "",
+    "Decision recomendada",
+    launch.score >= 80
+      ? "Se puede ejecutar piloto guiado con empresa real, dejando claro que aprobaciones y cierres son humanos."
+      : "Completar puertas pendientes antes de presentar como MVP piloto funcional."
+  ].join("\n");
+  ["4.4", "9.1"].forEach((code) => {
+    const linkedDocument = `validacion_mvp_${today()}_${code}`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "validacion mvp");
+    const evidence = {
+      title: `Validacion MVP piloto - requisito ${code}`,
+      code,
+      source: "validacion mvp",
+      status: launch.score >= 80 ? "registrada" : "sugerida",
+      linkedDocument,
+      content
+    };
+    if (existing) Object.assign(existing, evidence, { date: today() });
+    else state.evidence.unshift({ date: today(), ...evidence });
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  recordAuditEvent({
+    title: "Validacion MVP registrada",
+    detail: `MVP ${launch.score}% (${launch.label}). Siguiente: ${launch.next.label}.`,
+    code: "4.4/9.1",
+    type: "validacion_mvp",
+    actor: "humano"
+  });
+  addMessage("agent", `Registre validacion MVP: ${launch.score}% (${launch.label}). Quedo como evidencia para 4.4 y 9.1.`);
+  saveState();
+  showView("evidencias");
+  renderAll();
 }
 
 async function runMvpLaunchAction(id) {
@@ -2522,6 +2583,7 @@ function renderImplementationRoadmap() {
   });
   container.querySelector("[data-mvp-launch-report]")?.addEventListener("click", downloadMvpPilotReport);
   container.querySelector("[data-mvp-launch-evidence]")?.addEventListener("click", convertMvpPilotReportToEvidence);
+  container.querySelector("[data-mvp-launch-validate]")?.addEventListener("click", registerMvpValidation);
 }
 
 function renderImplementation() {
