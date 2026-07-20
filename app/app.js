@@ -7928,6 +7928,63 @@ async function sendLastGeneratedFormsToReview() {
   renderAll();
 }
 
+function lastGeneratedFormKey(table, activity = "") {
+  return `${table || ""}::${activity || ""}`;
+}
+
+function lastGeneratedFormKeys() {
+  const result = state.formGenerationResult;
+  if (!result?.responses?.length) return new Set();
+  return new Set(result.responses.map((item) => lastGeneratedFormKey(item.table, item.activity || "")));
+}
+
+function generatedReviewItems(items) {
+  return items.filter((item) => item.kind === "form" && item.recentGeneration);
+}
+
+function openLastGeneratedForms(items = buildReviewItems()) {
+  const result = state.formGenerationResult;
+  const recentForms = generatedReviewItems(items);
+  const first = recentForms[0] || result?.responses?.[0];
+  if (!first && !result) return;
+  state.formFilters.search = result?.activity || result?.requirement || first?.code || first?.table || "";
+  state.formFilters.status = "todos";
+  if (first?.activity || result?.activity) {
+    state.selectedFormActivity = first?.activity || result.activity;
+    state.selectedActivityName = first?.activity || result.activity;
+  }
+  if (first?.table) state.selectedFormTable = first.table;
+  saveState();
+  showView("formularios");
+  renderAll();
+}
+
+async function sendGeneratedFormsToReview(items = buildReviewItems()) {
+  const generatedForms = generatedReviewItems(items).filter((item) => item.status === "borrador");
+  if (!generatedForms.length) {
+    addMessage("agent", "No habia formularios recien generados en borrador para enviar a revision.");
+    return;
+  }
+  for (const item of generatedForms) {
+    await setFormReviewStatus(item.table, item.activity || "");
+  }
+}
+
+async function approveGeneratedReviewForms(items = buildReviewItems()) {
+  const generatedForms = generatedReviewItems(items).filter((item) => item.status === "revision");
+  if (!generatedForms.length) {
+    addMessage("agent", "No hay formularios recien generados en revision para aprobar.");
+    return;
+  }
+  if (!canCurrentUserApprove()) {
+    addMessage("agent", "No aprobe formularios: cambia el rol actual a Direccion o Admin para aprobar evidencias.");
+    return;
+  }
+  for (const item of generatedForms) {
+    await approveFormResponse(item.table, item.activity || "");
+  }
+}
+
 function selectedCatalogForm() {
   const catalog = visibleCatalogForms(window.formCatalog || []);
   return catalog.find((form) => form.table === state.selectedFormTable) || catalog[0];
@@ -8876,16 +8933,22 @@ function createPriorityActionsFromFindings() {
 
 function buildReviewItems() {
   const items = [];
+  const generatedKeys = lastGeneratedFormKeys();
   state.formResponses.forEach((form, index) => {
-    if (["borrador", "revision"].includes(normalizedFormStatus(form.status))) {
+    const status = normalizedFormStatus(form.status);
+    if (["borrador", "revision"].includes(status)) {
+      const recentGeneration = generatedKeys.has(lastGeneratedFormKey(form.table, form.activity || ""));
       items.push({
         kind: "form",
         index,
+        table: form.table,
+        activity: form.activity || "",
+        recentGeneration,
         title: form.form || form.table,
-        detail: `Formulario diligenciado por ${form.source || "agente"} pendiente de revision/aprobacion.`,
+        detail: `${recentGeneration ? "Recien generado por el agente. " : ""}Formulario diligenciado por ${form.source || "agente"} pendiente de revision/aprobacion.`,
         code: form.code || "7.5",
-        priority: form.status === "revision" ? "alta" : "media",
-        status: normalizedFormStatus(form.status)
+        priority: status === "revision" || recentGeneration ? "alta" : "media",
+        status
       });
     }
   });
@@ -8963,6 +9026,7 @@ function renderReviewInbox() {
   const packages = items.filter((item) => item.kind === "package").length;
   const high = items.filter((item) => item.priority === "alta").length;
   const decisionPanel = buildReviewDecisionPanel(items);
+  const generatedPanel = buildGeneratedReviewPanel(items);
   summary.innerHTML = `
     <div class="report-card"><span>Total pendiente</span><strong>${items.length}</strong></div>
     <div class="report-card"><span>Criticos</span><strong>${high}</strong></div>
@@ -8971,8 +9035,10 @@ function renderReviewInbox() {
     <div class="report-card"><span>Acciones</span><strong>${actions}</strong></div>
     <div class="report-card"><span>Eficacia</span><strong>${efficacy}</strong></div>
     <div class="report-card"><span>Paquetes</span><strong>${packages}</strong></div>
+    ${generatedPanel}
     ${decisionPanel}`;
   bindReviewDecisionPanel(summary, items);
+  bindGeneratedReviewPanel(summary, items);
   container.innerHTML = `
     <div class="review-filter-bar">
       <div>
@@ -8995,6 +9061,7 @@ function renderReviewInbox() {
           <div class="matrix-metrics">
             <span>Requisito ${item.code}</span>
             <span>${reviewKindLabel(item.kind)}</span>
+            ${item.recentGeneration ? "<span>Ultimo diligenciamiento</span>" : ""}
           </div>
         </div>
         <span class="badge ${item.priority === "alta" ? "no_cumple" : "en_proceso"}">${item.priority}</span>
@@ -9006,6 +9073,28 @@ function renderReviewInbox() {
     : `<div class="muted">No hay elementos pendientes de revision humana para este filtro.</div>`}`;
   bindReviewFocusControls(container);
   bindReviewInboxButtons(container);
+}
+
+function buildGeneratedReviewPanel(items) {
+  const result = state.formGenerationResult;
+  const recentForms = generatedReviewItems(items);
+  if (!result || !recentForms.length) return "";
+  const drafts = recentForms.filter((item) => item.status === "borrador").length;
+  const inReview = recentForms.filter((item) => item.status === "revision").length;
+  const label = result.activity || result.requirement || result.table || "formularios generados";
+  return `
+    <section class="generated-review-panel">
+      <div>
+        <p class="eyebrow">Ultimo diligenciamiento pendiente</p>
+        <h3>${escapeHtml(result.title)}</h3>
+        <p>${escapeHtml(label)}: ${recentForms.length} formulario(s) requieren decision humana. ${drafts} en borrador, ${inReview} en revision.</p>
+      </div>
+      <div class="generated-review-actions">
+        <button class="secondary-button" data-generated-review="open" type="button">Ver generados</button>
+        <button class="secondary-button" data-generated-review="send" type="button" ${drafts ? "" : "disabled"}>Enviar a revision</button>
+        <button data-generated-review="approve" type="button" ${inReview && canCurrentUserApprove() ? "" : "disabled"}>Aprobar revisados</button>
+      </div>
+    </section>`;
 }
 
 function buildReviewDecisionPanel(items) {
@@ -9052,6 +9141,25 @@ function reviewDecisionTitle(item) {
   if (item.kind === "action") return `Asignar accion: ${item.title}`;
   if (item.kind === "package") return `Revisar paquete: ${item.code}`;
   return item.title;
+}
+
+function bindGeneratedReviewPanel(container, items) {
+  container.querySelectorAll("[data-generated-review]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const command = button.dataset.generatedReview;
+      if (command === "open") {
+        openLastGeneratedForms(items);
+        return;
+      }
+      if (command === "send") {
+        await sendGeneratedFormsToReview(items);
+        return;
+      }
+      if (command === "approve") {
+        await approveGeneratedReviewForms(items);
+      }
+    });
+  });
 }
 
 function bindReviewDecisionPanel(container, items) {

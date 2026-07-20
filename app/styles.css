@@ -3711,6 +3711,39 @@ textarea {
   width: 100%;
 }
 
+.generated-review-panel {
+  align-items: start;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(280px, 1fr) minmax(250px, auto);
+  padding: 14px;
+}
+
+.generated-review-panel h3,
+.generated-review-panel p,
+.generated-review-panel .eyebrow {
+  margin: 0;
+}
+
+.generated-review-panel p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.generated-review-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.generated-review-actions button {
+  width: 100%;
+}
+
 .action-guidance-panel {
   align-items: start;
   background: #f0fdfa;
@@ -4195,6 +4228,7 @@ textarea {
   .agenda-plan-card,
   .agenda-plan-steps,
   .review-decision-panel,
+  .generated-review-panel,
   .company-intake-grid,
   .activity-intake-item,
   .action-form-grid,
