@@ -10450,6 +10450,9 @@ function renderActionClosureBoard() {
   container.querySelectorAll("[data-action-guided-focus]").forEach((button) => {
     button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionGuidedFocus)));
   });
+  container.querySelectorAll("[data-action-guided-evidence]").forEach((button) => {
+    button.addEventListener("click", () => convertActionToEvidence(Number(button.dataset.actionGuidedEvidence)));
+  });
 }
 
 function actionGuidanceTemplate(action, index, stage) {
@@ -10480,6 +10483,7 @@ function actionGuidanceTemplate(action, index, stage) {
         ${canClose
           ? `<button data-action-guided-close="${index}" type="button">Cerrar con validacion</button>`
           : `<button data-action-guided-advance="${index}" type="button">Completar siguiente paso</button>`}
+        <button class="secondary-button" data-action-guided-evidence="${index}" type="button">Enviar como evidencia</button>
         <button class="secondary-button" data-action-guided-review type="button">Ver revision humana</button>
       </div>
     </section>`;
@@ -10765,6 +10769,7 @@ function actionCardTemplate(item, index) {
         <div class="row-actions">
           <button class="secondary-button" data-action-assign="${index}" type="button">Asignar</button>
           <button class="secondary-button" data-action-advance="${index}" type="button">Avanzar cierre</button>
+          <button class="secondary-button" data-action-evidence="${index}" type="button">Evidencia</button>
           <button data-close-action="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
         </div>
       </div>
@@ -10892,6 +10897,59 @@ function toggleActionClosed(index) {
   renderAll();
 }
 
+function actionEvidenceContent(action) {
+  return [
+    `Accion: ${action.title || "Accion sin titulo"}`,
+    `Requisito: ${action.code || "10.1"}`,
+    `Tipo: ${action.type || "tarea"} | Prioridad: ${action.priority || "media"} | Estado: ${action.status || "abierta"}`,
+    `Actividad: ${action.relatedActivity || action.activity || "General"}`,
+    `Responsable: ${action.responsible || action.owner || "por asignar"} | Fecha limite: ${action.dueDate || action.deadline || action.fechaLimite || "por definir"}`,
+    `Origen: ${action.origin || "accion"}${action.sourceDetail ? ` | Fuente: ${action.sourceDetail}` : ""}`,
+    `Causa: ${action.cause || "por documentar"}`,
+    `Correccion inmediata: ${action.immediateCorrection || "pendiente"}`,
+    `Seguimiento: ${action.followUp || "pendiente"}`,
+    `Evidencia: ${action.evidence || "pendiente"}`,
+    `Eficacia: ${action.efficacyStatus || "pendiente"} - ${action.efficacyVerification || "por verificar"}`,
+    `Cierre: ${action.closedAt || "pendiente"}`
+  ].join("\n");
+}
+
+function convertActionToEvidence(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  const code = action.code || "10.1";
+  const title = `Evidencia de accion: ${action.title || "Accion sin titulo"}`;
+  const linkedDocument = `accion:${index}:${action.title || "sin titulo"}`;
+  const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "accion individual");
+  const evidence = {
+    title,
+    code,
+    source: "accion individual",
+    status: actionReadyToClose(action) || action.status === "cerrada" ? "registrada" : "sugerida",
+    linkedDocument,
+    activity: action.relatedActivity || action.activity || "",
+    linkedActivity: action.relatedActivity || action.activity || "",
+    content: actionEvidenceContent(action)
+  };
+  if (existing) {
+    Object.assign(existing, evidence, { date: today() });
+  } else {
+    state.evidence.unshift({ date: today(), ...evidence });
+  }
+  state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  recordAuditEvent({
+    title: "Accion enviada a evidencias",
+    detail: `${action.title || "Accion"} fue asociada como evidencia ${evidence.status} para el requisito ${code}.`,
+    code,
+    type: "evidencia",
+    actor: actionReadyToClose(action) || action.status === "cerrada" ? "humano" : "agente"
+  });
+  addMessage("agent", `Asocie "${action.title || "accion"}" como evidencia ${evidence.status} para ${code}.`);
+  saveState();
+  showView("evidencias");
+  renderAll();
+}
+
 function bindActionControls(container) {
   container.querySelectorAll("[data-open-activity-gaps]").forEach((button) => {
     button.addEventListener("click", () => showView("brechas_actividad"));
@@ -10928,6 +10986,9 @@ function bindActionControls(container) {
   });
   container.querySelectorAll("[data-action-advance]").forEach((button) => {
     button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionAdvance)));
+  });
+  container.querySelectorAll("[data-action-evidence]").forEach((button) => {
+    button.addEventListener("click", () => convertActionToEvidence(Number(button.dataset.actionEvidence)));
   });
   container.querySelectorAll("[data-close-action]").forEach((button) => {
     button.addEventListener("click", () => toggleActionClosed(Number(button.dataset.closeAction)));
