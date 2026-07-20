@@ -11403,7 +11403,10 @@ function renderEvidence() {
   container.innerHTML = state.evidence.length
     ? state.evidence.map((item, index) => `
       <div class="simple-row module-row">
-        <div><strong>${item.title}</strong><div class="muted">Requisito ${item.code} - Origen: ${item.source || "manual"} ${item.linkedDocument ? "- Documento vinculado" : ""}</div></div>
+        <div>
+          <strong>${item.title}</strong>
+          <div class="muted">Requisito ${item.code} - Origen: ${item.source || "manual"} ${item.linkedDocument ? `- Soporte: ${escapeHtml(item.linkedDocument)}` : ""}</div>
+        </div>
         <span class="badge ${item.status === "sugerida" ? "en_proceso" : "cumple"}">${item.status || "registrada"}</span>
         <button class="secondary-button" data-remove="evidence:${index}" type="button">Quitar</button>
       </div>`).join("")
@@ -11594,6 +11597,7 @@ function renderEvidenceWorkspace(item) {
         ${renderEvidenceWorkspaceList("Evidencias", evidenceWorkspaceEvidenceRows(item))}
         ${renderEvidenceWorkspaceList("Acciones", evidenceWorkspaceActionRows(item))}
       </div>
+      ${renderEvidenceSupportForm(item)}
       <div class="row-actions">
         <button data-evidence-workspace="prepare" data-evidence-code="${item.req.code}" type="button">Preparar paquete</button>
         <button class="secondary-button" data-evidence-workspace="forms" data-evidence-code="${item.req.code}" type="button">Abrir formularios</button>
@@ -11602,6 +11606,24 @@ function renderEvidenceWorkspace(item) {
         <button class="secondary-button" data-evidence-workspace="validate" data-evidence-code="${item.req.code}" type="button" ${suggested ? "" : "disabled"}>Validar sugeridas</button>
       </div>
     </section>`;
+}
+
+function renderEvidenceSupportForm(item) {
+  return `
+    <div class="evidence-support-form">
+      <div>
+        <p class="eyebrow">Soporte real</p>
+        <strong>Registrar evidencia sin perder trazabilidad</strong>
+        <span>Pega un enlace, nombre de archivo o referencia del soporte. El agente lo asocia al requisito, pero la empresa conserva el documento original.</span>
+      </div>
+      <label>Titulo del soporte
+        <input data-evidence-support-title="${item.req.code}" type="text" value="${escapeHtml(item.req.evidence)}">
+      </label>
+      <label>Enlace, archivo o referencia
+        <input data-evidence-support-ref="${item.req.code}" type="text" placeholder="Ej: Drive, PDF, acta, foto, carpeta fisica">
+      </label>
+      <button data-evidence-workspace="support" data-evidence-code="${item.req.code}" type="button">Registrar soporte real</button>
+    </div>`;
 }
 
 function renderEvidenceWorkspaceList(title, rows) {
@@ -11622,7 +11644,10 @@ function evidenceWorkspaceFormRows(item) {
 }
 
 function evidenceWorkspaceEvidenceRows(item) {
-  return item.evidences.map((evidence) => `${evidence.title || evidence.linkedDocument || "Evidencia"}: ${evidence.status || "registrada"}`);
+  return item.evidences.map((evidence) => {
+    const support = evidence.linkedDocument || evidence.document || evidence.link || "";
+    return `${evidence.title || support || "Evidencia"}: ${evidence.status || "registrada"}${support ? ` - ${support}` : ""}`;
+  });
 }
 
 function evidenceWorkspaceActionRows(item) {
@@ -11660,7 +11685,42 @@ function handleEvidenceWorkspaceAction(action, code) {
   }
   if (action === "validate") {
     validateSuggestedEvidenceForRequirement(code);
+    return;
   }
+  if (action === "support") {
+    registerRealEvidenceSupport(code);
+  }
+}
+
+function registerRealEvidenceSupport(code) {
+  const req = requirements.find((item) => item.code === code);
+  const titleInput = [...document.querySelectorAll("[data-evidence-support-title]")].find((input) => input.dataset.evidenceSupportTitle === code);
+  const refInput = [...document.querySelectorAll("[data-evidence-support-ref]")].find((input) => input.dataset.evidenceSupportRef === code);
+  const title = (titleInput?.value || req?.evidence || `Evidencia requisito ${code}`).trim();
+  const support = (refInput?.value || "").trim();
+  if (!support) {
+    addMessage("agent", "Para registrar soporte real, escribe un enlace, nombre de archivo o referencia del documento.");
+    return;
+  }
+  const existing = state.evidence.find((item) => item.code === code && item.source === "soporte humano" && item.linkedDocument === support);
+  const evidence = {
+    title,
+    code,
+    status: "registrada",
+    source: "soporte humano",
+    linkedDocument: support,
+    document: support,
+    validatedBy: `${state.ownerName || "Responsable"} (${roleLabel(state.currentUserRole)})`,
+    validatedAt: today()
+  };
+  if (existing) {
+    Object.assign(existing, evidence, { date: existing.date || today() });
+    saveState();
+    renderAll();
+    return;
+  }
+  addEvidenceRecord(evidence);
+  addMessage("agent", `Registre soporte real para ${code}: ${title}. Ahora este requisito cuenta con evidencia registrada.`);
 }
 
 function validateSuggestedEvidenceForRequirement(code) {

@@ -3166,6 +3166,39 @@ textarea {
   padding: 6px 8px;
 }
 
+.evidence-support-form {
+  align-items: end;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(220px, 1fr) auto;
+  padding: 12px;
+}
+
+.evidence-support-form p,
+.evidence-support-form strong,
+.evidence-support-form span {
+  display: block;
+  margin: 0;
+}
+
+.evidence-support-form span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.evidence-support-form label {
+  margin: 0;
+}
+
+.evidence-support-form button {
+  min-height: 42px;
+}
+
 .evidence-workspace .row-actions {
   justify-content: end;
 }
@@ -4238,6 +4271,7 @@ textarea {
   .evidence-workspace-head,
   .evidence-workspace-grid,
   .evidence-workspace-detail,
+  .evidence-support-form,
   .management-command-panel,
   .management-command-grid,
   .activity-operational-status,
