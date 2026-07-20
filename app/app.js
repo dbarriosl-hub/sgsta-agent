@@ -4096,6 +4096,7 @@ function prepareActivityPackage(activityName) {
   const created = activityPackageTables.map((table) => upsertActivityFormDraft(table, activityName)).filter(Boolean);
   suggestActivityEvidence(activityName);
   createActivityQuickAction(`Revisar paquete operativo de ${activityName}`, "8.1", "tarea", activityName);
+  setFormGenerationResult({ responses: created, payload: { activity: activityName }, source: "agente_actividad" });
   state.selectedActivityName = activityName;
   state.selectedFormActivity = activityName;
   state.formFilters.search = activityName;
@@ -7485,6 +7486,7 @@ function renderForms() {
   bindFormFilters();
   bindFormActivityTools();
   renderAiFormTestResult();
+  renderFormGenerationResult();
   renderFormRequirementCoverage();
 
   container.innerHTML = visibleForms.length
@@ -7827,6 +7829,105 @@ function renderAiFormTestResult() {
     </section>`;
 }
 
+function renderFormGenerationResult() {
+  const container = document.querySelector("#formGenerationResult");
+  if (!container) return;
+  const result = state.formGenerationResult;
+  if (!result) {
+    container.innerHTML = "";
+    return;
+  }
+  const pending = result.responses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status))).length;
+  const approved = result.responses.filter((item) => normalizedFormStatus(item.status) === "aprobado").length;
+  const filterLabel = result.activity || result.requirement || result.table || "";
+  container.innerHTML = `
+    <section class="form-generation-card">
+      <div>
+        <p class="eyebrow">Ultimo diligenciamiento</p>
+        <h3>${escapeHtml(result.title)}</h3>
+        <p>${escapeHtml(result.detail)}</p>
+        <div class="matrix-metrics">
+          <span>${result.count} formulario(s)</span>
+          <span>${pending} por aprobar</span>
+          <span>${approved} aprobado(s)</span>
+          <span>${escapeHtml(result.sourceLabel)}</span>
+        </div>
+      </div>
+      <div class="form-generation-next">
+        <span class="badge ${result.aiUsed ? "cumple" : "en_proceso"}">${result.aiUsed ? "IA" : "reglas"}</span>
+        <strong>${escapeHtml(result.nextStep)}</strong>
+        <div class="row-actions">
+          <button class="secondary-button" data-form-generation-filter type="button" ${filterLabel ? "" : "disabled"}>Ver generados</button>
+          <button data-form-generation-review type="button" ${pending ? "" : "disabled"}>Enviar a revision</button>
+          <button class="secondary-button" data-form-generation-human type="button">Revision humana</button>
+        </div>
+      </div>
+    </section>`;
+  container.querySelector("[data-form-generation-filter]")?.addEventListener("click", () => {
+    state.formFilters.search = filterLabel;
+    state.formFilters.status = "todos";
+    saveState();
+    renderForms();
+  });
+  container.querySelector("[data-form-generation-review]")?.addEventListener("click", sendLastGeneratedFormsToReview);
+  container.querySelector("[data-form-generation-human]")?.addEventListener("click", () => showView("revision_humana"));
+}
+
+function setFormGenerationResult({ responses = [], payload = {}, ai = {}, source = "agente" }) {
+  const validResponses = responses.filter(Boolean);
+  if (!validResponses.length) return;
+  const first = validResponses[0];
+  const aiUsed = Boolean(ai?.used || validResponses.some((item) => String(item.source || "").includes("ia")));
+  state.formGenerationResult = {
+    title: payload.activity
+      ? `Paquete generado para ${payload.activity}`
+      : payload.requirement
+        ? `Borradores del requisito ${payload.requirement}`
+        : `Formulario generado: ${first.form || first.table}`,
+    detail: `${validResponses.length} formulario(s) quedaron como borrador/revision. El agente no los aprueba: requieren revision humana para contar como evidencia completa.`,
+    sourceLabel: aiUsed ? `${ai.provider || "IA"} ${validResponses[0]?.aiModel || ""}`.trim() : source,
+    aiUsed,
+    provider: ai?.provider || "",
+    model: validResponses[0]?.aiModel || "",
+    activity: payload.activity || first.activity || "",
+    requirement: payload.requirement || first.code || "",
+    table: payload.table || first.table || "",
+    count: validResponses.length,
+    responses: validResponses.map((item) => ({
+      table: item.table,
+      activity: item.activity || "",
+      form: item.form || item.table,
+      code: item.code || "",
+      status: normalizedFormStatus(item.status)
+    })),
+    nextStep: "Enviar a revision humana y aprobar desde Direccion si el contenido esta correcto.",
+    createdAt: today()
+  };
+}
+
+async function sendLastGeneratedFormsToReview() {
+  const result = state.formGenerationResult;
+  if (!result) return;
+  let changed = 0;
+  for (const item of result.responses) {
+    const response = getFormResponse(item.table, item.activity || "");
+    if (!response || normalizedFormStatus(response.status) !== "borrador") continue;
+    await setFormReviewStatus(item.table, item.activity || "");
+    changed += 1;
+  }
+  addMessage("agent", changed ? `Envie ${changed} formulario(s) generados a revision humana.` : "No habia formularios en borrador para enviar a revision.");
+  state.formGenerationResult = {
+    ...result,
+    responses: result.responses.map((item) => {
+      const response = getFormResponse(item.table, item.activity || "");
+      return { ...item, status: normalizedFormStatus(response?.status || item.status) };
+    }),
+    nextStep: "Revisar en la bandeja humana y aprobar solo si el contenido es correcto."
+  };
+  saveState();
+  renderAll();
+}
+
 function selectedCatalogForm() {
   const catalog = visibleCatalogForms(window.formCatalog || []);
   return catalog.find((form) => form.table === state.selectedFormTable) || catalog[0];
@@ -8021,6 +8122,8 @@ async function fillCatalogForm(table) {
       actor: "agente"
     });
   }
+  const generated = getFormResponse(table);
+  setFormGenerationResult({ responses: generated ? [generated] : [], payload: { table }, source: "agente" });
   state.selectedFormTable = table;
   saveState();
   renderAll();
@@ -8039,6 +8142,7 @@ async function fillActivityCatalogForm(table) {
 function fillActivityCatalogFormLocal(table, activityName) {
   const response = upsertActivityFormDraft(table, activityName);
   if (!response) return;
+  setFormGenerationResult({ responses: [response], payload: { table, activity: activityName }, source: "agente_actividad" });
   state.selectedFormTable = table;
   state.selectedActivityName = activityName;
   state.formFilters.search = activityName;
@@ -8108,6 +8212,8 @@ async function fillRequirementForms(code) {
       });
     }
   });
+  const generated = forms.map((form) => getFormResponse(form.table)).filter(Boolean);
+  setFormGenerationResult({ responses: generated, payload: { requirement: code }, source: "agente" });
   state.formFilters.search = code;
   state.formFilters.status = "todos";
   saveState();
@@ -8137,6 +8243,7 @@ async function createFormDraftsInBackend(payload) {
       state.formFilters.search = payload.requirement;
       state.formFilters.status = "todos";
     }
+    setFormGenerationResult({ responses: result.responses || [], payload, ai: result.ai, source: "backend" });
     persistLocalState();
     updateBackendStatus("Backend conectado: borrador guardado", true);
     const aiText = result.ai?.used
