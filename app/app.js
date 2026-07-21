@@ -2124,11 +2124,78 @@ function renderMvpLaunchPanel() {
         <span>Evidencias <strong>${launch.evidenceWithSupport}/${requirements.length}</strong></span>
         <span>Acciones abiertas <strong>${launch.openActions.length}</strong></span>
       </div>
+      ${renderMvpAcceptanceGuide(launch)}
       <div class="row-actions">
         <button class="secondary-button" data-mvp-launch-report type="button">Descargar estado MVP</button>
         <button class="secondary-button" data-mvp-launch-evidence type="button">Enviar estado a evidencias</button>
         <button class="secondary-button" data-mvp-launch-validate type="button">Registrar validacion MVP</button>
         <button data-mvp-launch-run="all" type="button">Preparar paquete MVP</button>
+      </div>
+    </div>`;
+}
+
+function mvpAcceptanceRows(launch = mvpLaunchStatus()) {
+  return [
+    {
+      label: "1. Empresa",
+      detail: "Crear o revisar empresa, ubicacion, alcance y actividades.",
+      done: companyProfileGaps().length <= 2,
+      view: "empresa"
+    },
+    {
+      label: "2. Actividad",
+      detail: "Abrir una actividad y explicar riesgos, guia, equipo, seguro y participantes.",
+      done: launch.offerableActivities > 0 || launch.reviewActivities > 0,
+      view: "actividades"
+    },
+    {
+      label: "3. Agente",
+      detail: "Preparar riesgos, formularios, acciones o evidencias sin aprobar automaticamente.",
+      done: state.auditLog.some((event) => event.actor === "agente") || state.formResponses.some((item) => String(item.source || "").includes("agente")),
+      view: "agente"
+    },
+    {
+      label: "4. Humano",
+      detail: "Enviar algo a revision y demostrar que Direccion/Admin aprueba.",
+      done: launch.reviewItems.length > 0 || state.formResponses.some((item) => normalizedFormStatus(item.status) === "aprobado"),
+      view: "revision_humana"
+    },
+    {
+      label: "5. Evidencia",
+      detail: "Registrar soporte real o validar evidencia sugerida en un requisito.",
+      done: state.evidence.some((item) => item.status !== "sugerida"),
+      view: "evidencias"
+    },
+    {
+      label: "6. Mejora",
+      detail: "Mostrar una accion con seguimiento, evidencia y eficacia pendiente o eficaz.",
+      done: state.actions.some((action) => action.followUp || action.evidence || action.efficacyVerification),
+      view: "acciones"
+    }
+  ];
+}
+
+function renderMvpAcceptanceGuide(launch) {
+  const rows = mvpAcceptanceRows(launch);
+  const done = rows.filter((row) => row.done).length;
+  return `
+    <div class="mvp-acceptance-guide">
+      <div class="mvp-acceptance-head">
+        <div>
+          <p class="eyebrow">Prueba MVP en 20 minutos</p>
+          <strong>${done}/${rows.length} criterios listos</strong>
+          <span>Usa esta lista para probar con una empresa nueva sin explicar toda la norma.</span>
+        </div>
+        <button class="secondary-button" data-mvp-launch-guide type="button">Descargar guia</button>
+      </div>
+      <div class="mvp-acceptance-grid">
+        ${rows.map((row) => `
+          <article class="mvp-acceptance-item ${row.done ? "done" : ""}">
+            <span class="badge ${row.done ? "cumple" : "pendiente"}">${row.done ? "ok" : "falta"}</span>
+            <strong>${escapeHtml(row.label)}</strong>
+            <p>${escapeHtml(row.detail)}</p>
+            <button class="secondary-button" data-mvp-acceptance-open="${row.view}" type="button">Abrir</button>
+          </article>`).join("")}
       </div>
     </div>`;
 }
@@ -2584,6 +2651,10 @@ function renderImplementationRoadmap() {
   container.querySelector("[data-mvp-launch-report]")?.addEventListener("click", downloadMvpPilotReport);
   container.querySelector("[data-mvp-launch-evidence]")?.addEventListener("click", convertMvpPilotReportToEvidence);
   container.querySelector("[data-mvp-launch-validate]")?.addEventListener("click", registerMvpValidation);
+  container.querySelector("[data-mvp-launch-guide]")?.addEventListener("click", downloadPilotTestGuide);
+  container.querySelectorAll("[data-mvp-acceptance-open]").forEach((button) => {
+    button.addEventListener("click", () => showView(button.dataset.mvpAcceptanceOpen));
+  });
 }
 
 function renderImplementation() {

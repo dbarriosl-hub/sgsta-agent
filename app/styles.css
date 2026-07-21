@@ -1901,6 +1901,67 @@ textarea {
   color: var(--text);
 }
 
+.mvp-acceptance-guide {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mvp-acceptance-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.mvp-acceptance-head p,
+.mvp-acceptance-head strong,
+.mvp-acceptance-head span {
+  display: block;
+  margin: 0;
+}
+
+.mvp-acceptance-head span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.mvp-acceptance-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.mvp-acceptance-item {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+}
+
+.mvp-acceptance-item.done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.mvp-acceptance-item strong,
+.mvp-acceptance-item p {
+  margin: 0;
+}
+
+.mvp-acceptance-item p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .startup-approval-gate h3,
 .startup-approval-gate p,
 .startup-approval-gate .eyebrow {
@@ -4364,6 +4425,8 @@ textarea {
   .mvp-launch-head,
   .mvp-launch-gates,
   .mvp-launch-metrics,
+  .mvp-acceptance-head,
+  .mvp-acceptance-grid,
   .documents-layout,
   .forms-layout,
   .org-form,
