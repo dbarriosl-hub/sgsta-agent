@@ -2186,7 +2186,10 @@ function renderMvpAcceptanceGuide(launch) {
           <strong>${done}/${rows.length} criterios listos</strong>
           <span>Usa esta lista para probar con una empresa nueva sin explicar toda la norma.</span>
         </div>
-        <button class="secondary-button" data-mvp-launch-guide type="button">Descargar guia</button>
+        <div class="row-actions">
+          <button class="secondary-button" data-mvp-acceptance-observe type="button" ${done === rows.length ? "disabled" : ""}>Crear observaciones</button>
+          <button class="secondary-button" data-mvp-launch-guide type="button">Descargar guia</button>
+        </div>
       </div>
       <div class="mvp-acceptance-grid">
         ${rows.map((row) => `
@@ -2198,6 +2201,42 @@ function renderMvpAcceptanceGuide(launch) {
           </article>`).join("")}
       </div>
     </div>`;
+}
+
+function createMvpAcceptanceObservations() {
+  const missingRows = mvpAcceptanceRows().filter((row) => !row.done);
+  if (!missingRows.length) {
+    addMessage("agent", "Todos los criterios de la prueba MVP estan listos. Puedes registrar la validacion MVP.");
+    return;
+  }
+  state.pilotObservations = state.pilotObservations || [];
+  let created = 0;
+  missingRows.forEach((row) => {
+    const text = `Prueba MVP pendiente - ${row.label}: ${row.detail}`;
+    const exists = state.pilotObservations.some((item) => item.text === text && item.status !== "cerrada");
+    if (exists) return;
+    state.pilotObservations.unshift({
+      text,
+      area: "mvp",
+      activity: state.selectedActivityName || "General",
+      source: state.ownerName || "Responsable SGSTA",
+      priority: row.label.includes("Humano") || row.label.includes("Evidencia") ? "alta" : "media",
+      status: "abierta",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  recordAuditEvent({
+    title: "Criterios MVP convertidos en observaciones",
+    detail: `${created} criterio(s) pendiente(s) quedaron como observaciones piloto para mejora.`,
+    code: "10.2",
+    type: "piloto",
+    actor: "agente"
+  });
+  addMessage("agent", created ? `Converti ${created} criterio(s) pendiente(s) del MVP en observaciones piloto.` : "Los criterios pendientes ya estaban registrados como observaciones piloto.");
+  saveState();
+  showView("panel");
+  renderAll();
 }
 
 function mvpValidationSummaryText() {
@@ -2652,6 +2691,7 @@ function renderImplementationRoadmap() {
   container.querySelector("[data-mvp-launch-evidence]")?.addEventListener("click", convertMvpPilotReportToEvidence);
   container.querySelector("[data-mvp-launch-validate]")?.addEventListener("click", registerMvpValidation);
   container.querySelector("[data-mvp-launch-guide]")?.addEventListener("click", downloadPilotTestGuide);
+  container.querySelector("[data-mvp-acceptance-observe]")?.addEventListener("click", createMvpAcceptanceObservations);
   container.querySelectorAll("[data-mvp-acceptance-open]").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.mvpAcceptanceOpen));
   });
