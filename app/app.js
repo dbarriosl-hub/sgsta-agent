@@ -2553,12 +2553,21 @@ async function runStartupPilotStep(id) {
   if (!step) return;
   if (step.view) showView(step.view);
   if (id === "empresa") {
+    generateCompanyImplementationProfile({ silent: true });
     await fillRequirementForms("4.3");
     createAction("Completar alcance, partes interesadas y contexto de la empresa", "4.3", "tarea", "arranque empresa");
   }
-  if (id === "actividades") addActivity();
-  if (id === "riesgos") generateRiskMapWithAgent();
+  if (id === "actividades") {
+    if (!state.activities.length) addActivity();
+    else showView("actividades");
+  }
+  if (id === "riesgos") {
+    if (!state.activities.length) addActivity();
+    state.selectedActivityName = state.selectedActivityName || state.activities[0]?.name || "";
+    generateRiskMapWithAgent();
+  }
   if (id === "controles") {
+    if (!state.activities.length) addActivity();
     const activityName = state.selectedActivityName || state.activities[0]?.name;
     if (activityName) {
       addEquipmentForActivity(activityName);
@@ -2578,6 +2587,12 @@ async function runStartupPilotStep(id) {
     showView("evidencias");
   }
   if (id === "acciones") {
+    if (!state.actions.some((action) => action.status !== "cerrada")) {
+      createImplementationWorkPlanActions({ silent: true });
+    }
+    if (!state.actions.some((action) => action.status !== "cerrada")) {
+      createAction("Priorizar primeros pendientes del arranque SGSTA", "10.1", "tarea", "arranque empresa");
+    }
     state.actionFocusMode = "priority";
     state.actionFilterActivity = state.selectedActivityName || "";
     showView("acciones");
