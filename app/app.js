@@ -935,6 +935,7 @@ function renderPilotObservationPanel() {
         </label>
         <div class="row-actions wide">
           <button class="secondary-button" data-pilot-observation-report type="button">Descargar observaciones</button>
+          <button class="secondary-button" data-pilot-observation-evidence type="button">Enviar a evidencias</button>
           <button class="secondary-button" data-pilot-observation-actions type="button">Convertir abiertas en acciones</button>
           <button data-pilot-observation-add type="button">Registrar observacion</button>
         </div>
@@ -961,6 +962,7 @@ function bindPilotObservationControls(container) {
   container.querySelector("[data-pilot-observation-add]")?.addEventListener("click", addPilotObservation);
   container.querySelector("[data-pilot-observation-actions]")?.addEventListener("click", createPilotObservationActions);
   container.querySelector("[data-pilot-observation-report]")?.addEventListener("click", downloadPilotObservationReport);
+  container.querySelector("[data-pilot-observation-evidence]")?.addEventListener("click", convertPilotObservationReportToEvidence);
   container.querySelectorAll("[data-pilot-observation-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const created = createPilotObservationAction(Number(button.dataset.pilotObservationAction));
@@ -1173,6 +1175,46 @@ function downloadPilotObservationReport() {
     actor: "humano"
   });
   saveState();
+  renderAll();
+}
+
+function convertPilotObservationReportToEvidence() {
+  const content = pilotObservationReportText();
+  const summary = pilotObservationSummary();
+  const title = `Reporte observaciones piloto ${today()}`;
+  const codes = ["10.2", "9.1"];
+  let created = 0;
+  let updated = 0;
+  codes.forEach((code) => {
+    const linkedDocument = `${title} (${code})`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "observaciones piloto");
+    const evidence = {
+      title: `${title} - requisito ${code}`,
+      code,
+      source: "observaciones piloto",
+      status: summary.total ? "registrada" : "sugerida",
+      linkedDocument,
+      content
+    };
+    if (existing) {
+      Object.assign(existing, evidence, { date: today() });
+      updated += 1;
+    } else {
+      state.evidence.unshift({ date: today(), ...evidence });
+      created += 1;
+    }
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  recordAuditEvent({
+    title: "Observaciones piloto enviadas a evidencias",
+    detail: `${created} evidencia(s) creada(s), ${updated} actualizada(s), observaciones: ${summary.total}.`,
+    code: codes.join("/"),
+    type: "evidencia",
+    actor: "humano"
+  });
+  addMessage("agent", `Asocie observaciones del piloto como evidencia para ${codes.join(" y ")}.`);
+  saveState();
+  showView("evidencias");
   renderAll();
 }
 
