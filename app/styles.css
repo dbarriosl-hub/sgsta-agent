@@ -1703,6 +1703,30 @@ textarea {
   padding: 14px;
 }
 
+.startup-notice {
+  align-items: center;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.startup-notice strong,
+.startup-notice p {
+  display: block;
+  margin: 4px 0 0;
+}
+
+.startup-notice p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .startup-guide-head {
   align-items: center;
   display: grid;
@@ -4418,6 +4442,7 @@ textarea {
   .implementation-layout,
   .onboarding-card,
   .phase-grid,
+  .startup-notice,
   .startup-guide-head,
   .startup-step-grid,
   .startup-approval-gate,

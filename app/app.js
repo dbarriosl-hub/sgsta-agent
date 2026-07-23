@@ -234,6 +234,7 @@ const defaultState = {
   agentFindings: [],
   closurePackages: [],
   evidencePackageNotice: null,
+  startupNotice: null,
   selectedEvidenceCode: "6.1.2",
   selectedActivityName: "Senderismo",
   activityHelperNotice: null,
@@ -300,6 +301,7 @@ function mergeState(base, current) {
     agentFindings: current.agentFindings || base.agentFindings,
     closurePackages: current.closurePackages || base.closurePackages,
     evidencePackageNotice: current.evidencePackageNotice || base.evidencePackageNotice,
+    startupNotice: current.startupNotice || base.startupNotice,
     selectedEvidenceCode: current.selectedEvidenceCode || base.selectedEvidenceCode,
     activityHelperNotice: current.activityHelperNotice || base.activityHelperNotice,
     actionFilterActivity: current.actionFilterActivity || base.actionFilterActivity,
@@ -2513,8 +2515,21 @@ function renderStartupPilotGuide() {
   const steps = startupPilotSteps();
   const done = steps.filter((step) => step.done).length;
   const next = steps.find((step) => !step.done) || steps[steps.length - 1];
+  const notice = state.startupNotice;
   return `
     <div class="startup-guide">
+      ${notice ? `
+        <div class="startup-notice">
+          <div>
+            <span class="badge cumple">Hecho</span>
+            <strong>${escapeHtml(notice.title)}</strong>
+            <p>${escapeHtml(notice.detail)}</p>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button" data-startup-notice-open="${escapeHtml(notice.view || next.view)}" type="button">Abrir resultado</button>
+            <button data-startup-notice-clear type="button">Entendido</button>
+          </div>
+        </div>` : ""}
       <div class="startup-guide-head">
         <div>
           <p class="eyebrow">Empresa nueva</p>
@@ -2551,6 +2566,17 @@ function renderStartupPilotGuide() {
 async function runStartupPilotStep(id) {
   const step = startupPilotSteps().find((item) => item.id === id);
   if (!step) return;
+  const before = {
+    activities: state.activities.length,
+    risks: state.risks.length,
+    actions: state.actions.length,
+    forms: state.formResponses.length,
+    evidence: state.evidence.length,
+    equipment: state.equipment.length,
+    people: state.people.length,
+    policies: state.policies.length,
+    participants: state.participantEvidence.length
+  };
   if (step.view) showView(step.view);
   if (id === "empresa") {
     generateCompanyImplementationProfile({ silent: true });
@@ -2597,6 +2623,33 @@ async function runStartupPilotStep(id) {
     state.actionFilterActivity = state.selectedActivityName || "";
     showView("acciones");
   }
+  const after = {
+    activities: state.activities.length,
+    risks: state.risks.length,
+    actions: state.actions.length,
+    forms: state.formResponses.length,
+    evidence: state.evidence.length,
+    equipment: state.equipment.length,
+    people: state.people.length,
+    policies: state.policies.length,
+    participants: state.participantEvidence.length
+  };
+  const created = [
+    after.activities - before.activities > 0 ? `${after.activities - before.activities} actividad(es)` : "",
+    after.risks - before.risks > 0 ? `${after.risks - before.risks} riesgo(s)` : "",
+    after.forms - before.forms > 0 ? `${after.forms - before.forms} formulario(s)` : "",
+    after.evidence - before.evidence > 0 ? `${after.evidence - before.evidence} evidencia(s)` : "",
+    after.actions - before.actions > 0 ? `${after.actions - before.actions} accion(es)` : "",
+    after.equipment - before.equipment > 0 ? `${after.equipment - before.equipment} equipo(s)` : "",
+    after.people - before.people > 0 ? `${after.people - before.people} guia/persona(s)` : "",
+    after.policies - before.policies > 0 ? `${after.policies - before.policies} poliza(s)` : "",
+    after.participants - before.participants > 0 ? `${after.participants - before.participants} evidencia(s) participante` : ""
+  ].filter(Boolean);
+  state.startupNotice = {
+    title: `Paso preparado: ${step.title}`,
+    detail: created.length ? `Se creo o preparo: ${created.join(", ")}. Siguiente: revisa el modulo y completa los datos reales.` : "No se crearon registros nuevos porque ya existian datos para este paso. Revisa el modulo y completa/aprueba lo pendiente.",
+    view: step.view
+  };
   addMessage("agent", `Arranque empresa nueva: avance el paso ${step.title}.`);
   saveState();
   renderAll();
@@ -2719,6 +2772,14 @@ function renderImplementationRoadmap() {
   });
   container.querySelectorAll("[data-startup-run]").forEach((button) => {
     button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
+  });
+  container.querySelector("[data-startup-notice-clear]")?.addEventListener("click", () => {
+    state.startupNotice = null;
+    saveState();
+    renderAll();
+  });
+  container.querySelector("[data-startup-notice-open]")?.addEventListener("click", (event) => {
+    showView(event.currentTarget.dataset.startupNoticeOpen);
   });
   container.querySelector("[data-startup-gate='actions']")?.addEventListener("click", () => {
     state.actionFocusMode = "priority";
