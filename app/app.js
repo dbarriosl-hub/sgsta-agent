@@ -2543,6 +2543,7 @@ function renderStartupPilotGuide() {
         <div class="row-actions startup-guide-actions">
           <button class="secondary-button" data-startup-reset type="button">Empezar limpio</button>
           <button class="secondary-button" data-startup-demo type="button">Cargar ejemplo</button>
+          <button class="secondary-button" data-startup-report type="button">Descargar arranque</button>
         </div>
       </div>
       <div class="startup-step-grid">
@@ -2561,6 +2562,60 @@ function renderStartupPilotGuide() {
       </div>
       ${renderStartupApprovalGate(done, steps.length)}
     </div>`;
+}
+
+function startupReportText() {
+  const steps = startupPilotSteps();
+  const done = steps.filter((step) => step.done).length;
+  const next = steps.find((step) => !step.done) || steps[steps.length - 1];
+  const openActions = state.actions.filter((action) => action.status !== "cerrada");
+  const activityRows = companyActivityIntakeRows();
+  return [
+    "ESTADO DE ARRANQUE - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    "",
+    `Avance arranque: ${done}/${steps.length} pasos (${Math.round((done / steps.length) * 100)}%).`,
+    `Siguiente paso: ${next.title} - ${next.detail}`,
+    "",
+    "Pasos de arranque",
+    ...steps.map((step) => `- ${step.done ? "[listo]" : "[pendiente]"} ${step.label}. ${step.title}: ${step.detail}`),
+    "",
+    "Datos por actividad",
+    ...(activityRows.length ? activityRows.map((row) => `- ${row.name}: ${row.pct}% listo. Faltan: ${row.missing.length ? row.missing.join(", ") : "sin faltantes principales"}.`) : ["- Sin actividades registradas."]),
+    "",
+    "Acciones abiertas",
+    ...(openActions.length ? openActions.slice(0, 10).map((action) => `- ${action.code || "SG"} ${action.title || "Accion"} (${action.priority || "media"})`) : ["- Sin acciones abiertas."]),
+    "",
+    "Ultimo resultado del agente",
+    state.startupNotice ? `${state.startupNotice.title}: ${state.startupNotice.detail}` : "- Sin resultado reciente de arranque.",
+    "",
+    "Regla de gobierno",
+    "El agente prepara datos, borradores, evidencias y acciones. La empresa revisa, completa datos reales y aprueba cumplimiento."
+  ].join("\n");
+}
+
+function downloadStartupReport() {
+  const blob = new Blob([startupReportText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "estado_arranque_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Estado de arranque descargado",
+    detail: "Se descargo el avance del arranque guiado de empresa nueva.",
+    code: "4.4",
+    type: "arranque",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
 }
 
 async function runStartupPilotStep(id) {
@@ -2773,6 +2828,7 @@ function renderImplementationRoadmap() {
   container.querySelectorAll("[data-startup-run]").forEach((button) => {
     button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
   });
+  container.querySelector("[data-startup-report]")?.addEventListener("click", downloadStartupReport);
   container.querySelector("[data-startup-notice-clear]")?.addEventListener("click", () => {
     state.startupNotice = null;
     saveState();
