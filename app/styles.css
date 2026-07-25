@@ -742,6 +742,44 @@ textarea {
   color: var(--text);
 }
 
+.subscription-snapshot {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, auto) auto;
+}
+
+.subscription-snapshot h3,
+.subscription-snapshot p {
+  margin: 0;
+}
+
+.subscription-snapshot p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.subscription-snapshot-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+}
+
+.subscription-snapshot-metrics span {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+}
+
+.subscription-snapshot-metrics strong {
+  color: var(--ink);
+}
+
 .demo-script {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -4476,6 +4514,8 @@ textarea {
   .demo-readiness-card,
   .mvp-pilot-card,
   .mvp-pilot-main,
+  .subscription-snapshot,
+  .subscription-snapshot-metrics,
   .phva-grid,
   .phva-maturity-grid,
   .plans-grid,

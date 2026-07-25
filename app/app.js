@@ -543,6 +543,7 @@ function renderAll() {
   renderMetrics();
   renderSystemHealthSummary();
   renderDemoReadiness();
+  renderSubscriptionSnapshot();
   renderOperationReadinessSummary();
   renderTodayWork();
   renderRequirements();
@@ -670,6 +671,30 @@ function renderDemoReadiness() {
     button.addEventListener("click", (event) => showView(event.currentTarget.dataset.demoStep));
   });
   bindPilotObservationControls(container);
+}
+
+function renderSubscriptionSnapshot() {
+  const container = document.querySelector("#subscriptionSnapshot");
+  if (!container) return;
+  const recommendation = recommendedSubscriptionPlan();
+  const current = subscriptionPlans[state.currentPlan] || subscriptionPlans.profesional;
+  const usage = currentPlanUsage();
+  const over = Object.values(usage).filter((item) => item.over);
+  container.innerHTML = `
+    <div class="subscription-snapshot">
+      <div>
+        <p class="eyebrow">SaaS</p>
+        <h3>${escapeHtml(current.name)} ${recommendation.currentMatches ? "bien alineado" : `-> recomendar ${recommendation.recommended.name}`}</h3>
+        <p>${escapeHtml(recommendation.reasons[0] || current.fit)}${over.length ? ` Hay ${over.length} limite(s) superado(s).` : ""}</p>
+      </div>
+      <div class="subscription-snapshot-metrics">
+        <span>Formularios <strong>${usage.forms.used}/${usage.forms.limit}</strong></span>
+        <span>Agente <strong>${usage.agentRuns.used}/${usage.agentRuns.limit}</strong></span>
+        <span>Normas <strong>${usage.norms.used}/${usage.norms.limit}</strong></span>
+      </div>
+      <button data-open-subscription type="button">Ver suscripcion</button>
+    </div>`;
+  container.querySelector("[data-open-subscription]")?.addEventListener("click", () => showView("suscripcion"));
 }
 
 function mvpPilotStatus(demo) {
