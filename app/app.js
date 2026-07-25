@@ -2544,6 +2544,7 @@ function renderStartupPilotGuide() {
           <button class="secondary-button" data-startup-reset type="button">Empezar limpio</button>
           <button class="secondary-button" data-startup-demo type="button">Cargar ejemplo</button>
           <button class="secondary-button" data-startup-report type="button">Descargar arranque</button>
+          <button data-startup-evidence type="button">Enviar a evidencias</button>
         </div>
       </div>
       <div class="startup-step-grid">
@@ -2615,6 +2616,52 @@ function downloadStartupReport() {
     actor: "humano"
   });
   saveState();
+  renderAll();
+}
+
+function convertStartupReportToEvidence() {
+  const content = startupReportText();
+  const steps = startupPilotSteps();
+  const done = steps.filter((step) => step.done).length;
+  const title = `Estado de arranque ${today()}`;
+  const codes = ["4.1", "4.4"];
+  let created = 0;
+  let updated = 0;
+  codes.forEach((code) => {
+    const linkedDocument = `${title} (${code})`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "arranque guiado");
+    const evidence = {
+      title: `${title} - requisito ${code}`,
+      code,
+      source: "arranque guiado",
+      status: done ? "registrada" : "sugerida",
+      linkedDocument,
+      content
+    };
+    if (existing) {
+      Object.assign(existing, evidence, { date: today() });
+      updated += 1;
+    } else {
+      state.evidence.unshift({ date: today(), ...evidence });
+      created += 1;
+    }
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  state.startupNotice = {
+    title: "Arranque enviado a evidencias",
+    detail: `${created} evidencia(s) creada(s), ${updated} actualizada(s). Revisalas como soporte de contexto y sistema de gestion.`,
+    view: "evidencias"
+  };
+  recordAuditEvent({
+    title: "Estado de arranque enviado a evidencias",
+    detail: `${created} evidencia(s) creada(s), ${updated} actualizada(s), requisitos ${codes.join(", ")}.`,
+    code: codes.join("/"),
+    type: "arranque",
+    actor: "humano"
+  });
+  addMessage("agent", "Asocie el estado de arranque como evidencia para 4.1 y 4.4. Si aun faltan datos, quedara como base de trabajo para completar.");
+  saveState();
+  showView("evidencias");
   renderAll();
 }
 
@@ -2829,6 +2876,7 @@ function renderImplementationRoadmap() {
     button.addEventListener("click", () => runStartupPilotStep(button.dataset.startupRun));
   });
   container.querySelector("[data-startup-report]")?.addEventListener("click", downloadStartupReport);
+  container.querySelector("[data-startup-evidence]")?.addEventListener("click", convertStartupReportToEvidence);
   container.querySelector("[data-startup-notice-clear]")?.addEventListener("click", () => {
     state.startupNotice = null;
     saveState();
