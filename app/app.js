@@ -10592,6 +10592,46 @@ function downloadPilotSalesPlan() {
   renderAll();
 }
 
+function convertPilotSalesPlanToEvidence() {
+  const plan = pilotSalesPlan();
+  const content = pilotSalesPlanText();
+  const title = `Plan piloto comercial ${today()}`;
+  const codes = ["4.4", "10.2"];
+  let created = 0;
+  let updated = 0;
+  codes.forEach((code) => {
+    const linkedDocument = `${title} (${code})`;
+    const existing = state.evidence.find((item) => item.linkedDocument === linkedDocument && item.source === "plan piloto comercial");
+    const evidence = {
+      title: `${title} - requisito ${code}`,
+      code,
+      source: "plan piloto comercial",
+      status: plan.pct >= 80 ? "registrada" : "sugerida",
+      linkedDocument,
+      content
+    };
+    if (existing) {
+      Object.assign(existing, evidence, { date: today() });
+      updated += 1;
+    } else {
+      state.evidence.unshift({ date: today(), ...evidence });
+      created += 1;
+    }
+    state.compliance[code] = state.compliance[code] === "cumple" ? "cumple" : "en_proceso";
+  });
+  recordAuditEvent({
+    title: "Plan piloto comercial enviado a evidencias",
+    detail: `${created} evidencia(s) creada(s), ${updated} actualizada(s), avance piloto ${plan.pct}%.`,
+    code: codes.join("/"),
+    type: "suscripcion",
+    actor: "humano"
+  });
+  addMessage("agent", `Asocie el plan piloto comercial como evidencia para ${codes.join(" y ")}. Revisa si queda sugerida o registrada segun avance.`);
+  saveState();
+  showView("evidencias");
+  renderAll();
+}
+
 function createPilotSalesActions() {
   const plan = pilotSalesPlan();
   let created = 0;
@@ -10656,10 +10696,12 @@ function renderPilotSalesPackage() {
       </div>
       <div class="row-actions">
         <button class="secondary-button" data-pilot-download type="button">Descargar plan piloto</button>
+        <button class="secondary-button" data-pilot-evidence type="button">Enviar a evidencias</button>
         <button data-pilot-actions type="button">Crear acciones piloto</button>
       </div>
     </article>`;
   container.querySelector("[data-pilot-download]")?.addEventListener("click", downloadPilotSalesPlan);
+  container.querySelector("[data-pilot-evidence]")?.addEventListener("click", convertPilotSalesPlanToEvidence);
   container.querySelector("[data-pilot-actions]")?.addEventListener("click", createPilotSalesActions);
 }
 
