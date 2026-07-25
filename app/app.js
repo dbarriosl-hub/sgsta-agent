@@ -9587,6 +9587,66 @@ function priorityRank(priority) {
   return { alta: 3, media: 2, baja: 1 }[priority] || 2;
 }
 
+function reviewInboxReportText() {
+  const items = buildReviewItems();
+  const high = items.filter((item) => item.priority === "alta");
+  const grouped = ["form", "evidence", "action", "efficacy", "package"].map((kind) => ({
+    kind,
+    label: reviewKindLabel(kind),
+    items: items.filter((item) => item.kind === kind)
+  })).filter((group) => group.items.length);
+  const first = items[0];
+  return [
+    "ACTA DE DECISIONES PENDIENTES - REVISION HUMANA",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    `Rol actual: ${roleLabel(state.currentUserRole)}`,
+    "",
+    "Resumen",
+    `- Pendientes totales: ${items.length}`,
+    `- Criticos: ${high.length}`,
+    `- Siguiente decision: ${first ? reviewDecisionTitle(first) : "sin pendientes visibles"}`,
+    "",
+    "Pendientes por tipo",
+    ...(grouped.length ? grouped.flatMap((group) => [
+      "",
+      group.label,
+      ...group.items.map((item) => `- [${item.priority || "media"}] Req. ${item.code || "SG"}: ${item.title}. ${item.detail}`)
+    ]) : ["- No hay pendientes de revision humana."]),
+    "",
+    "Regla de gobierno",
+    "El agente prepara, ordena y sugiere. La direccion o responsable autorizado aprueba formularios, valida evidencias reales, cierra acciones criticas y confirma eficacia.",
+    "",
+    "Uso recomendado",
+    "Descargar esta acta antes de una reunion corta de direccion, resolver primero los criticos y dejar evidencia de las decisiones tomadas."
+  ].join("\n");
+}
+
+function downloadReviewInboxReport() {
+  const content = reviewInboxReportText();
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "acta_decisiones_revision_humana.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Acta de revision humana descargada",
+    detail: "Se descargo el listado de decisiones pendientes para aprobacion humana.",
+    code: "9.3/10.1",
+    type: "revision_humana",
+    actor: "humano"
+  });
+  addMessage("agent", "Descargue el acta de revision humana con pendientes, criticos y regla de gobierno.");
+  saveState();
+  renderAll();
+}
+
 function renderReviewInbox() {
   const container = document.querySelector("#reviewInbox");
   const summary = document.querySelector("#reviewInboxSummary");
@@ -13471,6 +13531,7 @@ document.querySelector("#downloadReport").addEventListener("click", downloadExec
 document.querySelector("#runImplementationReview").addEventListener("click", runImplementationReview);
 document.querySelector("#runAgentMonitor").addEventListener("click", runAgentMonitor);
 document.querySelector("#downloadAuditLog").addEventListener("click", downloadAuditLogReport);
+document.querySelector("#downloadReviewInbox").addEventListener("click", downloadReviewInboxReport);
 document.querySelector("#refreshReviewInbox").addEventListener("click", () => {
   renderReviewInbox();
   addMessage("agent", "Actualice la bandeja de revision humana con los pendientes actuales.");
