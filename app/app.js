@@ -10263,12 +10263,27 @@ function renderSubscriptionPlans() {
   renderPilotSalesPackage();
   const planUsage = document.querySelector("#planUsage");
   if (planUsage) {
-    planUsage.innerHTML = Object.entries(usage).map(([key, item]) => `
+    planUsage.innerHTML = `
+      ${renderPlanRecommendation()}
+      ${Object.entries(usage).map(([key, item]) => `
       <div class="usage-card ${item.over ? "over" : ""}">
         <span>${item.label}</span>
         <strong>${item.used}/${item.limit}</strong>
         <div class="progress"><span style="width:${Math.min(item.pct, 100)}%"></span></div>
-      </div>`).join("");
+      </div>`).join("")}`;
+    planUsage.querySelector("[data-plan-recommendation]")?.addEventListener("click", (event) => {
+      const nextPlan = event.currentTarget.dataset.planRecommendation;
+      if (!nextPlan || nextPlan === state.currentPlan) return;
+      state.currentPlan = nextPlan;
+      recordAuditEvent({
+        title: "Plan recomendado aplicado",
+        detail: `La organizacion cambio al plan recomendado ${subscriptionPlans[nextPlan].name}.`,
+        type: "suscripcion",
+        actor: "humano"
+      });
+      saveState();
+      renderAll();
+    });
   }
   const systemsMatrix = document.querySelector("#systemsMatrix");
   if (systemsMatrix) {
@@ -10359,6 +10374,52 @@ function currentPlanUsage() {
     const count = used[key] || 0;
     return [key, { label: labels[key], used: count, limit, pct: Math.round((count / limit) * 100), over: count > limit }];
   }));
+}
+
+function recommendedSubscriptionPlan() {
+  const usage = currentPlanUsage();
+  const activities = state.activities.length;
+  const evidencePackages = requirements.map(evidencePackageForRequirement);
+  const activeEvidence = evidencePackages.filter((item) => item.score > 0).length;
+  const needsConsultor = usage.organizations.used > 1 || usage.systems.used > 1 || usage.norms.used > 1;
+  const needsProfessional = activities > 1 || activeEvidence > 8 || state.planUsage.agentRuns > subscriptionPlans.basico.limits.agentRuns || state.formResponses.length > subscriptionPlans.basico.limits.forms;
+  const id = needsConsultor ? "consultor" : needsProfessional ? "profesional" : "basico";
+  const current = subscriptionPlans[state.currentPlan] || subscriptionPlans.profesional;
+  const recommended = subscriptionPlans[id];
+  const reasons = [];
+  if (activities > 1) reasons.push(`${activities} actividades requieren control separado`);
+  if (activeEvidence > 8) reasons.push(`${activeEvidence} requisitos ya tienen paquete de evidencia`);
+  if (state.formResponses.length > subscriptionPlans.basico.limits.forms) reasons.push("uso de formularios supera el plan Basico");
+  if (state.planUsage.agentRuns > subscriptionPlans.basico.limits.agentRuns) reasons.push("uso del agente supera el plan Basico");
+  if (needsConsultor) reasons.push("hay senales de multi-cliente, multi-sistema o multi-norma");
+  if (!reasons.length) reasons.push("la empresa aun esta en arranque y puede validar valor con bajo alcance");
+  return {
+    id,
+    current,
+    recommended,
+    currentMatches: current.name === recommended.name,
+    reasons
+  };
+}
+
+function renderPlanRecommendation() {
+  const recommendation = recommendedSubscriptionPlan();
+  return `
+    <article class="plan-recommendation ${recommendation.currentMatches ? "ok" : "review"}">
+      <div>
+        <p class="eyebrow">Plan recomendado por uso real</p>
+        <h3>${escapeHtml(recommendation.recommended.name)}</h3>
+        <p>${escapeHtml(recommendation.recommended.text)}</p>
+        <div class="relation-chips">
+          ${recommendation.reasons.slice(0, 4).map((reason) => `<span>${escapeHtml(reason)}</span>`).join("")}
+        </div>
+      </div>
+      <div class="plan-recommendation-side">
+        <span class="badge ${recommendation.currentMatches ? "cumple" : "en_proceso"}">${recommendation.currentMatches ? "plan alineado" : "revisar plan"}</span>
+        <strong>${escapeHtml(recommendation.recommended.price)}</strong>
+        <button data-plan-recommendation="${recommendation.id}" type="button" ${recommendation.currentMatches ? "disabled" : ""}>Usar recomendado</button>
+      </div>
+    </article>`;
 }
 
 function commercialSummaryData() {
