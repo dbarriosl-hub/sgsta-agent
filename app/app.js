@@ -12236,6 +12236,7 @@ function renderEvidenceWorkspace(item) {
       ${renderEvidenceSupportForm(item)}
       <div class="row-actions">
         <button data-evidence-workspace="prepare" data-evidence-code="${item.req.code}" type="button">Preparar paquete</button>
+        <button class="secondary-button" data-evidence-workspace="download" data-evidence-code="${item.req.code}" type="button">Descargar resumen</button>
         <button class="secondary-button" data-evidence-workspace="forms" data-evidence-code="${item.req.code}" type="button">Abrir formularios</button>
         <button class="secondary-button" data-evidence-workspace="actions" data-evidence-code="${item.req.code}" type="button">Abrir acciones</button>
         <button class="secondary-button" data-evidence-workspace="review" data-evidence-code="${item.req.code}" type="button">Revision humana</button>
@@ -12296,6 +12297,10 @@ function handleEvidenceWorkspaceAction(action, code) {
     prepareEvidencePackage(code);
     return;
   }
+  if (action === "download") {
+    downloadEvidencePackageSummary(code);
+    return;
+  }
   if (action === "forms") {
     state.formFilters.search = code;
     state.formFilters.status = "todos";
@@ -12326,6 +12331,71 @@ function handleEvidenceWorkspaceAction(action, code) {
   if (action === "support") {
     registerRealEvidenceSupport(code);
   }
+}
+
+function evidencePackageSummaryText(code) {
+  const req = requirements.find((item) => item.code === code);
+  if (!req) return "Requisito no encontrado.";
+  const item = evidencePackageForRequirement(req);
+  const lines = [
+    "RESUMEN DE PAQUETE DE EVIDENCIA - SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    "",
+    `Requisito: ${item.req.code} ${item.req.title}`,
+    `PHVA: ${item.req.phase || "Por clasificar"}`,
+    `Cumplimiento estimado: ${item.score}%`,
+    `Evidencia esperada: ${item.req.evidence}`,
+    `Siguiente paso: ${evidencePackageNextStep(item)}`,
+    "",
+    "Estado del paquete",
+    `- Formularios aprobados: ${item.stats.formsApproved}/${item.stats.formsTotal}`,
+    `- Formularios por actividad aprobados: ${item.stats.activityFormsApproved}/${activityFormTargetForRequirement(item.stats) || item.stats.activityFormsTotal}`,
+    `- Evidencias reales: ${item.stats.registeredEvidence}`,
+    `- Evidencias sugeridas: ${item.stats.suggestedEvidence}`,
+    `- Acciones abiertas: ${item.actions.length}`,
+    `- Faltantes: ${item.missing.length ? item.missing.join(", ") : "sin faltantes visibles"}`,
+    "",
+    "Formularios vinculados",
+    ...(evidenceWorkspaceFormRows(item).length ? evidenceWorkspaceFormRows(item).map((row) => `- ${row}`) : ["- Sin formularios vinculados."]),
+    "",
+    "Evidencias vinculadas",
+    ...(evidenceWorkspaceEvidenceRows(item).length ? evidenceWorkspaceEvidenceRows(item).map((row) => `- ${row}`) : ["- Sin evidencias vinculadas."]),
+    "",
+    "Acciones abiertas",
+    ...(evidenceWorkspaceActionRows(item).length ? evidenceWorkspaceActionRows(item).map((row) => `- ${row}`) : ["- Sin acciones abiertas."]),
+    "",
+    "Revision humana",
+    "El agente puede preparar y sugerir evidencias. La aprobacion de cumplimiento, cierre de acciones y eficacia requiere validacion humana."
+  ];
+  return lines.join("\n");
+}
+
+function downloadEvidencePackageSummary(code) {
+  const req = requirements.find((item) => item.code === code);
+  if (!req) return;
+  const content = evidencePackageSummaryText(code);
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `paquete_evidencia_${code.replaceAll(".", "_")}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: `Resumen de evidencia descargado ${code}`,
+    detail: `Se descargo el resumen del paquete de evidencia para ${req.title}.`,
+    code,
+    type: "evidencia",
+    actor: "humano"
+  });
+  addMessage("agent", `Descargue el resumen del paquete ${code}. Sirve para revisar faltantes antes de aprobar cumplimiento.`);
+  saveState();
+  renderAll();
 }
 
 function registerRealEvidenceSupport(code) {
