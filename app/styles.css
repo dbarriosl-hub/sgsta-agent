@@ -2013,15 +2013,24 @@ textarea {
 }
 
 .mvp-acceptance-item strong,
-.mvp-acceptance-item p {
+.mvp-acceptance-item p,
+.mvp-acceptance-item small {
   margin: 0;
 }
 
-.mvp-acceptance-item p {
+.mvp-acceptance-item p,
+.mvp-acceptance-item small {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.mvp-acceptance-item small {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px;
 }
 
 .startup-approval-gate h3,

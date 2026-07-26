@@ -2208,36 +2208,42 @@ function mvpAcceptanceRows(launch = mvpLaunchStatus()) {
     {
       label: "1. Empresa",
       detail: "Crear o revisar empresa, ubicacion, alcance y actividades.",
+      expected: "El perfil del agente muestra empresa, zona, alcance, partes interesadas y faltantes.",
       done: companyProfileGaps().length <= 2,
       view: "empresa"
     },
     {
       label: "2. Actividad",
       detail: "Abrir una actividad y explicar riesgos, guia, equipo, seguro y participantes.",
+      expected: "La actividad muestra ficha operativa y brechas especificas antes de ofertar.",
       done: launch.offerableActivities > 0 || launch.reviewActivities > 0,
       view: "actividades"
     },
     {
       label: "3. Agente",
       detail: "Preparar riesgos, formularios, acciones o evidencias sin aprobar automaticamente.",
+      expected: "El agente genera borradores o acciones y deja claro que requieren revision humana.",
       done: state.auditLog.some((event) => event.actor === "agente") || state.formResponses.some((item) => String(item.source || "").includes("agente")),
       view: "agente"
     },
     {
       label: "4. Humano",
       detail: "Enviar algo a revision y demostrar que Direccion/Admin aprueba.",
+      expected: "La bandeja humana muestra decisiones pendientes y permite descargar el acta.",
       done: launch.reviewItems.length > 0 || state.formResponses.some((item) => normalizedFormStatus(item.status) === "aprobado"),
       view: "revision_humana"
     },
     {
       label: "5. Evidencia",
       detail: "Registrar soporte real o validar evidencia sugerida en un requisito.",
+      expected: "El paquete del requisito distingue evidencia sugerida, real y faltantes.",
       done: state.evidence.some((item) => item.status !== "sugerida"),
       view: "evidencias"
     },
     {
       label: "6. Mejora",
       detail: "Mostrar una accion con seguimiento, evidencia y eficacia pendiente o eficaz.",
+      expected: "La accion no se cierra sin seguimiento, evidencia y verificacion de eficacia.",
       done: state.actions.some((action) => action.followUp || action.evidence || action.efficacyVerification),
       view: "acciones"
     }
@@ -2257,6 +2263,7 @@ function renderMvpAcceptanceGuide(launch) {
         </div>
         <div class="row-actions">
           <button class="secondary-button" data-mvp-acceptance-observe type="button" ${done === rows.length ? "disabled" : ""}>Crear observaciones</button>
+          <button class="secondary-button" data-mvp-acceptance-download type="button">Descargar prueba real</button>
           <button class="secondary-button" data-mvp-launch-guide type="button">Descargar guia</button>
         </div>
       </div>
@@ -2266,10 +2273,73 @@ function renderMvpAcceptanceGuide(launch) {
             <span class="badge ${row.done ? "cumple" : "pendiente"}">${row.done ? "ok" : "falta"}</span>
             <strong>${escapeHtml(row.label)}</strong>
             <p>${escapeHtml(row.detail)}</p>
+            <small>${escapeHtml(row.expected)}</small>
             <button class="secondary-button" data-mvp-acceptance-open="${row.view}" type="button">Abrir</button>
           </article>`).join("")}
       </div>
     </div>`;
+}
+
+function realPilotTestText() {
+  const launch = mvpLaunchStatus();
+  const rows = mvpAcceptanceRows(launch);
+  const done = rows.filter((row) => row.done).length;
+  return [
+    "PRUEBA REAL GUIADA - MVP SGSTA AGENT",
+    "",
+    `Organizacion: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `Fecha: ${today()}`,
+    `Responsable: ${state.ownerName || "Por definir"}`,
+    `Estado MVP: ${launch.score}% - ${launch.label}`,
+    `Criterios listos: ${done}/${rows.length}`,
+    "",
+    "Objetivo",
+    "Validar si una empresa de turismo de aventura puede entender y usar el flujo sin experiencia tecnica: empresa -> actividades -> riesgos -> controles -> evidencias -> acciones -> revision humana.",
+    "",
+    "Recorrido recomendado",
+    ...rows.map((row, index) => [
+      `${index + 1}. ${row.label}`,
+      `   Probar: ${row.detail}`,
+      `   Resultado esperado: ${row.expected}`,
+      `   Estado actual: ${row.done ? "listo" : "pendiente"}`,
+      `   Pantalla: ${row.view}`
+    ].join("\n")),
+    "",
+    "Criterios de aceptacion",
+    "- El usuario entiende cual es el siguiente paso sin ayuda tecnica.",
+    "- Los botones visibles producen una accion perceptible: navegar, crear, descargar, registrar o mostrar resultado.",
+    "- El agente prepara informacion util, pero no aprueba cumplimiento por si solo.",
+    "- Cada actividad se revisa por separado antes de ofertar.",
+    "- Las evidencias sugeridas no cuentan como cierre final hasta validacion humana o soporte real.",
+    "- Las observaciones del piloto se convierten en acciones de mejora.",
+    "",
+    "Decision final",
+    done === rows.length
+      ? "La prueba MVP esta lista para ejecutarse con empresa real y registrar observaciones."
+      : "Antes del piloto, crear observaciones para los criterios pendientes y cerrar los bloqueos principales."
+  ].join("\n");
+}
+
+function downloadRealPilotTest() {
+  const blob = new Blob([realPilotTestText()], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "prueba_real_mvp_sgsta_agent.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Prueba real MVP descargada",
+    detail: "Se descargo el recorrido guiado para probar el MVP con una empresa nueva.",
+    code: "4.4",
+    type: "mvp_piloto",
+    actor: "humano"
+  });
+  addMessage("agent", "Descargue la prueba real guiada del MVP. Usala para validar el flujo con una empresa nueva.");
+  saveState();
+  renderAll();
 }
 
 function createMvpAcceptanceObservations() {
@@ -2939,6 +3009,7 @@ function renderImplementationRoadmap() {
   container.querySelector("[data-mvp-launch-validate]")?.addEventListener("click", registerMvpValidation);
   container.querySelector("[data-mvp-launch-guide]")?.addEventListener("click", downloadPilotTestGuide);
   container.querySelector("[data-mvp-acceptance-observe]")?.addEventListener("click", createMvpAcceptanceObservations);
+  container.querySelector("[data-mvp-acceptance-download]")?.addEventListener("click", downloadRealPilotTest);
   container.querySelectorAll("[data-mvp-acceptance-open]").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.mvpAcceptanceOpen));
   });
