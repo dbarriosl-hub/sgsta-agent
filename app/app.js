@@ -172,6 +172,7 @@ const stateKey = "sgsta-agent-demo-v3";
 const apiBaseUrl = window.location.protocol.startsWith("http") ? window.location.origin : "http://localhost:8080";
 let backendOnline = false;
 let backendSyncTimer = null;
+let ignoreBackendHydrationUntil = 0;
 
 const defaultState = {
   orgName: "Mi empresa de turismo",
@@ -395,6 +396,11 @@ async function hydrateFromBackend() {
   try {
     const apiState = await fetchBackendState();
     backendOnline = true;
+    if (Date.now() < ignoreBackendHydrationUntil) {
+      updateBackendStatus("Backend conectado: conservando limpieza local", true);
+      syncStateToBackend();
+      return;
+    }
     if (hasFrontendState(apiState)) {
       state = mergeState(clone(defaultState), apiStateToAppState(apiState));
       persistLocalState();
@@ -425,9 +431,11 @@ async function syncStateToBackend() {
     if (!response.ok) throw new Error("No se pudo guardar en backend");
     backendOnline = true;
     updateBackendStatus("Backend conectado: cambios guardados", true);
+    return true;
   } catch {
     backendOnline = false;
     updateBackendStatus("Modo local: cambios guardados solo en navegador", false);
+    return false;
   }
 }
 
@@ -2337,6 +2345,11 @@ function downloadRealPilotTest() {
     type: "mvp_piloto",
     actor: "humano"
   });
+  state.startupNotice = {
+    title: "Prueba real descargada",
+    detail: "Busca el archivo prueba_real_mvp_sgsta_agent.txt en Descargas y sigue el recorrido criterio por criterio.",
+    view: "implementacion"
+  };
   addMessage("agent", "Descargue la prueba real guiada del MVP. Usala para validar el flujo con una empresa nueva.");
   saveState();
   renderAll();
@@ -2537,8 +2550,8 @@ function startupPilotSteps() {
       id: "controles",
       label: "4",
       title: "Controles antes de ofertar",
-      detail: selectedReadiness ? `${selectedActivity}: ${starterControlsReady ? "controles base preparados" : `${selectedReadiness.score}% listo; ${selectedReadiness.gaps.length} brecha(s)`}.` : "Verificar guia, equipo, seguro y participantes por actividad.",
-      view: "brechas_actividad",
+      detail: selectedReadiness ? `${selectedActivity}: completa riesgo, guia, equipo, seguro, participantes y emergencia en la ficha.` : "Verificar guia, equipo, seguro y participantes por actividad.",
+      view: "actividades",
       done: starterControlsReady,
       action: "Crear controles"
     },
@@ -2799,7 +2812,12 @@ async function runStartupPilotStep(id) {
       addPolicyForActivity(activityName);
       prepareActivityPackage(activityName);
       createSelectedActivityGapActions(activityName);
-      showView("brechas_actividad");
+      state.startupNotice = {
+        title: `Controles preparados para ${activityName}`,
+        detail: "Abre la ficha de la actividad y completa los campos de riesgo, equipo, guia, participacion, seguro y emergencia con datos reales.",
+        view: "actividades"
+      };
+      showView("actividades");
     }
   }
   if (id === "evidencias") {
@@ -2964,7 +2982,7 @@ function renderImplementationRoadmap() {
   container.querySelectorAll("[data-startup-open]").forEach((button) => {
     button.addEventListener("click", () => {
       const step = startupPilotSteps().find((item) => item.id === button.dataset.startupOpen);
-      if (step?.view) showView(step.view);
+      openStartupStep(step);
     });
   });
   container.querySelectorAll("[data-startup-run]").forEach((button) => {
@@ -3011,8 +3029,45 @@ function renderImplementationRoadmap() {
   container.querySelector("[data-mvp-acceptance-observe]")?.addEventListener("click", createMvpAcceptanceObservations);
   container.querySelector("[data-mvp-acceptance-download]")?.addEventListener("click", downloadRealPilotTest);
   container.querySelectorAll("[data-mvp-acceptance-open]").forEach((button) => {
-    button.addEventListener("click", () => showView(button.dataset.mvpAcceptanceOpen));
+    button.addEventListener("click", () => openMvpAcceptanceView(button.dataset.mvpAcceptanceOpen));
   });
+}
+
+function openStartupStep(step) {
+  if (!step) return;
+  if (step.id === "controles") {
+    if (!state.activities.length) addActivity();
+    state.selectedActivityName = state.selectedActivityName || state.activities[0]?.name || "";
+    state.startupNotice = {
+      title: "Completa controles en la ficha",
+      detail: "En Actividades abre la ficha y revisa: Riesgos, Equipos, Guias, Participacion, Seguro y Emergencia.",
+      view: "actividades"
+    };
+    saveState();
+    showView("actividades");
+    return;
+  }
+  if (step.id === "evidencias") {
+    state.selectedEvidenceCode = lowestRequirementCodes(1)[0] || "4.4";
+    saveState();
+    showView("evidencias");
+    return;
+  }
+  if (step.view) showView(step.view);
+}
+
+function openMvpAcceptanceView(view) {
+  if (view === "evidencias") {
+    const weakest = requirements.map(evidencePackageForRequirement).sort((a, b) => a.score - b.score)[0];
+    state.selectedEvidenceCode = weakest?.req.code || "4.4";
+    saveState();
+  }
+  if (view === "actividades") {
+    if (!state.activities.length) addActivity();
+    state.selectedActivityName = state.selectedActivityName || state.activities[0]?.name || "";
+    saveState();
+  }
+  showView(view);
 }
 
 function renderImplementation() {
@@ -12825,15 +12880,30 @@ function cleanNewCompanyState() {
   return next;
 }
 
-function resetPrototypeForNewCompany() {
-  const shouldReset = window.confirm("Esto reinicia los datos del prototipo en esta organizacion. Usa esto para probar una empresa desde cero. ¿Continuar?");
-  if (!shouldReset) return;
+async function resetPrototypeForNewCompany() {
+  updateBackendStatus("Reiniciando empresa nueva...", backendOnline);
+  ignoreBackendHydrationUntil = Date.now() + 15000;
   state = cleanNewCompanyState();
-  saveState();
+  state.startupNotice = {
+    title: "Empresa nueva lista",
+    detail: "Datos limpiados. El backend se esta actualizando para que no vuelvan datos anteriores al navegar.",
+    view: "empresa"
+  };
+  persistLocalState();
   document.querySelector("#chatLog").innerHTML = "";
-  addMessage("agent", "Reinicie el prototipo. Empieza por Implementacion > Arranque guiado o por Empresa y alcance.");
+  addMessage("agent", "Reinicie el prototipo para una empresa nueva. Empieza por Empresa y alcance, luego registra actividades reales.");
   renderAll();
   showView("implementacion");
+  const synced = await syncStateToBackend();
+  state.startupNotice = {
+    title: synced ? "Empresa nueva guardada" : "Empresa nueva en modo local",
+    detail: synced
+      ? "La limpieza quedo guardada en backend. Ya puedes registrar Tobiaraft SAS sin que vuelvan datos anteriores."
+      : "La limpieza quedo en el navegador. Revisa conexion si necesitas persistencia en Railway.",
+    view: "empresa"
+  };
+  persistLocalState();
+  renderAll();
 }
 
 function convertSelectedDocumentToEvidence() {

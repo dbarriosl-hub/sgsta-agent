@@ -1762,7 +1762,7 @@ textarea {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .startup-guide-head {
@@ -2263,7 +2263,8 @@ textarea {
   overflow: auto;
   padding: 12px;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .step-row {
@@ -2376,7 +2377,7 @@ textarea {
   font-size: 12px;
   line-height: 1.35;
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .document-preview {
@@ -2386,7 +2387,7 @@ textarea {
   padding: 14px;
   display: grid;
   gap: 12px;
-  min-height: 360px;
+  min-height: 180px;
   min-width: 0;
   overflow: auto;
 }
@@ -2398,8 +2399,8 @@ textarea {
 .document-preview pre {
   margin: 0;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   font-family: Segoe UI, Arial, sans-serif;
   line-height: 1.5;
   color: #1f2937;
