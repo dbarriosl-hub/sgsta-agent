@@ -2068,7 +2068,75 @@ function implementationStatus(step) {
   return step.check(state) ? "completo" : "pendiente";
 }
 
+function hasOperationalInput() {
+  const company = state.company || {};
+  const defaultCompany = defaultState.company || {};
+  const textFields = [
+    "legalName",
+    "nit",
+    "region",
+    "city",
+    "phone",
+    "operatingArea",
+    "activityDescription",
+    "localContext",
+    "scope",
+    "stakeholders"
+  ];
+  const hasCompanyData = textFields.some((field) => {
+    const value = String(company[field] || "").trim();
+    const defaultValue = String(defaultCompany[field] || "").trim();
+    return value && value !== defaultValue;
+  });
+  return Boolean(
+    hasCompanyData
+    || state.activities.length
+    || state.people.length
+    || state.trainingNeeds.length
+    || state.equipment.length
+    || state.policies.length
+    || state.participantEvidence.length
+    || state.risks.length
+    || state.documents.length
+    || state.formResponses.length
+    || state.actions.length
+    || state.evidence.length
+    || state.incidents.length
+    || state.audits.length
+    || state.managementReviews.length
+    || state.pilotObservations.length
+    || state.agentFindings.length
+    || state.closurePackages.length
+  );
+}
+
+function hasAgentWorkOutput() {
+  if (!hasOperationalInput()) return false;
+  return state.auditLog.some((event) => event.actor === "agente" && event.type !== "estado")
+    || state.formResponses.some((item) => String(item.source || "").includes("agente"))
+    || state.actions.some((action) => String(action.origin || "").includes("agente"))
+    || state.evidence.some((item) => String(item.source || "").includes("agente"));
+}
+
+function hasHumanReviewEvidence() {
+  return state.formResponses.some((item) => {
+    const status = normalizedFormStatus(item.status);
+    return status === "revision" || status === "aprobado";
+  })
+    || state.evidence.some((item) => item.validatedBy || item.validationDate || item.status === "registrada")
+    || state.auditLog.some((event) => ["aprobacion", "validacion_evidencia", "validacion_mvp", "revision_paquete"].includes(event.type))
+    || state.actions.some((action) => action.efficacyReviewedBy || action.status === "pendiente_eficacia" || action.status === "cerrada")
+    || (state.closurePackages || []).some((item) => item.reviewStatus === "revisado");
+}
+
 function implementationProgress() {
+  if (!hasOperationalInput()) {
+    return {
+      completed: 0,
+      total: implementationSteps.length,
+      pct: 0
+    };
+  }
   const completed = implementationSteps.filter((step) => step.check(state)).length;
   return {
     completed,
@@ -2136,8 +2204,10 @@ function mvpLaunchStatus() {
     {
       id: "review",
       label: "Revision humana",
-      done: state.managementReviews.length > 0 && reviewItems.length > 0,
-      detail: state.managementReviews.length
+      done: hasHumanReviewEvidence(),
+      detail: hasHumanReviewEvidence()
+        ? "Ya hay revision, aprobacion o validacion humana registrada."
+        : state.managementReviews.length
         ? `${reviewItems.length} decision(es) humanas visibles para aprobar o revisar.`
         : "Falta preparar revision por direccion 9.3.",
       view: "revision_humana"
@@ -2231,14 +2301,14 @@ function mvpAcceptanceRows(launch = mvpLaunchStatus()) {
       label: "3. Agente",
       detail: "Preparar riesgos, formularios, acciones o evidencias sin aprobar automaticamente.",
       expected: "El agente genera borradores o acciones y deja claro que requieren revision humana.",
-      done: state.auditLog.some((event) => event.actor === "agente") || state.formResponses.some((item) => String(item.source || "").includes("agente")),
+      done: hasAgentWorkOutput(),
       view: "agente"
     },
     {
       label: "4. Humano",
       detail: "Enviar algo a revision y demostrar que Direccion/Admin aprueba.",
       expected: "La bandeja humana muestra decisiones pendientes y permite descargar el acta.",
-      done: launch.reviewItems.length > 0 || state.formResponses.some((item) => normalizedFormStatus(item.status) === "aprobado"),
+      done: hasHumanReviewEvidence(),
       view: "revision_humana"
     },
     {

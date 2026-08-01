@@ -1766,9 +1766,9 @@ textarea {
 }
 
 .startup-guide-head {
-  align-items: center;
+  align-items: start;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px auto;
+  grid-template-columns: minmax(260px, 1fr) 120px;
   gap: 14px;
 }
 
@@ -1791,7 +1791,8 @@ textarea {
 }
 
 .startup-guide-actions {
-  justify-content: end;
+  grid-column: 1 / -1;
+  justify-content: flex-start;
 }
 
 .startup-step {
@@ -1876,10 +1877,15 @@ textarea {
 }
 
 .mvp-launch-head {
-  align-items: center;
+  align-items: start;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1fr) 120px auto;
+  grid-template-columns: minmax(260px, 1fr) 120px;
+}
+
+.mvp-launch-head .row-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
 }
 
 .mvp-launch-head h3,
@@ -1916,7 +1922,7 @@ textarea {
 .mvp-launch-gates {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .mvp-launch-gate {
@@ -1942,7 +1948,7 @@ textarea {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .mvp-launch-metrics {
@@ -1973,8 +1979,9 @@ textarea {
 }
 
 .mvp-acceptance-head {
-  align-items: center;
+  align-items: start;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
 }
@@ -1995,7 +2002,7 @@ textarea {
 .mvp-acceptance-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .mvp-acceptance-item {
@@ -2023,7 +2030,7 @@ textarea {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .mvp-acceptance-item small {
