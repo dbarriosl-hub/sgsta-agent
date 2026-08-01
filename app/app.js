@@ -3827,14 +3827,15 @@ function renderCompanyIntakeGuide() {
 
 function buildCompanyImplementationProfile() {
   const org = state.company.legalName || state.orgName || "Organizacion por definir";
-  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || state.company.operatingArea || "Ubicacion por definir";
+  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || "Ubicacion por definir";
+  const operatingArea = state.company.operatingArea || "Zona/ruta de operacion pendiente de definir";
   const activities = state.activities.map((activity) => {
     const related = activityRelatedItems(activity.name);
     const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12).map((risk) => risk.title);
     return `- ${activity.name}: ${activity.place || "lugar por definir"}. Lider: ${activity.leader || "por definir"}. Riesgos: ${related.risks.length}; equipos: ${related.equipment.length}; guias/personas: ${related.people.length}; seguros: ${related.policies.length}; participantes/evidencias: ${related.participants.length}. ${highRisks.length ? `Riesgos altos: ${highRisks.join(", ")}.` : ""}`;
   }).join("\n") || "- Actividades por definir.";
   const gaps = companyProfileGaps();
-  return `PERFIL DE IMPLEMENTACION SGSTA\n\nOrganizacion: ${org}\nUbicacion/zona: ${location}\nAlcance: ${state.company.scope || "Pendiente de definir"}\nPartes interesadas: ${state.company.stakeholders || "Pendientes de definir"}\nContexto local: ${state.company.localContext || "Pendiente de documentar"}\nActividades declaradas: ${state.company.activityDescription || "Pendientes de describir"}\n\nActividades operativas:\n${activities}\n\nDatos faltantes para que el agente trabaje mejor:\n${gaps.length ? gaps.map((gap) => `- ${gap}`).join("\n") : "- No hay faltantes principales visibles."}\n\nUso del agente:\nEste perfil debe alimentar borradores, formularios, matriz de riesgos, plan de capacitacion, revision por direccion y paquetes de evidencia. La aprobacion final siempre es humana.`;
+  return `PERFIL DE IMPLEMENTACION SGSTA\n\nOrganizacion: ${org}\nUbicacion administrativa: ${location}\nZona/ruta de operacion: ${operatingArea}\nAlcance: ${state.company.scope || "Pendiente de definir"}\nPartes interesadas: ${state.company.stakeholders || "Pendientes de definir"}\nContexto local: ${state.company.localContext || "Pendiente de documentar"}\nActividades declaradas: ${state.company.activityDescription || "Pendientes de describir"}\n\nActividades operativas:\n${activities}\n\nDatos faltantes para que el agente trabaje mejor:\n${gaps.length ? gaps.map((gap) => `- ${gap}`).join("\n") : "- No hay faltantes principales visibles."}\n\nUso del agente:\nEste perfil debe alimentar borradores, formularios, matriz de riesgos, plan de capacitacion, revision por direccion y paquetes de evidencia. La aprobacion final siempre es humana.`;
 }
 
 function renderCompanyImplementationProfile() {
@@ -13436,7 +13437,9 @@ function documentDraftTemplates() {
   const org = state.company.legalName || state.orgName;
   const scope = state.company.scope || "Alcance pendiente de definir.";
   const stakeholders = state.company.stakeholders || "Partes interesadas pendientes de definir.";
-  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || state.company.operatingArea || "Ubicacion por definir";
+  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || "Ubicacion por definir";
+  const operatingArea = state.company.operatingArea || "Zona/ruta de operacion pendiente de definir";
+  const locationContext = `Ubicacion administrativa: ${location}\nZona/ruta de operacion: ${operatingArea}`;
   const profile = state.company.profileSummary || buildCompanyImplementationProfile();
   const activity = state.activities[0]?.name || "Actividad por definir";
   const activityLines = state.activities.map((item) => `- ${item.name}: ${item.place || "lugar por definir"}. Lider: ${item.leader || "por definir"}. Condiciones: ${item.conditions || "por definir"}.`).join("\n") || "- Actividades por definir.";
@@ -13450,12 +13453,12 @@ function documentDraftTemplates() {
     {
       title: "Alcance del SGSTA",
       code: "4.3",
-      content: `ALCANCE DEL SGSTA\n\nOrganizacion: ${org}\nUbicacion/zona de operacion: ${location}\n\nEl Sistema de Gestion de Seguridad de Turismo de Aventura aplica a:\n${scope}\n\nActividades incluidas:\n${activityLines}\n\nPartes interesadas consideradas:\n${stakeholders}\n\nContexto local considerado:\n${state.company.localContext || "Pendiente de documentar por la organizacion."}\n\nLimites del sistema:\n- Actividades ofertadas y controladas por la organizacion.\n- Personal, guias, proveedores, equipos, seguros, procedimientos, emergencias, participantes y evidencias relacionadas.\n- No reemplaza permisos legales, seguros ni aprobaciones humanas requeridas.\n\nEste borrador debe ser revisado y aprobado por la direccion.`
+      content: `ALCANCE DEL SGSTA\n\nOrganizacion: ${org}\n${locationContext}\n\nEl Sistema de Gestion de Seguridad de Turismo de Aventura aplica a:\n${scope}\n\nActividades incluidas:\n${activityLines}\n\nPartes interesadas consideradas:\n${stakeholders}\n\nContexto local considerado:\n${state.company.localContext || "Pendiente de documentar por la organizacion."}\n\nLimites del sistema:\n- Actividades ofertadas y controladas por la organizacion.\n- Personal, guias, proveedores, equipos, seguros, procedimientos, emergencias, participantes y evidencias relacionadas.\n- No reemplaza permisos legales, seguros ni aprobaciones humanas requeridas.\n\nEste borrador debe ser revisado y aprobado por la direccion.`
     },
     {
       title: "Politica de seguridad",
       code: "5.2",
-      content: `POLITICA DE SEGURIDAD\n\n${org} se compromete a planificar, operar y mejorar sus actividades de turismo de aventura en ${location}, bajo criterios de seguridad, prevencion de incidentes, cumplimiento de requisitos aplicables y mejora continua.\n\nActividades cubiertas por esta politica:\n${activityLines}\n\nLa organizacion se compromete a:\n- Identificar y tratar riesgos por actividad.\n- Mantener personal competente, capacitado y consciente de sus responsabilidades.\n- Conservar equipos operativos, inspeccionados y mantenidos.\n- Validar seguros y condiciones antes de ofertar u operar actividades.\n- Comunicar informacion clara de seguridad a participantes antes, durante y despues de la actividad.\n- Investigar incidentes y ejecutar acciones correctivas, preventivas y de mejora.\n- Revisar el desempeno del SGSTA con informacion real y decisiones de direccion.\n\nEste documento es un borrador generado por el agente y requiere aprobacion formal.`
+      content: `POLITICA DE SEGURIDAD\n\n${org} se compromete a planificar, operar y mejorar sus actividades de turismo de aventura en ${location}, especificamente en ${operatingArea}, bajo criterios de seguridad, prevencion de incidentes, cumplimiento de requisitos aplicables y mejora continua.\n\nActividades cubiertas por esta politica:\n${activityLines}\n\nLa organizacion se compromete a:\n- Identificar y tratar riesgos por actividad.\n- Mantener personal competente, capacitado y consciente de sus responsabilidades.\n- Conservar equipos operativos, inspeccionados y mantenidos.\n- Validar seguros y condiciones antes de ofertar u operar actividades.\n- Comunicar informacion clara de seguridad a participantes antes, durante y despues de la actividad.\n- Investigar incidentes y ejecutar acciones correctivas, preventivas y de mejora.\n- Revisar el desempeno del SGSTA con informacion real y decisiones de direccion.\n\nEste documento es un borrador generado por el agente y requiere aprobacion formal.`
     },
     {
       title: "Procedimiento operacional de servicio",
@@ -13465,7 +13468,7 @@ function documentDraftTemplates() {
     {
       title: "Plan de emergencia",
       code: "8.2",
-      content: `PLAN DE EMERGENCIA\n\nOrganizacion: ${org}\nUbicacion/zona: ${location}\nActividad base: ${activity}\n\nEscenarios de emergencia derivados del perfil:\n${emergencyScenarios}\n\nRecursos y equipos disponibles:\n${equipmentLines}\n\nPersonal y capacitacion requerida:\n${trainingLines}\n\nSeguros/coberturas por validar:\n${policyLines}\n\nRequisitos minimos:\n- Definir responsable de respuesta y comunicaciones.\n- Confirmar rutas, puntos de encuentro y medios de contacto.\n- Verificar botiquin/equipos de emergencia antes de operar.\n- Registrar simulacros, incidentes, aprendizajes y acciones de mejora.\n\nEl plan debe probarse mediante simulacros, registrar resultados y generar acciones de mejora cuando se detecten fallas.`
+      content: `PLAN DE EMERGENCIA\n\nOrganizacion: ${org}\n${locationContext}\nActividad base: ${activity}\n\nEscenarios de emergencia derivados del perfil:\n${emergencyScenarios}\n\nRecursos y equipos disponibles:\n${equipmentLines}\n\nPersonal y capacitacion requerida:\n${trainingLines}\n\nSeguros/coberturas por validar:\n${policyLines}\n\nRequisitos minimos:\n- Definir responsable de respuesta y comunicaciones.\n- Confirmar rutas, puntos de encuentro y medios de contacto.\n- Verificar botiquin/equipos de emergencia antes de operar.\n- Registrar simulacros, incidentes, aprendizajes y acciones de mejora.\n\nEl plan debe probarse mediante simulacros, registrar resultados y generar acciones de mejora cuando se detecten fallas.`
     },
     {
       title: "Resumen para revision por la direccion",
