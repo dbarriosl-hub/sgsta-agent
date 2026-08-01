@@ -3747,7 +3747,7 @@ function createCompanyIntakeActions() {
   });
   addMessage("agent", created ? `Cree ${created} accion(es) para completar la entrevista inicial.` : "La entrevista inicial ya tenia acciones abiertas para sus pendientes.");
   saveState();
-  renderAll();
+  showView("acciones");
 }
 
 function renderCompanyIntakeGuide() {
@@ -3809,7 +3809,6 @@ function renderCompanyIntakeGuide() {
         </div>
       </div>
       <div class="row-actions">
-        <button class="secondary-button" data-intake-download type="button">Descargar entrevista</button>
         <button class="secondary-button" data-intake-package type="button">Descargar paquete inicial</button>
         <button data-intake-actions type="button">Crear acciones</button>
       </div>
@@ -3817,7 +3816,6 @@ function renderCompanyIntakeGuide() {
   container.querySelectorAll("[data-intake-open]").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.intakeOpen));
   });
-  container.querySelector("[data-intake-download]")?.addEventListener("click", downloadCompanyIntakeGuide);
   container.querySelector("[data-intake-package]")?.addEventListener("click", downloadCompanyImplementationPackage);
   container.querySelector("[data-intake-actions]")?.addEventListener("click", createCompanyIntakeActions);
   container.querySelectorAll("[data-intake-activity-actions]").forEach((button) => {
@@ -3853,9 +3851,11 @@ function renderCompanyImplementationProfile() {
     </div>
     <pre>${escapeHtml(profile)}</pre>
     <div class="row-actions">
+      <button class="secondary-button" data-company-profile-action="update" type="button">Actualizar perfil</button>
       <button class="secondary-button" data-company-profile-action="evidence" type="button">Enviar a evidencias</button>
       <button data-company-profile-action="forms" type="button">Usar en formularios</button>
     </div>`;
+  container.querySelector("[data-company-profile-action='update']")?.addEventListener("click", () => generateCompanyImplementationProfile());
   container.querySelector("[data-company-profile-action='evidence']")?.addEventListener("click", () => {
     addEvidenceRecord({
       title: "Perfil de implementacion SGSTA",
