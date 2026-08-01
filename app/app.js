@@ -3484,9 +3484,19 @@ function fillCompanyForm() {
   });
 }
 
+function isRealCompanyName() {
+  const name = String(state.company?.legalName || state.orgName || "").trim().toLowerCase();
+  return Boolean(name && name !== "mi empresa de turismo" && name !== "mi empresa");
+}
+
+function isRealResponsibleName() {
+  const name = String(state.ownerName || "").trim().toLowerCase();
+  return Boolean(name && name !== "responsable sgsta" && name !== "responsable");
+}
+
 function companyProfileGaps() {
   const gaps = [];
-  if (!state.company.legalName) gaps.push("nombre legal");
+  if (!isRealCompanyName()) gaps.push("nombre legal");
   if (!state.company.city && !state.company.operatingArea) gaps.push("ubicacion/zona de operacion");
   if (!state.company.scope) gaps.push("alcance");
   if (!state.company.stakeholders) gaps.push("partes interesadas");
@@ -3507,7 +3517,7 @@ function companyIntakeItems() {
       id: "identidad",
       label: "Identidad",
       question: "Como se llama legalmente la empresa y quien responde por el SGSTA?",
-      done: Boolean(state.company.legalName && state.ownerName),
+      done: isRealCompanyName() && isRealResponsibleName(),
       action: "Completar nombre legal y responsable SGSTA",
       view: "empresa",
       code: "4.1"
