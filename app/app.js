@@ -4954,6 +4954,19 @@ function saveSelectedActivity() {
   renderAll();
 }
 
+function activityDifficultyOptions(selectedValue = "") {
+  const options = [
+    { value: "", label: "Seleccionar nivel" },
+    { value: "1", label: "1 - Muy facil" },
+    { value: "2", label: "2 - Facil" },
+    { value: "3", label: "3 - Moderada" },
+    { value: "4", label: "4 - Dificil" },
+    { value: "5", label: "5 - Tecnica / alta exigencia" }
+  ];
+  const normalized = String(selectedValue || "").trim();
+  return options.map((option) => `<option value="${option.value}" ${normalized === option.value ? "selected" : ""}>${option.label}</option>`).join("");
+}
+
 function activityRiskRows(activityName) {
   const risks = state.risks
     .map((risk, index) => ({ risk, index }))
@@ -5748,7 +5761,11 @@ function renderActivities() {
             <option value="revision" ${selectedActivity.status === "revision" ? "selected" : ""}>Revision</option>
           </select>
         </label>
-        <label>Dificultad / nivel<input id="activityDifficulty" type="text" value="${escapeHtml(selectedActivity.difficulty || "")}"></label>
+        <label>Dificultad / nivel
+          <select id="activityDifficulty">
+            ${activityDifficultyOptions(selectedActivity.difficulty)}
+          </select>
+        </label>
         <label class="wide">Condiciones de operacion<textarea id="activityConditions">${escapeHtml(selectedActivity.conditions || "")}</textarea></label>
         <label class="wide">Condiciones de participacion<textarea id="activityParticipantRequirements">${escapeHtml(selectedActivity.participantRequirements || "")}</textarea></label>
         <div class="wide button-row">
