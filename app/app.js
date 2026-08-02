@@ -4937,6 +4937,14 @@ function updateActivityReferences(oldName, newName) {
 function saveSelectedActivity() {
   const activity = state.activities.find((item) => item.name === state.selectedActivityName);
   if (!activity) return;
+  const nextName = applySelectedActivityFormValues(activity);
+  state.compliance["8.1"] = "en_proceso";
+  saveState();
+  addMessage("agent", `Actualice la ficha de actividad ${nextName}. El agente usara estos datos para formularios, riesgos, equipos y participantes.`);
+  renderAll();
+}
+
+function applySelectedActivityFormValues(activity) {
   const oldName = activity.name;
   const nextName = document.querySelector("#activityName").value.trim() || oldName;
   activity.name = nextName;
@@ -4948,10 +4956,7 @@ function saveSelectedActivity() {
   activity.participantRequirements = document.querySelector("#activityParticipantRequirements").value.trim();
   updateActivityReferences(oldName, nextName);
   state.selectedActivityName = nextName;
-  state.compliance["8.1"] = "en_proceso";
-  saveState();
-  addMessage("agent", `Actualice la ficha de actividad ${nextName}. El agente usara estos datos para formularios, riesgos, equipos y participantes.`);
-  renderAll();
+  return nextName;
 }
 
 function activityDifficultyOptions(selectedValue = "") {
@@ -4965,6 +4970,72 @@ function activityDifficultyOptions(selectedValue = "") {
   ];
   const normalized = String(selectedValue || "").trim();
   return options.map((option) => `<option value="${option.value}" ${normalized === option.value ? "selected" : ""}>${option.label}</option>`).join("");
+}
+
+function activityDifficultyLabel(value) {
+  return {
+    "1": "muy facil",
+    "2": "facil",
+    "3": "moderada",
+    "4": "dificil",
+    "5": "tecnica o de alta exigencia"
+  }[String(value || "").trim()] || "por definir";
+}
+
+function suggestedActivityConditionDrafts(activity) {
+  const name = activity.name || "actividad";
+  const lower = `${name} ${activity.place || ""} ${state.company.operatingArea || ""} ${state.company.localContext || ""}`.toLowerCase();
+  const place = activity.place || state.company.operatingArea || "ruta/zona por definir";
+  const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || "ubicacion por definir";
+  const area = state.company.operatingArea || place;
+  const localContext = state.company.localContext || "condiciones locales pendientes de documentar";
+  const difficulty = activityDifficultyLabel(activity.difficulty);
+  const leader = activity.leader || "guia responsable por definir";
+  const commonStop = "La actividad no se realiza si hay condiciones inseguras, equipo incompleto, falta de guia competente, ausencia de comunicacion minima o cambios del entorno que superen los criterios definidos por la organizacion.";
+  let operation;
+  let participation;
+
+  if (lower.includes("rafting") || lower.includes("balsa") || lower.includes("rio") || lower.includes("agua")) {
+    operation = `Recorrido guiado de ${name} en ${place}, dentro de la zona de operacion ${area}. La actividad se clasifica como dificultad ${difficulty} y queda sujeta a verificacion previa de caudal, clima, visibilidad, acceso al embarcadero, puntos de salida/llegada y criterio del guia responsable (${leader}). Antes de salir se revisan balsa, remos, chalecos, cascos, botiquin, comunicacion, numero de participantes por embarcacion y plan de respuesta ante emergencia. Contexto local considerado: ${localContext}. ${commonStop}`;
+    participation = "Participantes con condicion fisica compatible con actividad acuatica. Uso obligatorio de chaleco salvavidas, casco y calzado adecuado. Deben recibir charla de seguridad, seguir instrucciones del guia, informar condiciones de salud relevantes y aceptar consentimiento informado o evidencia externa equivalente. No se permite participar bajo efectos de alcohol o sustancias psicoactivas. Menores de edad solo con autorizacion del acudiente y condiciones definidas por la empresa.";
+  } else if (lower.includes("sender") || lower.includes("caminata") || lower.includes("trekking")) {
+    operation = `Recorrido guiado de ${name} en ${place}, dentro de la zona de operacion ${area}. La actividad se clasifica como dificultad ${difficulty} y depende de clima, estado del sendero, visibilidad, puntos de acceso, hidratacion disponible, comunicacion y criterio del guia responsable (${leader}). Antes de salir se verifica ruta, botiquin, comunicacion, lista de participantes, tiempos estimados, puntos de encuentro y condiciones del terreno. Contexto local considerado: ${localContext}. ${commonStop}`;
+    participation = "Participantes con condicion fisica acorde con la duracion y dificultad del recorrido. Deben usar calzado cerrado, ropa adecuada al clima, hidratacion y elementos personales requeridos. Deben recibir charla de seguridad, permanecer con el grupo, informar condiciones de salud relevantes y aceptar consentimiento informado o evidencia externa equivalente. Menores de edad solo con autorizacion del acudiente y acompanamiento segun politica de la empresa.";
+  } else if (lower.includes("cuatrimoto") || lower.includes("moto") || lower.includes("atv")) {
+    operation = `Ruta guiada de ${name} en ${place}, dentro de la zona de operacion ${area}. La actividad se clasifica como dificultad ${difficulty} y depende de clima, estado de la ruta, visibilidad, trafico local, velocidad controlada, estado mecanico de los vehiculos y criterio del guia responsable (${leader}). Antes de salir se verifica casco, frenos, luces, combustible, comunicacion, briefing de conduccion, distancia entre vehiculos y plan de emergencia. Contexto local considerado: ${localContext}. ${commonStop}`;
+    participation = "Participantes con edad y condiciones minimas definidas por la empresa para conduccion o acompanamiento. Uso obligatorio de casco y elementos de proteccion indicados. Deben recibir briefing de conduccion segura, respetar velocidad, distancia, instrucciones del guia y firmar consentimiento informado o evidencia externa equivalente. No se permite participar bajo efectos de alcohol o sustancias psicoactivas.";
+  } else {
+    operation = `Actividad guiada de ${name} en ${place}, dentro de la zona de operacion ${area}. La actividad se clasifica como dificultad ${difficulty} y se ejecuta segun condiciones del entorno, clima, acceso, disponibilidad de guia competente (${leader}), equipos requeridos, comunicacion y plan de respuesta ante emergencia. Antes de iniciar se revisan controles operacionales, participantes, equipos, ruta/lugar, riesgos principales y criterios para suspender o reprogramar. Contexto local considerado: ${localContext}. ${commonStop}`;
+    participation = "Participantes con condicion fisica y requisitos compatibles con la actividad. Deben recibir informacion previa sobre riesgos, condiciones, equipo requerido, comportamiento esperado, restricciones y canales de emergencia. Deben seguir instrucciones del guia, informar condiciones de salud relevantes y aceptar consentimiento informado o evidencia externa equivalente. No se permite participar bajo efectos de alcohol o sustancias psicoactivas.";
+  }
+
+  return { operation, participation };
+}
+
+function suggestActivityConditionsWithAgent(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName) || state.activities.find((item) => item.name === state.selectedActivityName);
+  if (!activity) return;
+  applySelectedActivityFormValues(activity);
+  const drafts = suggestedActivityConditionDrafts(activity);
+  activity.conditions = drafts.operation;
+  activity.participantRequirements = drafts.participation;
+  state.compliance["8.1"] = "en_proceso";
+  state.activityHelperNotice = {
+    activity: activity.name,
+    message: "Borrador de condiciones de operacion y participacion generado. Revisalo, ajustalo y guarda/aprueba con criterio humano.",
+    section: "profile",
+    date: today()
+  };
+  recordAuditEvent({
+    title: "Condiciones de actividad sugeridas",
+    detail: `El agente preparo borradores de condiciones de operacion y participacion para ${activity.name}.`,
+    code: "8.1",
+    type: "borrador_actividad",
+    actor: "agente"
+  });
+  addMessage("agent", state.activityHelperNotice.message);
+  saveState();
+  renderAll();
 }
 
 function activityRiskRows(activityName) {
@@ -5769,6 +5840,7 @@ function renderActivities() {
         <label class="wide">Condiciones de operacion<textarea id="activityConditions">${escapeHtml(selectedActivity.conditions || "")}</textarea></label>
         <label class="wide">Condiciones de participacion<textarea id="activityParticipantRequirements">${escapeHtml(selectedActivity.participantRequirements || "")}</textarea></label>
         <div class="wide button-row">
+          <button class="secondary-button" data-suggest-activity-conditions="${escapeHtml(selectedActivity.name)}" type="button">Sugerir condiciones con agente</button>
           <button id="saveActivityProfile" type="submit">Guardar actividad</button>
         </div>
       </form>
@@ -5859,6 +5931,7 @@ function renderActivities() {
   container.querySelector("[data-add-guide-activity]")?.addEventListener("click", (event) => addGuideForActivity(event.currentTarget.dataset.addGuideActivity));
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
+  container.querySelector("[data-suggest-activity-conditions]")?.addEventListener("click", (event) => suggestActivityConditionsWithAgent(event.currentTarget.dataset.suggestActivityConditions));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
   container.querySelector("[data-prepare-activity-package]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivityPackage));
   container.querySelector("[data-open-activity-forms]")?.addEventListener("click", (event) => {
