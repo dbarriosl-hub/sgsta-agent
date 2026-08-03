@@ -8413,9 +8413,7 @@ function renderForms() {
 
   container.querySelectorAll("[data-view-form]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.selectedFormTable = button.dataset.viewForm;
-      saveState();
-      renderAll();
+      focusFormPreview(button.dataset.viewForm, "", { search: "", status: "todos", phva: "todos" });
     });
   });
   container.querySelectorAll("[data-fill-form]").forEach((button) => {
@@ -8433,6 +8431,26 @@ function formEvidenceExists(response) {
   if (!response) return false;
   const linkedDocument = response.activity ? `${response.table}:${response.activity}` : response.table;
   return state.evidence.some((item) => item.linkedDocument === linkedDocument);
+}
+
+function focusFormPreview(table, activity = "", options = {}) {
+  if (!table) return;
+  state.selectedFormTable = table;
+  if (activity) {
+    state.selectedFormActivity = activity;
+    state.selectedActivityName = activity;
+  }
+  if (options.search !== undefined) state.formFilters.search = options.search;
+  if (options.status) state.formFilters.status = options.status;
+  if (options.phva) state.formFilters.phva = options.phva;
+  saveState();
+  renderForms();
+  requestAnimationFrame(() => {
+    const preview = document.querySelector("#formPreview");
+    preview?.scrollIntoView({ behavior: "smooth", block: "start" });
+    preview?.classList.add("activity-section-active");
+    window.setTimeout(() => preview?.classList.remove("activity-section-active"), 1800);
+  });
 }
 
 function nextFormWorkItem(catalog) {
@@ -8515,6 +8533,9 @@ async function handleFormGuideAction(button) {
     state.formFilters.status = "todos";
     saveState();
     renderForms();
+    requestAnimationFrame(() => {
+      document.querySelector("#formsTable")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     return;
   }
   if (table) state.selectedFormTable = table;
@@ -8523,8 +8544,7 @@ async function handleFormGuideAction(button) {
     state.selectedActivityName = activity;
   }
   if (action === "open") {
-    saveState();
-    renderForms();
+    focusFormPreview(table, activity, { search: "", status: "todos", phva: "todos" });
     return;
   }
   if (action === "draft") {
@@ -8761,6 +8781,11 @@ function renderFormGenerationResult() {
       </div>
     </section>`;
   container.querySelector("[data-form-generation-filter]")?.addEventListener("click", () => {
+    const first = result.responses[0];
+    if (first?.table) {
+      focusFormPreview(first.table, first.activity || "", { search: filterLabel, status: "todos", phva: "todos" });
+      return;
+    }
     state.formFilters.search = filterLabel;
     state.formFilters.status = "todos";
     saveState();
