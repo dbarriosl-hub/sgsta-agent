@@ -8386,8 +8386,17 @@ function renderForms() {
   renderFormGenerationResult();
   renderFormRequirementCoverage();
 
-  container.innerHTML = visibleForms.length
-    ? visibleForms.map((form) => {
+  const primaryForms = visibleForms.filter((form) => {
+    const response = selectedFormResponse(form);
+    const status = normalizedFormStatus(response?.status);
+    const requirement = getFormRequirement(form);
+    return response || state.formFilters.search || requirement.code === state.selectedEvidenceCode || requirement.code === "4.3";
+  });
+  const displayedForms = primaryForms.length ? primaryForms : visibleForms.slice(0, 8);
+  const hiddenCount = Math.max(0, visibleForms.length - displayedForms.length);
+
+  container.innerHTML = displayedForms.length
+    ? `${hiddenCount ? `<div class="muted form-list-note">Mostrando los formularios mas relevantes. Abre herramientas avanzadas para filtrar los ${visibleForms.length} formularios.</div>` : ""}${displayedForms.map((form) => {
       const response = selectedFormResponse(form);
       const status = normalizedFormStatus(response?.status);
       const requirement = getFormRequirement(form);
@@ -8408,7 +8417,7 @@ function renderForms() {
             <button class="secondary-button" data-fill-activity-form="${form.table}" type="button">Actividad</button>
           </div>
         </div>`;
-    }).join("")
+    }).join("")}`
     : `<div class="muted">No hay formularios con esos filtros.</div>`;
 
   container.querySelectorAll("[data-view-form]").forEach((button) => {

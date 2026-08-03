@@ -478,14 +478,17 @@
           <section class="panel">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Desde Excel: Tablas + Campos</p>
-                <h2>Catalogo de formularios</h2>
+                <p class="eyebrow">Revision y aprobacion</p>
+                <h2>Formularios de la actividad</h2>
               </div>
               <button id="addFormResponse" type="button">Diligenciar con agente</button>
             </div>
-            <div id="formCatalogSummary" class="catalog-summary"></div>
             <div id="formWorkGuide" class="form-work-guide"></div>
-            <div class="form-filters">
+            <div id="formGenerationResult" class="form-generation-result"></div>
+            <details class="form-advanced-tools">
+              <summary>Filtros y herramientas avanzadas</summary>
+              <div id="formCatalogSummary" class="catalog-summary"></div>
+              <div class="form-filters">
               <input id="formSearch" type="search" placeholder="Buscar formulario, tabla o requisito">
               <select id="formPhvaFilter">
                 <option value="todos">Todo PHVA</option>
@@ -501,18 +504,18 @@
                 <option value="revision">Revision</option>
                 <option value="aprobado">Aprobado</option>
               </select>
-            </div>
-            <div class="activity-form-tools">
-              <label>
-                Actividad para el agente
-                <select id="formActivitySelect"></select>
-              </label>
-              <button id="fillActivityFormPackage" class="secondary-button" type="button">Diligenciar paquete actividad</button>
-              <button id="testAiFormDraft" class="secondary-button" type="button">Probar IA sin guardar</button>
-            </div>
-            <div id="aiFormTestResult" class="ai-test-result"></div>
-            <div id="formGenerationResult" class="form-generation-result"></div>
-            <div id="formRequirementCoverage" class="coverage-list"></div>
+              </div>
+              <div class="activity-form-tools">
+                <label>
+                  Actividad para el agente
+                  <select id="formActivitySelect"></select>
+                </label>
+                <button id="fillActivityFormPackage" class="secondary-button" type="button">Diligenciar paquete actividad</button>
+                <button id="testAiFormDraft" class="secondary-button" type="button">Probar IA sin guardar</button>
+              </div>
+              <div id="aiFormTestResult" class="ai-test-result"></div>
+              <div id="formRequirementCoverage" class="coverage-list"></div>
+            </details>
             <div id="formsTable" class="simple-table"></div>
           </section>
           <section class="panel">

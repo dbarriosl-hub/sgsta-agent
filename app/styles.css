@@ -2425,10 +2425,16 @@ textarea {
 }
 
 .catalog-summary {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.catalog-summary .catalog-card {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 8px 10px;
 }
 
 .form-filters {
@@ -2436,6 +2442,31 @@ textarea {
   grid-template-columns: minmax(220px, 1fr) 150px 170px;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.form-advanced-tools {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+}
+
+.form-advanced-tools summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.form-advanced-tools[open] summary {
+  margin-bottom: 10px;
+}
+
+.form-list-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  margin-bottom: 8px;
+  padding: 10px;
 }
 
 .form-work-guide {
@@ -2558,9 +2589,9 @@ textarea {
   border: 1px solid #fde68a;
   border-radius: 8px;
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(280px, 1fr) minmax(260px, 0.45fr);
-  padding: 14px;
+  gap: 10px;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.42fr);
+  padding: 12px;
 }
 
 .form-generation-card h3,
@@ -2571,6 +2602,7 @@ textarea {
 
 .form-generation-card p {
   color: var(--muted);
+  font-size: 13px;
   margin-top: 5px;
 }
 
@@ -2579,8 +2611,8 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 9px;
 }
 
 .form-generation-next strong {
