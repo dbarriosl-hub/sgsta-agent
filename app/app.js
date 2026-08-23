@@ -8096,6 +8096,75 @@ function regenerateDocumentDraft(index) {
   renderAll();
 }
 
+function stripDocumentAiAppendix(content) {
+  return String(content || "").replace(/\n{2,}AJUSTE SUGERIDO POR IA[\s\S]*$/i, "").trim();
+}
+
+function cleanInstructionSentence(instruction) {
+  const text = String(instruction || "")
+    .replace(/^agreg(a|ue|uele|arle|ale)\s+que\s+/i, "")
+    .replace(/^incluir\s+que\s+/i, "")
+    .replace(/^anadir\s+que\s+/i, "")
+    .trim();
+  if (!text) return "";
+  const normalized = text.charAt(0).toUpperCase() + text.slice(1);
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+}
+
+function documentLineFromInstruction(instruction) {
+  const lower = String(instruction || "").toLowerCase();
+  if (/(restring|solo|unicamente|cumplan|condicion|usuario|participante)/.test(lower)) {
+    return "La actividad solo se oferta y ejecuta con participantes que cumplan las condiciones de participacion definidas, acepten los requisitos de seguridad y reciban la informacion previa aplicable.";
+  }
+  if (/(chaleco|casco|equipo|inspeccion|mantenimiento)/.test(lower)) {
+    return "Antes de iniciar la actividad se verifica que los equipos requeridos esten disponibles, inspeccionados, en estado operativo y con evidencia registrada.";
+  }
+  if (/(guia|competencia|certificado|personal)/.test(lower)) {
+    return "La actividad solo se ejecuta con guia responsable asignado y competencia vigente de acuerdo con los riesgos, la ruta y las condiciones operativas.";
+  }
+  if (/(emergencia|rescate|primeros auxilios)/.test(lower)) {
+    return "La actividad debe contar con plan de respuesta a emergencias, medios de comunicacion y responsables definidos antes de operar.";
+  }
+  return cleanInstructionSentence(instruction);
+}
+
+function insertDocumentLineInSection(content, line, sectionTitles) {
+  const lines = String(content || "").split("\n");
+  const lowerTitles = sectionTitles.map((title) => title.toLowerCase());
+  const sectionIndex = lines.findIndex((entry) => lowerTitles.includes(entry.trim().toLowerCase()));
+  if (sectionIndex === -1) return "";
+
+  let insertAt = sectionIndex + 1;
+  while (insertAt < lines.length && lines[insertAt].trim() !== "") insertAt += 1;
+  lines.splice(insertAt, 0, `- ${line}`);
+  return lines.join("\n");
+}
+
+function integrateDocumentInstruction(content, instruction, doc) {
+  const baseContent = stripDocumentAiAppendix(content || documentTemplateFor(doc).content || "");
+  const line = documentLineFromInstruction(instruction);
+  if (!line) return baseContent;
+  if (baseContent.toLowerCase().includes(line.toLowerCase())) return baseContent;
+
+  const sectionCandidates = [
+    "La organizacion se compromete a:",
+    "Controles minimos antes de operar:",
+    "Actividades cubiertas por esta politica:",
+    "Actividades incluidas:",
+    "Limites del sistema:",
+    "Requisitos minimos:",
+    "Responsabilidades:"
+  ];
+  const sectionContent = insertDocumentLineInSection(baseContent, line, sectionCandidates);
+  if (sectionContent) return sectionContent;
+
+  const finalNote = /\n{2,}Este documento\b/i;
+  if (finalNote.test(baseContent)) {
+    return baseContent.replace(finalNote, `\n- ${line}\n\nEste documento`);
+  }
+  return `${baseContent.trim()}\n\nCriterio incorporado:\n- ${line}`;
+}
+
 function improveSelectedDocumentWithInstruction() {
   const doc = selectedDocument();
   if (!doc) return;
@@ -8106,7 +8175,8 @@ function improveSelectedDocumentWithInstruction() {
   }
   doc.aiInstruction = instruction;
   const current = doc.content || documentTemplateFor(doc).content || "";
-  doc.content = `${current.trim()}\n\nAJUSTE SUGERIDO POR IA\n${instruction}\n\nTexto incorporado para revision humana:\n- Revisar que el ajuste sea coherente con la actividad, los riesgos, equipos, personal y evidencias del SGSTA.\n- Confirmar responsable, aplicacion operativa y registros asociados antes de aprobar.`;
+  doc.content = integrateDocumentInstruction(current, instruction, doc);
+  doc.lastAiChange = instruction;
   doc.status = "borrador";
   doc.updatedAt = today();
   state.compliance[doc.code || "7.5"] = "en_proceso";
@@ -8117,7 +8187,7 @@ function improveSelectedDocumentWithInstruction() {
     type: "documento",
     actor: "agente"
   });
-  addMessage("agent", `Agregué el ajuste solicitado a "${doc.title}". Queda como borrador para revisión humana.`);
+  addMessage("agent", `Integré el ajuste solicitado dentro de "${doc.title}". Queda como borrador para revision humana.`);
   saveState();
   renderAll();
 }
