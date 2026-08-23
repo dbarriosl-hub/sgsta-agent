@@ -7948,7 +7948,213 @@ function riskEditRow(risk, index) {
     </div>`;
 }
 
+function suggestedDocumentCode(doc, index = 0) {
+  const title = String(doc?.title || "").toLowerCase();
+  if (title.includes("alcance")) return "SGSTA-DOC-001";
+  if (title.includes("politica")) return "SGSTA-DOC-002";
+  if (title.includes("procedimiento")) return "SGSTA-PRO-001";
+  if (title.includes("emergencia")) return "SGSTA-PLA-001";
+  if (title.includes("revision por la direccion")) return "SGSTA-ACT-001";
+  return `SGSTA-DOC-${String(index + 1).padStart(3, "0")}`;
+}
+
+function registryStatusClass(status = "") {
+  const normalized = String(status || "").toLowerCase();
+  if (["aprobado", "aprobada", "vigente", "recibida", "recibido", "cerrada", "operativo", "cumple"].includes(normalized)) return "cumple";
+  if (["pendiente", "vencida", "fuera_servicio", "no_cumple"].includes(normalized)) return "no_cumple";
+  return "en_proceso";
+}
+
+function externalRecordCode(prefix, index) {
+  return `${prefix}-${String(index + 1).padStart(3, "0")}`;
+}
+
+function documentRegistryRows() {
+  const rows = [];
+  state.documents.forEach((doc, index) => {
+    rows.push({
+      code: doc.documentCode || suggestedDocumentCode(doc, index),
+      type: doc.type || (String(doc.title || "").toLowerCase().includes("procedimiento") ? "procedimiento" : "documento"),
+      name: doc.title || "Documento sin titulo",
+      requirement: doc.code || "7.5",
+      activity: doc.activity || "Sistema",
+      medium: "Interno app",
+      link: doc.content ? "Borrador en sistema" : "Sin contenido",
+      status: doc.status || "borrador",
+      source: "documento"
+    });
+  });
+  state.policies.forEach((policy, index) => rows.push({
+    code: externalRecordCode("SGSTA-REG-6.1.3", index),
+    type: "registro externo",
+    name: `Poliza / seguro - ${policy.activity || "General"}`,
+    requirement: "6.1.3",
+    activity: policy.activity || "General",
+    medium: "Link o soporte externo",
+    link: policy.policyLink || policy.document || policy.evidence || "",
+    status: policyIsComplete(policy) ? "vigente" : (policy.status || "pendiente"),
+    source: "policies",
+    index,
+    field: "policyLink"
+  }));
+  state.people.forEach((person, index) => rows.push({
+    code: externalRecordCode("SGSTA-REG-7.2", index),
+    type: "registro externo",
+    name: `Competencia / certificado - ${person.name || "Persona por definir"}`,
+    requirement: "7.2",
+    activity: person.activity || "General",
+    medium: "Certificado, curso o soporte externo",
+    link: person.evidence || "",
+    status: personIsComplete(person) ? "cumple" : (person.competence || "pendiente"),
+    source: "people",
+    index,
+    field: "evidence"
+  }));
+  state.trainingNeeds.forEach((training, index) => rows.push({
+    code: externalRecordCode("SGSTA-REG-7.3", index),
+    type: "registro externo",
+    name: `Capacitacion - ${training.topic || "Tema por definir"}`,
+    requirement: training.code || "7.2/7.3",
+    activity: training.activity || "General",
+    medium: "Asistencia, evaluacion, certificado o acta",
+    link: training.evidence || training.certificate || "",
+    status: trainingNeedComplete(training) ? "cerrada" : (training.status || "pendiente"),
+    source: "trainingNeeds",
+    index,
+    field: training.evidence ? "evidence" : "certificate"
+  }));
+  state.equipment.forEach((equipment, index) => rows.push({
+    code: externalRecordCode("SGSTA-REG-7.1", index),
+    type: "registro externo",
+    name: `HV / inspeccion / mantenimiento - ${equipment.name || "Equipo por nombrar"}`,
+    requirement: "7.1/8.1",
+    activity: equipment.activity || "General",
+    medium: "Hoja de vida, checklist, foto o acta externa",
+    link: equipment.evidence || "",
+    status: equipmentIsComplete(equipment) ? "operativo" : (equipment.status || "revision"),
+    source: "equipment",
+    index,
+    field: "evidence"
+  }));
+  state.participantEvidence.forEach((item, index) => rows.push({
+    code: externalRecordCode("SGSTA-REG-7.4.3", index),
+    type: "registro externo",
+    name: `${item.kind || "Participantes / consentimiento"} - ${item.phase || "antes"}`,
+    requirement: "7.4.3 / ISO 21103",
+    activity: item.activity || "General",
+    medium: "Formulario externo, consentimiento o evidencia enlazada",
+    link: item.link || item.evidence || "",
+    status: participantEvidenceIsComplete(item) ? "recibida" : (item.status || "pendiente"),
+    source: "participantEvidence",
+    index,
+    field: item.link ? "link" : "evidence"
+  }));
+  return rows;
+}
+
+function renderDocumentMasterList() {
+  const list = document.querySelector("#documentMasterList");
+  const summary = document.querySelector("#documentMasterSummary");
+  if (!list || !summary) return;
+  const rows = documentRegistryRows();
+  const approved = rows.filter((row) => ["aprobado", "aprobada", "vigente", "recibida", "recibido", "cerrada", "operativo", "cumple"].includes(String(row.status).toLowerCase())).length;
+  const external = rows.filter((row) => row.type.includes("externo")).length;
+  const missingLinks = rows.filter((row) => row.type.includes("externo") && !row.link).length;
+  summary.innerHTML = `
+    <div class="report-card"><span>Total items</span><strong>${rows.length}</strong></div>
+    <div class="report-card"><span>Listos/aprobados</span><strong>${approved}</strong></div>
+    <div class="report-card"><span>Registros externos</span><strong>${external}</strong></div>
+    <div class="report-card"><span>Sin link</span><strong>${missingLinks}</strong></div>`;
+  list.innerHTML = rows.length ? rows.map((row) => `
+    <article class="master-document-row">
+      <div>
+        <span class="badge requisito">${escapeHtml(row.requirement)}</span>
+        <span class="badge ${registryStatusClass(row.status)}">${escapeHtml(row.status || "pendiente")}</span>
+      </div>
+      <strong>${escapeHtml(row.code)} - ${escapeHtml(row.name)}</strong>
+      <p>${escapeHtml(row.type)} · ${escapeHtml(row.activity)} · ${escapeHtml(row.medium)}</p>
+      ${row.source === "documento" ? `<small>${escapeHtml(row.link)}</small>` : `
+        <label>Link / evidencia externa
+          <input data-master-link="${row.source}:${row.index}:${row.field}" type="text" value="${escapeHtml(row.link || "")}" placeholder="Pega aqui link de Drive, OneDrive, Excel, PDF o soporte">
+        </label>`}
+    </article>`).join("") : `<div class="muted">No hay documentos ni registros en el listado maestro.</div>`;
+  list.querySelectorAll("[data-master-link]").forEach((field) => {
+    field.addEventListener("change", () => updateMasterRegistryLink(field));
+  });
+}
+
+function updateMasterRegistryLink(field) {
+  const [collection, rawIndex, key] = field.dataset.masterLink.split(":");
+  const item = state[collection]?.[Number(rawIndex)];
+  if (!item) return;
+  item[key] = field.value.trim();
+  item.updatedAt = today();
+  if (collection === "people") state.compliance["7.2"] = "en_proceso";
+  if (collection === "trainingNeeds") state.compliance["7.3"] = "en_proceso";
+  if (collection === "equipment") state.compliance["7.1"] = "en_proceso";
+  if (collection === "policies") state.compliance["6.1.3"] = "en_proceso";
+  if (collection === "participantEvidence") state.compliance["7.4.3"] = "en_proceso";
+  saveState();
+  renderAll();
+}
+
+function assignDocumentCodes() {
+  state.documents.forEach((doc, index) => {
+    if (!doc.documentCode) doc.documentCode = suggestedDocumentCode(doc, index);
+    if (!doc.version) doc.version = "1";
+    doc.updatedAt = today();
+  });
+  state.compliance["7.5"] = "en_proceso";
+  addMessage("agent", "Asigne codigos sugeridos a los documentos controlados. Puedes ajustarlos antes de aprobar.");
+  saveState();
+  renderAll();
+}
+
+function documentMasterListText() {
+  const rows = documentRegistryRows();
+  return [
+    "SGSTA-LMD-001 - Listado maestro de documentos y registros",
+    "Sistema: SGSTA Agent / NTC ISO 21101",
+    `Organizacion: ${state.orgName}`,
+    `Fecha de generacion: ${today()}`,
+    "",
+    "Codigo | Tipo | Nombre | Requisito | Actividad | Medio | Link/Evidencia | Estado",
+    ...rows.map((row) => `${row.code} | ${row.type} | ${row.name} | ${row.requirement} | ${row.activity} | ${row.medium} | ${row.link || "por registrar"} | ${row.status || "pendiente"}`)
+  ].join("\n");
+}
+
+function downloadDocumentMasterList() {
+  const content = documentMasterListText();
+  upsertControlledDocument({
+    documentCode: "SGSTA-LMD-001",
+    title: "Listado maestro de documentos y registros",
+    code: "7.5",
+    status: "borrador",
+    type: "registro",
+    content
+  });
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "SGSTA-LMD-001_listado_maestro_documentos_registros.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordAuditEvent({
+    title: "Listado maestro descargado",
+    detail: "Se descargo y registro el listado maestro de documentos y registros.",
+    code: "7.5",
+    type: "documento",
+    actor: "humano"
+  });
+  saveState();
+  renderAll();
+}
+
 function renderDocuments() {
+  renderDocumentMasterList();
   const container = document.querySelector("#documentsTable");
   container.innerHTML = state.documents.length
     ? state.documents.map((doc, index) => `
@@ -14477,26 +14683,31 @@ function documentDraftTemplates() {
   const emergencyScenarios = state.risks.filter((risk) => riskLevel(risk) >= 9).map((risk) => `- ${risk.activity || "General"}: ${risk.title}. Control base: ${risk.control || "por definir"}.`).join("\n") || "- Lesion, perdida de comunicacion, cambio climatico, falla de equipo o incidente durante la actividad.";
   return [
     {
+      documentCode: "SGSTA-DOC-001",
       title: "Alcance del SGSTA",
       code: "4.3",
       content: `ALCANCE DEL SGSTA\n\nOrganizacion: ${org}\n${locationContext}\n\nEl Sistema de Gestion de Seguridad de Turismo de Aventura aplica a:\n${scope}\n\nActividades incluidas:\n${activityLines}\n\nPartes interesadas consideradas:\n${stakeholders}\n\nContexto local considerado:\n${state.company.localContext || "Pendiente de documentar por la organizacion."}\n\nLimites del sistema:\n- Actividades ofertadas y controladas por la organizacion.\n- Personal, guias, proveedores, equipos, seguros, procedimientos, emergencias, participantes y evidencias relacionadas.\n- No reemplaza permisos legales, seguros ni aprobaciones humanas requeridas.\n\nEste borrador debe ser revisado y aprobado por la direccion.`
     },
     {
+      documentCode: "SGSTA-DOC-002",
       title: "Politica de seguridad",
       code: "5.2",
       content: `POLITICA DE SEGURIDAD\n\n${org} se compromete a planificar, operar y mejorar sus actividades de turismo de aventura en ${location}, especificamente en ${operatingArea}, bajo criterios de seguridad, prevencion de incidentes, cumplimiento de requisitos aplicables y mejora continua.\n\nActividades cubiertas por esta politica:\n${activityLines}\n\nLa organizacion se compromete a:\n- Identificar y tratar riesgos por actividad.\n- Mantener personal competente, capacitado y consciente de sus responsabilidades.\n- Conservar equipos operativos, inspeccionados y mantenidos.\n- Validar seguros y condiciones antes de ofertar u operar actividades.\n- Comunicar informacion clara de seguridad a participantes antes, durante y despues de la actividad.\n- Investigar incidentes y ejecutar acciones correctivas, preventivas y de mejora.\n- Revisar el desempeno del SGSTA con informacion real y decisiones de direccion.\n\nEste documento es un borrador generado por el agente y requiere aprobacion formal.`
     },
     {
+      documentCode: "SGSTA-PRO-001",
       title: "Procedimiento operacional de servicio",
       code: "8.1",
       content: `PROCEDIMIENTO DE PRESTACION DEL SERVICIO DE TURISMO DE AVENTURA\n\nOrganizacion: ${org}\n${locationContext}\nActividad principal: ${activity}\nNorma especifica de actividad: por confirmar por la organizacion segun la NTS-AV aplicable y la version vigente.\n\n1. Objetivo\nEstablecer la forma como ${org} planifica, oferta, prepara, ejecuta, controla, cierra y mejora la prestacion del servicio de ${activity}, manteniendo condiciones controladas de seguridad, trazabilidad y evidencia para el SGSTA.\n\n2. Alcance\nEste procedimiento aplica desde la promocion o informacion previa al participante, reserva o inscripcion, planificacion operativa, verificacion del escenario, recepcion de participantes, charla de seguridad, entrega de equipos, verificacion GO/NO GO, ejecucion, manejo de novedades, cierre, registros y mejora posterior del servicio.\n\n3. Responsabilidades\n- Direccion o responsable de la empresa: aprobar el procedimiento, asignar recursos, definir si la actividad puede ofertarse y revisar resultados del SGSTA.\n- Responsable de operaciones: planificar la actividad, verificar personal, equipos, seguros, riesgos, condiciones del lugar y registros antes de operar.\n- Guia, instructor o lider de actividad: ejecutar la verificacion preoperacional, dirigir la charla de seguridad, supervisar la actividad, tomar decisiones GO/NO GO y registrar novedades.\n- Personal de apoyo: cumplir instrucciones del lider, apoyar control de participantes, equipos, comunicaciones y respuesta ante novedades.\n- Participante o usuario: entregar informacion requerida por canales externos, declarar condiciones relevantes, usar equipos, atender instrucciones y reportar novedades.\n\nPersonal identificado por la organizacion:\n${staffLines}\n\n4. Condiciones generales para prestar el servicio\nLa actividad solo debe ofertarse o ejecutarse cuando se cumplan, como minimo, estas condiciones:\n- La actividad, ruta o lugar esta definido y fue revisado frente a riesgos previsibles.\n- El personal asignado es competente o esta validado para la actividad.\n- Los equipos y EPP requeridos estan disponibles, inspeccionados y en estado operativo.\n- La poliza o cobertura aplicable a la actividad fue validada antes de operar.\n- Los participantes recibieron informacion clara sobre actividad, dificultad, riesgos, restricciones y comportamiento esperado.\n- Existe medio de comunicacion, botiquin, plan de emergencia y responsable de respuesta.\n- Las condiciones ambientales y del lugar no superan los criterios de seguridad definidos.\n- La seguridad prevalece sobre la venta o ejecucion comercial del servicio.\n\nActividades y condiciones declaradas:\n${activityLines}\n\n5. Desarrollo del procedimiento\n5.1 Promocion e informacion previa al participante\nAntes de la reserva o contratacion, la empresa debe comunicar descripcion de la actividad, lugar, duracion estimada, dificultad, riesgos relevantes, condiciones fisicas requeridas, restricciones de edad/peso/salud cuando apliquen, vestuario, equipos suministrados, criterios de modificacion o cancelacion, reglas de comportamiento y existencia de seguros cuando corresponda.\n\n5.2 Reserva o inscripcion\nLa empresa debe registrar por medio externo o soporte controlado la aceptacion de condiciones, contacto de emergencia, datos minimos necesarios, autorizacion de menores cuando aplique y cualquier condicion especial que pueda afectar la seguridad. En el MVP no se almacenan datos sensibles: se conserva enlace o evidencia externa.\n\n5.3 Planificacion previa de la actividad\nEl responsable de operaciones debe verificar ruta o escenario, clima, variables particulares de la actividad, equipos, EPP, botiquin, comunicaciones, personal competente, numero y caracteristicas del grupo, rutas de evacuacion, contactos de emergencia y condiciones que puedan generar decision NO GO.\n\n5.4 Recepcion y registro de participantes\nAntes de iniciar, el guia o responsable debe confirmar identidad operativa del grupo, asistencia, informacion recibida, restricciones declaradas, autorizaciones requeridas y aceptacion de instrucciones de seguridad.\n\n5.5 Verificacion de condiciones del participante\nEl guia debe confirmar que cada participante cumple las condiciones definidas para la actividad. Cuando una condicion de edad, salud, estado fisico, consumo de alcohol/sustancias, embarazo, habilidad para seguir instrucciones u otra restriccion aumente el riesgo, la empresa debe impedir la participacion o ajustar la operacion.\n\nCondiciones de participacion definidas:\n${participantLines}\n\n5.6 Charla de seguridad\nAntes del inicio, el guia debe realizar charla de seguridad que incluya descripcion de la actividad, riesgos principales, reglas obligatorias, conductas prohibidas, comandos o senales, uso de equipos, actuacion ante caida/separacion/emergencia, evacuacion y responsabilidad del participante de seguir instrucciones. Debe quedar evidencia de la charla o aceptacion externa.\n\n5.7 Entrega y verificacion de equipos y EPP\nEl responsable debe seleccionar, entregar, ajustar e inspeccionar visualmente los equipos y EPP. No debe iniciar la actividad con equipos faltantes, deteriorados, sin inspeccion o sin responsable definido.\n\nEquipos asociados:\n${equipmentLines}\n\n5.8 Verificacion final GO / NO GO\nAntes de iniciar, el guia responsable debe decidir GO / NO GO revisando participantes, personal, equipos, EPP, comunicaciones, clima, condiciones del lugar, ruta, medios de emergencia, seguros y riesgos adicionales. Si un punto critico no esta controlado, la actividad no debe iniciar o debe ser reprogramada.\n\n5.9 Medidas de seguridad durante la actividad\nDurante la ejecucion se debe mantener supervision continua, control del grupo, cumplimiento de comandos, comunicacion entre guias, seguimiento de cambios ambientales, control de equipos, cambios en riesgos y registro de novedades.\n\n5.10 Cambios de condiciones durante la actividad\nEl guia puede continuar, modificar recorrido, detener temporalmente, evacuar o cancelar cuando cambien clima, caudal, visibilidad, terreno, estado de participantes, estado de equipos, comunicacion o cualquier variable que altere el nivel de riesgo.\n\n5.11 Incidentes y emergencias\nAnte accidente, lesion, separacion del grupo, falla de equipo, cambio brusco de clima, situacion medica, rescate o evacuacion, se debe activar el plan de emergencia, proteger a las personas, comunicar a responsables, registrar el evento y generar acciones correctivas o de mejora.\n\n5.12 Finalizacion segura\nAl terminar, el guia debe conducir al grupo a punto seguro, contar participantes, revisar estado de salud, recibir equipos, registrar incidentes/novedades y confirmar cierre operativo.\n\n5.13 Actividades posteriores al servicio\nEl responsable debe inspeccionar equipos, retirar equipos danados, limpiar, desinfectar, secar, mantener, almacenar y actualizar registros u hojas de vida cuando aplique.\n\n5.14 Evaluacion de la actividad\nEl guia o responsable debe evaluar condiciones encontradas, comportamiento del grupo, incidentes, cambios de ruta, problemas de equipos, efectividad de controles, observaciones de participantes y necesidad de actualizar riesgos, procedimientos o acciones.\n\n5.15 Cierre del servicio\nEl servicio se cierra cuando estan completos los registros definidos, novedades e incidentes fueron reportados, acciones necesarias quedaron abiertas y la evidencia fue enviada a revision o aprobacion humana.\n\n6. Controles especificos para ${activity}\n${specificControls}\n\n7. Riesgos y controles considerados\n${riskLines}\n\n8. Seguros y coberturas\n${policyLines}\n\n9. Evidencias externas de participantes\n${participantEvidenceLines}\n\n10. Registros requeridos\nRegistro | Responsable | Momento | Informacion minima\n--- | --- | --- | ---\nRegistro de participantes | Guia/responsable | Antes de iniciar | Actividad, fecha, confirmacion de informacion y consentimiento externo\nDeclaracion de condiciones/restricciones | Participante/responsable | Antes de iniciar | Condiciones relevantes, restricciones y aceptacion de instrucciones\nLista de chequeo preoperacional | Guia/responsable | Antes de iniciar | Lugar, clima, equipos, personal, comunicaciones, emergencia y GO/NO GO\nRegistro de charla de seguridad | Guia | Antes de iniciar | Temas comunicados y evidencia de realizacion\nVerificacion de equipos/EPP | Guia/personal de apoyo | Antes y despues | Estado, ajuste, novedades, retiro de servicio si aplica\nBitacora de operacion | Guia/responsable | Durante y al cierre | Hora, ruta, grupo, novedades, cambios y decisiones\nRegistro de incidentes | Responsable designado | Cuando ocurra | Descripcion, atencion, causa inicial, acciones y seguimiento\nEvaluacion/cierre de actividad | Responsable de operaciones | Despues | Resultados, observaciones, mejoras y acciones\n\n11. Criterios de suspension o cancelacion\nSituacion | Accion\n--- | ---\nCondiciones normales y controles completos | Iniciar o continuar\nRiesgo controlable | Aplicar control adicional y registrar decision\nRiesgo que supera criterios definidos | No iniciar, suspender o reprogramar\nFalta de guia competente, equipo critico, seguro o comunicacion | No iniciar\nCambio ambiental, incidente o emergencia | Detener, proteger al grupo y activar plan de emergencia\n\n12. Diagrama del proceso\nPromocion e informacion -> Reserva -> Planificacion -> Verificacion del escenario -> Registro de participantes -> Verificacion de aptitud -> Charla de seguridad -> Entrega y ajuste de EPP -> Verificacion GO/NO GO -> Inicio -> Supervision y controles durante la actividad -> Gestion de novedades -> Finalizacion segura -> Conteo de participantes -> Recepcion e inspeccion de equipos -> Evaluacion -> Registros -> Mejora.\n\n13. Aspectos que deben personalizarse con la empresa\n- Confirmar la NTS-AV especifica aplicable a la actividad y su version vigente.\n- Definir numero maximo de participantes, relacion guia/participantes y restricciones tecnicas propias.\n- Completar criterios GO/NO GO medibles para clima, caudal, terreno, visibilidad u otras variables.\n- Completar responsables nominales, registros reales, formatos, codigos internos y evidencias.\n- Validar que el procedimiento coincide con permisos, seguros, contratos, proveedores y plan de emergencias.\n\nEste documento es un borrador generado por el agente. Requiere revision y aprobacion humana antes de usarse como documento controlado.`
     },
     {
+      documentCode: "SGSTA-PLA-001",
       title: "Plan de emergencia",
       code: "8.2",
       content: `PLAN DE EMERGENCIA\n\nOrganizacion: ${org}\n${locationContext}\nActividad base: ${activity}\n\nEscenarios de emergencia derivados del perfil:\n${emergencyScenarios}\n\nRecursos y equipos disponibles:\n${equipmentLines}\n\nPersonal y capacitacion requerida:\n${trainingLines}\n\nSeguros/coberturas por validar:\n${policyLines}\n\nRequisitos minimos:\n- Definir responsable de respuesta y comunicaciones.\n- Confirmar rutas, puntos de encuentro y medios de contacto.\n- Verificar botiquin/equipos de emergencia antes de operar.\n- Registrar simulacros, incidentes, aprendizajes y acciones de mejora.\n\nEl plan debe probarse mediante simulacros, registrar resultados y generar acciones de mejora cuando se detecten fallas.`
     },
     {
+      documentCode: "SGSTA-ACT-001",
       title: "Resumen para revision por la direccion",
       code: "9.3",
       content: `RESUMEN PARA REVISION POR LA DIRECCION\n\nPeriodo: ${today()}\n\nPerfil usado por el agente:\n${profile}\n\nEntradas preparadas por el agente:\n- Acciones abiertas: ${state.actions.filter((item) => item.status !== "cerrada").length}\n- Riesgos registrados: ${state.risks.length}\n- Incidentes registrados: ${state.incidents.length}\n- Necesidades de capacitacion abiertas: ${state.trainingNeeds.filter((item) => item.status !== "cerrada").length}\n- Equipos en revision: ${state.equipment.filter((item) => item.status !== "operativo").length}\n- Polizas pendientes: ${state.policies.filter((item) => item.status !== "vigente").length}\n\nDecisiones sugeridas:\n${managementReviewOperationalDecisions().map((decision) => `- ${decision.title}: ${decision.detail}`).join("\n")}\n\nSalidas sugeridas:\n- Priorizar cierre de acciones vencidas o criticas.\n- Aprobar recursos para capacitacion, mantenimiento, seguros y evidencias.\n- Definir si alguna actividad no debe ofertarse hasta cerrar brechas criticas.\n- Revisar oportunidades de mejora del SGSTA.\n\nEste borrador debe ser validado por la direccion.`
@@ -14506,7 +14717,8 @@ function documentDraftTemplates() {
 
 function generateDocumentDraft(options = {}) {
   const templates = documentDraftTemplates();
-  const next = templates.find((template) => !state.documents.some((doc) => doc.title === template.title && doc.content)) || templates[0];
+  const implementationTemplates = templates.filter((template) => template.code !== "9.3");
+  const next = implementationTemplates.find((template) => !state.documents.some((doc) => doc.title === template.title && doc.content)) || implementationTemplates[0] || templates[0];
   const existingIndex = state.documents.findIndex((doc) => doc.title === next.title);
   if (existingIndex >= 0) {
     state.documents[existingIndex] = { ...state.documents[existingIndex], ...next, status: "borrador" };
@@ -14899,6 +15111,8 @@ document.querySelector("#addRisk").addEventListener("click", addRisk);
 document.querySelector("#generateRiskMapAgent").addEventListener("click", generateRiskMapWithAgent);
 document.querySelector("#addDocument").addEventListener("click", addDocument);
 document.querySelector("#generateDocumentDraft").addEventListener("click", generateDocumentDraft);
+document.querySelector("#assignDocumentCodes").addEventListener("click", assignDocumentCodes);
+document.querySelector("#downloadDocumentMasterList").addEventListener("click", downloadDocumentMasterList);
 document.querySelector("#addIncident").addEventListener("click", addIncident);
 document.querySelector("#addAudit").addEventListener("click", addAudit);
 document.querySelector("#addManagementReview").addEventListener("click", addManagementReview);

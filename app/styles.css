@@ -1385,6 +1385,41 @@ textarea {
   gap: 16px;
 }
 
+.master-document-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.master-document-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.master-document-row strong,
+.master-document-row p,
+.master-document-row small {
+  overflow-wrap: anywhere;
+}
+
+.master-document-row p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.master-document-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .forms-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
