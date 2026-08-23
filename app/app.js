@@ -228,6 +228,7 @@ const defaultState = {
     { title: "Procedimiento operacional de caminatas", code: "8.1", status: "borrador", content: "" }
   ],
   selectedDocumentIndex: 0,
+  routeNotice: null,
   incidents: [],
   audits: [],
   managementReviews: [],
@@ -295,6 +296,7 @@ function mergeState(base, current) {
     risks: current.risks || base.risks,
     documents: current.documents || base.documents,
     selectedDocumentIndex: current.selectedDocumentIndex ?? base.selectedDocumentIndex,
+    routeNotice: current.routeNotice || base.routeNotice,
     incidents: current.incidents || base.incidents,
     audits: current.audits || base.audits,
     managementReviews: current.managementReviews || base.managementReviews,
@@ -549,6 +551,7 @@ function renderAll() {
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
   renderResumeTrail();
+  renderNavigationNotice();
   renderMetrics();
   renderSystemHealthSummary();
   renderDemoReadiness();
@@ -1600,6 +1603,27 @@ function renderResumeTrail() {
   container.querySelector("[data-resume-action='secondary']")?.addEventListener("click", () => runResumeAction(resume.secondary));
 }
 
+function renderNavigationNotice() {
+  const container = document.querySelector("#navigationNotice");
+  if (!container) return;
+  const notice = state.routeNotice;
+  if (!notice) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `
+    <div>
+      <strong>${escapeHtml(notice.title || "Modulo abierto")}</strong>
+      <p>${escapeHtml(notice.detail || "")}</p>
+    </div>
+    <button class="secondary-button" data-clear-route-notice type="button">Cerrar</button>`;
+  container.querySelector("[data-clear-route-notice]")?.addEventListener("click", () => {
+    state.routeNotice = null;
+    saveState();
+    renderNavigationNotice();
+  });
+}
+
 function renderTodayWork() {
   const container = document.querySelector("#todayWork");
   if (!container) return;
@@ -2028,6 +2052,7 @@ function renderChapterProgress() {
             const itemPct = Math.round(requirementCompletionScore(item.code) * 100);
             const status = requirementCompletionStatus(item.code);
             const requirementActions = state.actions.filter((action) => action.code === item.code && action.status !== "cerrada").length;
+            const targetLabel = requirementDefaultView(item.code).replaceAll("_", " ");
             return `
               <div class="requirement-line">
                 <div>
@@ -2037,7 +2062,7 @@ function renderChapterProgress() {
                 </div>
                 <div class="requirement-line-actions">
                   <span>${itemPct}%</span>
-                  <button class="secondary-button" data-requirement-open="${escapeHtml(item.code)}" type="button">Abrir</button>
+                  <button class="secondary-button" data-requirement-open="${escapeHtml(item.code)}" type="button">Ir a ${escapeHtml(targetLabel)}</button>
                 </div>
               </div>`;
           }).join("")}
@@ -2092,10 +2117,17 @@ function requirementDefaultView(code) {
 }
 
 function openRequirementFromDashboard(code) {
+  const requirement = requirements.find((item) => item.code === code);
+  const targetView = requirementDefaultView(code);
   state.selectedEvidenceCode = code;
   state.selectedFormTable = formDefinitions.find((form) => form.code === code)?.table || state.selectedFormTable;
   if (code.startsWith("10.")) state.actionFilterActivity = "";
-  showView(requirementDefaultView(code));
+  state.routeNotice = {
+    title: `Requisito ${code} abierto`,
+    detail: `${requirement?.title || "Requisito"} se esta trabajando en el modulo ${targetView.replaceAll("_", " ")}.`
+  };
+  showView(targetView);
+  window.scrollTo({ top: 0, behavior: "smooth" });
   renderAll();
 }
 
@@ -2172,7 +2204,15 @@ function renderDashboardImplementationQueue() {
   container.querySelectorAll("[data-dashboard-step]").forEach((button) => {
     button.addEventListener("click", () => {
       const step = implementationSteps.find((item) => item.id === button.dataset.dashboardStep);
-      if (step?.view) showView(step.view);
+      if (step?.view) {
+        state.routeNotice = {
+          title: `Paso ${step.title} abierto`,
+          detail: `Trabaja este paso en el modulo ${step.view.replaceAll("_", " ")}. Estado actual: ${implementationQueueStatus(step).label}.`
+        };
+        showView(step.view);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        renderAll();
+      }
     });
   });
 }
@@ -7112,8 +7152,16 @@ function policyCoverageRows() {
 }
 
 function policyCoverageMatrixText() {
+  const docCode = "SGSTA-REG-6.1.3-001";
   return [
-    "Matriz de seguros por actividad - SGSTA Agent",
+    `${docCode} - Matriz de seguros por actividad`,
+    "Sistema: SGSTA Agent / NTC ISO 21101",
+    "Tipo: Registro controlado",
+    "Requisito relacionado: 6.1.3 - Requisitos legales y otros requisitos aplicables",
+    `Fecha de generacion: ${today()}`,
+    "",
+    "Listado maestro:",
+    "Este registro debe aparecer en Documentos controlados como evidencia del control de seguros por actividad.",
     "",
     "Criterio:",
     "Cada actividad debe tener poliza vigente, cobertura clara, vigencia, documento soporte y relacion con riesgos antes de ofertar u operar.",
@@ -7130,18 +7178,28 @@ function policyCoverageMatrixText() {
 }
 
 function downloadPolicyCoverageMatrix() {
-  const blob = new Blob([policyCoverageMatrixText()], { type: "text/plain;charset=utf-8" });
+  const docCode = "SGSTA-REG-6.1.3-001";
+  const content = policyCoverageMatrixText();
+  upsertControlledDocument({
+    documentCode: docCode,
+    title: "Matriz de seguros por actividad",
+    code: "6.1.3",
+    status: "borrador",
+    type: "registro",
+    content
+  });
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "matriz_seguros_por_actividad.txt";
+  link.download = `${docCode}_matriz_seguros_por_actividad.txt`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
   recordAuditEvent({
     title: "Matriz de seguros descargada",
-    detail: "Se descargo la matriz de cobertura por actividad.",
+    detail: `${docCode} fue descargado y registrado en documentos controlados.`,
     code: "6.1.3",
     type: "seguro",
     actor: "humano"
@@ -7673,7 +7731,10 @@ function renderDocuments() {
   container.innerHTML = state.documents.length
     ? state.documents.map((doc, index) => `
       <div class="simple-row module-row">
-        <div><strong>${doc.title}</strong><div class="muted">Requisito ${doc.code} - ${doc.content ? "con borrador IA" : "sin contenido"}</div></div>
+        <div>
+          <strong>${doc.title}</strong>
+          <div class="muted">${doc.documentCode ? `${escapeHtml(doc.documentCode)} - ` : ""}Requisito ${doc.code} - ${doc.content ? "con contenido" : "sin contenido"}</div>
+        </div>
         <span class="badge ${doc.status === "aprobado" ? "cumple" : "en_proceso"}">${doc.status}</span>
         <div class="row-actions">
           <button class="secondary-button" data-preview-doc="${index}" type="button">Ver</button>
@@ -7710,6 +7771,7 @@ function renderDocumentPreview() {
   const content = doc.content || "Este documento aun no tiene borrador generado por el agente.";
   preview.innerHTML = `
     <div class="document-meta">
+      ${doc.documentCode ? `<span class="badge phva">${escapeHtml(doc.documentCode)}</span>` : ""}
       <span class="badge en_proceso">${doc.code}</span>
       <span class="badge ${doc.status === "aprobado" ? "cumple" : "en_proceso"}">${doc.status}</span>
     </div>
@@ -7722,7 +7784,21 @@ function selectedDocument() {
 }
 
 function documentFilename(doc) {
-  return `${(doc?.title || "documento_sgsta").toLowerCase().replaceAll(" ", "_").replaceAll("/", "-")}.txt`;
+  const code = doc?.documentCode ? `${doc.documentCode}_` : "";
+  return `${code}${(doc?.title || "documento_sgsta").toLowerCase().replaceAll(" ", "_").replaceAll("/", "-")}.txt`;
+}
+
+function upsertControlledDocument(doc) {
+  const match = state.documents.find((item) => item.documentCode === doc.documentCode || (item.title === doc.title && item.code === doc.code));
+  if (match) {
+    Object.assign(match, doc, { updatedAt: today() });
+    state.selectedDocumentIndex = state.documents.indexOf(match);
+    return match;
+  }
+  const created = { ...doc, createdAt: today(), updatedAt: today() };
+  state.documents.unshift(created);
+  state.selectedDocumentIndex = 0;
+  return created;
 }
 
 function downloadSelectedDocument() {

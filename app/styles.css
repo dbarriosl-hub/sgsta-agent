@@ -248,6 +248,33 @@ nav {
   color: var(--muted);
 }
 
+.navigation-notice {
+  display: none;
+}
+
+.navigation-notice:not(:empty) {
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 16px;
+  padding: 12px 14px;
+}
+
+.navigation-notice strong,
+.navigation-notice p {
+  margin: 0;
+}
+
+.navigation-notice p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
 .dashboard-details {
   padding: 0;
 }
