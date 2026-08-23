@@ -1501,6 +1501,8 @@ function todayWorkItems() {
 
 function resumeStepStatus() {
   const progress = implementationProgress();
+  const activeView = document.querySelector(".view.active")?.id || "dashboard";
+  if (activeView === "capacitacion") return trainingResumeStatus(progress);
   const companyGaps = companyProfileGaps();
   const baseCompanyGaps = companyGaps.filter((gap) => !gap.includes("por actividad"));
   const work = todayWorkItems();
@@ -1588,6 +1590,40 @@ function resumeStepStatus() {
   };
 }
 
+function trainingResumeStatus(progress) {
+  const open = state.trainingNeeds.filter((item) => !trainingNeedComplete(item));
+  const high = open.filter((item) => item.priority === "alta" || item.priority === "critica");
+  const complete = state.trainingNeeds.filter(trainingNeedComplete);
+  if (!state.trainingNeeds.length) {
+    return {
+      phase: "Hacer",
+      title: "Detectar necesidades de capacitacion",
+      detail: "Cruza actividad, guia/persona, riesgos altos y competencia para crear capacitaciones pendientes.",
+      pct: progress.pct,
+      primary: { label: "Detectar brechas", view: "capacitacion", command: "detect_training" },
+      secondary: { label: "Nueva necesidad", view: "capacitacion", command: "add_training" }
+    };
+  }
+  if (open.length) {
+    return {
+      phase: "Hacer",
+      title: "Programar capacitaciones pendientes",
+      detail: `${open.length} capacitacion(es) siguen abiertas; ${high.length} de alta prioridad. Completa fecha, evaluacion, certificado y evidencia para poder cerrar.`,
+      pct: progress.pct,
+      primary: { label: "Actualizar brechas", view: "capacitacion", command: "detect_training" },
+      secondary: { label: "Nueva necesidad", view: "capacitacion", command: "add_training" }
+    };
+  }
+  return {
+    phase: "Hacer",
+    title: "Capacitaciones cerradas",
+    detail: `${complete.length} capacitacion(es) tienen evidencia suficiente. Revisa que el personal relacionado haya quedado competente.`,
+    pct: progress.pct,
+    primary: { label: "Ver personal", view: "personal" },
+    secondary: { label: "Ver evidencias", view: "evidencias" }
+  };
+}
+
 function runResumeAction(action) {
   if (!action) return;
   if (action.activity) {
@@ -1600,6 +1636,8 @@ function runResumeAction(action) {
   if (action.command === "activity_intake_actions" && action.activity) createActivityIntakeActions(action.activity);
   if (action.command === "activity_gap_action" && action.activity && action.gapKey) createActivityGapAction(action.activity, action.gapKey);
   if (action.command === "management_review") addManagementReview();
+  if (action.command === "detect_training") detectTrainingNeeds();
+  if (action.command === "add_training") addTrainingNeed();
   showView(action.view || "dashboard");
   renderAll();
 }
