@@ -420,6 +420,13 @@ textarea {
   margin-bottom: 16px;
 }
 
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.92fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
 .system-health-panel {
   margin-bottom: 16px;
   padding: 14px;
@@ -1675,6 +1682,124 @@ textarea {
   grid-template-columns: 1fr 180px;
   align-items: center;
   gap: 14px;
+}
+
+.chapter-detail {
+  display: block;
+  padding: 0;
+}
+
+.chapter-detail summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  list-style: none;
+  padding: 14px;
+}
+
+.chapter-detail summary::-webkit-details-marker {
+  display: none;
+}
+
+.chapter-detail summary::before {
+  color: var(--accent);
+  content: "+";
+  font-weight: 900;
+  grid-column: 1 / -1;
+  justify-self: end;
+  margin-bottom: -20px;
+}
+
+.chapter-detail[open] summary::before {
+  content: "-";
+}
+
+.chapter-progress-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.chapter-requirements {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+
+.requirement-line {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.requirement-line strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.requirement-line p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.requirement-line-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.requirement-line-actions span {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.implementation-queue {
+  display: grid;
+  gap: 10px;
+}
+
+.queue-intro {
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.queue-intro p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.implementation-queue-row {
+  align-items: center;
+  background: #fbfcfe;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  padding: 12px;
+}
+
+.implementation-queue-row.next {
+  background: #ecfdf5;
+  border-color: #5eead4;
+}
+
+.implementation-queue-row p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0;
 }
 
 .progress {
@@ -4664,6 +4789,7 @@ textarea {
   .system-health-grid,
   .operation-readiness-grid,
   .operation-activity-card,
+  .dashboard-main-grid,
   .demo-readiness-card,
   .mvp-pilot-card,
   .mvp-pilot-main,
@@ -4767,10 +4893,13 @@ textarea {
   }
 
   .requirement-row,
+  .requirement-line,
+  .implementation-queue-row,
   .step-row,
   .simple-row,
   .coverage-item,
   .chapter-row,
+  .chapter-detail summary,
   .module-row,
   .finding-row,
   .alert-row,
@@ -4785,6 +4914,14 @@ textarea {
   .activity-gap-row,
   .review-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .requirement-line-actions {
+    justify-content: space-between;
+  }
+
+  .implementation-queue-row {
+    align-items: stretch;
   }
 
   .risk-edit-row {

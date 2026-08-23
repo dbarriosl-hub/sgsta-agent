@@ -122,6 +122,26 @@
       <section id="resumeTrail" class="resume-trail" aria-live="polite"></section>
 
       <section id="dashboard" class="view active">
+        <div class="dashboard-main-grid">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Mapa general</p>
+                <h2>Avance por capitulo</h2>
+              </div>
+            </div>
+            <div id="chapterProgress" class="chapter-list chapter-accordion"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Implementacion</p>
+                <h2>Lista ordenada de tareas</h2>
+              </div>
+            </div>
+            <div id="dashboardImplementationQueue" class="implementation-queue"></div>
+          </section>
+        </div>
         <section class="panel today-panel">
           <div class="panel-heading">
             <div>
@@ -131,19 +151,42 @@
           </div>
           <div id="todayWork"></div>
         </section>
-        <div class="metrics">
-          <article><span>Cumplimiento</span><strong id="metricCompliance">0%</strong></article>
-          <article><span>Requisitos evaluados</span><strong id="metricEvaluated">0</strong></article>
-          <article><span>Acciones abiertas</span><strong id="metricActions">0</strong></article>
-          <article><span>Evidencias</span><strong id="metricEvidence">0</strong></article>
-          <article><span>Riesgos altos</span><strong id="metricHighRisks">0</strong></article>
-          <article><span>Personal pendiente</span><strong id="metricPeoplePending">0</strong></article>
-          <article><span>Capacitaciones</span><strong id="metricTraining">0</strong></article>
-          <article><span>Polizas por vencer</span><strong id="metricPoliciesDue">0</strong></article>
-        </div>
-        <section class="panel system-health-panel">
-          <div id="systemHealthSummary"></div>
-        </section>
+        <details class="panel dashboard-details">
+          <summary>
+            <span>Indicadores y operacion</span>
+            <small>Ver numeros, semaforo, actividades para ofertar y acciones abiertas.</small>
+          </summary>
+          <div class="dashboard-details-body">
+            <div class="metrics">
+              <article><span>Cumplimiento</span><strong id="metricCompliance">0%</strong></article>
+              <article><span>Requisitos evaluados</span><strong id="metricEvaluated">0</strong></article>
+              <article><span>Acciones abiertas</span><strong id="metricActions">0</strong></article>
+              <article><span>Evidencias</span><strong id="metricEvidence">0</strong></article>
+              <article><span>Riesgos altos</span><strong id="metricHighRisks">0</strong></article>
+              <article><span>Personal pendiente</span><strong id="metricPeoplePending">0</strong></article>
+              <article><span>Capacitaciones</span><strong id="metricTraining">0</strong></article>
+              <article><span>Polizas por vencer</span><strong id="metricPoliciesDue">0</strong></article>
+            </div>
+            <section class="system-health-panel">
+              <div id="systemHealthSummary"></div>
+            </section>
+            <section class="operation-summary-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Operacion</p>
+                  <h2>Actividades para ofertar</h2>
+                </div>
+              </div>
+              <div id="operationReadinessSummary"></div>
+            </section>
+            <div class="panel-grid">
+              <section>
+                <div class="panel-heading"><h2>Proximas acciones</h2></div>
+                <div id="nextActions" class="action-list"></div>
+              </section>
+            </div>
+          </div>
+        </details>
         <details class="panel dashboard-details">
           <summary>
             <span>Mas informacion de prueba y demo</span>
@@ -164,25 +207,6 @@
             </section>
           </div>
         </details>
-        <section class="panel operation-summary-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Operacion</p>
-              <h2>Actividades para ofertar</h2>
-            </div>
-          </div>
-          <div id="operationReadinessSummary"></div>
-        </section>
-        <div class="panel-grid">
-          <section class="panel">
-            <div class="panel-heading"><h2>Avance por capitulo</h2></div>
-            <div id="chapterProgress" class="chapter-list"></div>
-          </section>
-          <section class="panel">
-            <div class="panel-heading"><h2>Proximas acciones</h2></div>
-            <div id="nextActions" class="action-list"></div>
-          </section>
-        </div>
       </section>
 
       <section id="implementacion" class="view">

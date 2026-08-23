@@ -558,6 +558,7 @@ function renderAll() {
   renderRequirements();
   renderClosurePackages();
   renderImplementation();
+  renderDashboardImplementationQueue();
   renderActions();
   renderAlerts();
   renderAgenda();
@@ -2002,20 +2003,51 @@ function renderOperationReadinessSummary() {
 }
 
 function renderChapterProgress() {
+  const container = document.querySelector("#chapterProgress");
+  if (!container) return;
   const chapters = ["4", "5", "6", "7", "8", "9", "10"];
-  document.querySelector("#chapterProgress").innerHTML = chapters.map((chapter) => {
+  container.innerHTML = chapters.map((chapter, index) => {
     const items = requirements.filter((item) => item.chapter === chapter);
     const score = items.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
     const pct = Math.round((score / items.length) * 100);
+    const openActions = state.actions.filter((action) => (action.code || "").startsWith(chapter) && action.status !== "cerrada").length;
     return `
-      <div class="chapter-row">
-        <div><strong>Capitulo ${chapter}</strong><div class="muted">${items.length} requisitos evaluables</div></div>
-        <div><div class="progress"><span style="width:${pct}%"></span></div><div class="muted">${pct}%</div></div>
-      </div>`;
+      <details class="chapter-row chapter-detail" ${index === 0 ? "open" : ""}>
+        <summary>
+          <div>
+            <strong>Capitulo ${chapter}</strong>
+            <div class="muted">${items.length} requisitos evaluables${openActions ? ` - ${openActions} accion(es) abiertas` : ""}</div>
+          </div>
+          <div class="chapter-progress-cell">
+            <div class="progress"><span style="width:${pct}%"></span></div>
+            <div class="muted">${pct}%</div>
+          </div>
+        </summary>
+        <div class="chapter-requirements">
+          ${items.map((item) => {
+            const itemPct = Math.round(requirementCompletionScore(item.code) * 100);
+            const status = requirementCompletionStatus(item.code);
+            const requirementActions = state.actions.filter((action) => action.code === item.code && action.status !== "cerrada").length;
+            return `
+              <div class="requirement-line">
+                <div>
+                  <span class="badge ${status === "cumple" ? "cumple" : status === "pendiente" ? "pendiente" : "en_proceso"}">${escapeHtml(item.code)}</span>
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <p>${escapeHtml(item.evidence)}${requirementActions ? ` - ${requirementActions} accion(es)` : ""}</p>
+                </div>
+                <div class="requirement-line-actions">
+                  <span>${itemPct}%</span>
+                  <button class="secondary-button" data-requirement-open="${escapeHtml(item.code)}" type="button">Abrir</button>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+      </details>`;
   }).join("");
 
   const openActions = state.actions.filter((item) => item.status !== "cerrada").slice(0, 5);
   const nextActions = document.querySelector("#nextActions");
+  if (!nextActions) return;
   nextActions.innerHTML = openActions.length
     ? openActions.map((item, index) => `
       <div class="action-card action-card-link">
@@ -2035,6 +2067,112 @@ function renderChapterProgress() {
       }
       showView("acciones");
       renderAll();
+    });
+  });
+  container.querySelectorAll("[data-requirement-open]").forEach((button) => {
+    button.addEventListener("click", () => openRequirementFromDashboard(button.dataset.requirementOpen));
+  });
+}
+
+function requirementDefaultView(code) {
+  if (["4.1", "4.2", "4.3", "4.4", "5.1", "5.2", "6.2"].includes(code)) return "empresa";
+  if (code === "5.3" || code === "7.2" || code === "7.3") return "personal";
+  if (code === "6.1" || code === "6.1.2") return "riesgos";
+  if (code === "6.1.3") return "seguros";
+  if (code === "7.1") return "equipos";
+  if (code === "7.4") return "participantes";
+  if (code === "7.5") return "documentos";
+  if (code === "8.1") return "actividades";
+  if (code === "8.2" || code === "8.3") return "incidentes";
+  if (code === "9.1") return "reportes";
+  if (code === "9.2") return "auditorias";
+  if (code === "9.3") return "revision";
+  if (code.startsWith("10.")) return "acciones";
+  return "diagnostico";
+}
+
+function openRequirementFromDashboard(code) {
+  state.selectedEvidenceCode = code;
+  state.selectedFormTable = formDefinitions.find((form) => form.code === code)?.table || state.selectedFormTable;
+  if (code.startsWith("10.")) state.actionFilterActivity = "";
+  showView(requirementDefaultView(code));
+  renderAll();
+}
+
+function implementationStepRequirementCodes(step) {
+  const raw = step.code || "";
+  const parts = raw.split("/").map((item) => item.trim()).filter(Boolean);
+  const codes = new Set();
+  parts.forEach((part) => {
+    const range = part.match(/^(\d+)\.(\d+)-(\d+)\.(\d+)$/);
+    if (range && range[1] === range[3]) {
+      const chapter = range[1];
+      const start = Number(range[2]);
+      const end = Number(range[4]);
+      requirements
+        .filter((item) => item.chapter === chapter)
+        .forEach((item) => {
+          const minor = Number(item.code.split(".")[1]);
+          if (minor >= start && minor <= end) codes.add(item.code);
+        });
+      return;
+    }
+    const shortRange = part.match(/^(\d+)\.(\d+)-(\d+)$/);
+    if (shortRange) {
+      const chapter = shortRange[1];
+      const start = Number(shortRange[2]);
+      const end = Number(shortRange[3]);
+      requirements
+        .filter((item) => item.chapter === chapter)
+        .forEach((item) => {
+          const minor = Number(item.code.split(".")[1]);
+          if (minor >= start && minor <= end) codes.add(item.code);
+        });
+      return;
+    }
+    codes.add(part);
+  });
+  return [...codes];
+}
+
+function implementationQueueStatus(step) {
+  const codes = implementationStepRequirementCodes(step);
+  const forms = state.formResponses.filter((item) => codes.includes(item.code));
+  const reviewCount = forms.filter((item) => normalizedFormStatus(item.status) === "revision").length;
+  const draftCount = forms.filter((item) => normalizedFormStatus(item.status) === "borrador").length;
+  if (implementationStatus(step) === "completo") return { label: "culminada", className: "cumple", detail: "Ya cuenta para el avance." };
+  if (reviewCount) return { label: "para aprobacion", className: "en_proceso", detail: `${reviewCount} formulario(s) en revision humana.` };
+  if (draftCount) return { label: "borrador", className: "en_proceso", detail: `${draftCount} borrador(es) generados por revisar.` };
+  return { label: "pendiente", className: "pendiente", detail: step.action };
+}
+
+function renderDashboardImplementationQueue() {
+  const container = document.querySelector("#dashboardImplementationQueue");
+  if (!container) return;
+  const next = nextImplementationStep();
+  container.innerHTML = `
+    <div class="queue-intro">
+      <span class="badge phva">${implementationProgress().pct}% PHVA</span>
+      <p>Orden sugerido para montar el sistema. Abre solo el paso que sigue; el detalle queda dentro de cada modulo.</p>
+    </div>
+    ${implementationSteps.map((step, index) => {
+      const status = implementationQueueStatus(step);
+      const isNext = step.id === next.id;
+      return `
+        <div class="implementation-queue-row ${isNext ? "next" : ""}">
+          <div class="step-index">${index + 1}</div>
+          <div>
+            <strong>${escapeHtml(step.title)}</strong>
+            <p>${escapeHtml(step.stage)} - Requisito ${escapeHtml(step.code)}. ${escapeHtml(status.detail)}</p>
+          </div>
+          <span class="badge ${status.className}">${escapeHtml(status.label)}</span>
+          <button class="${isNext ? "" : "secondary-button"}" data-dashboard-step="${escapeHtml(step.id)}" type="button">${isNext ? "Continuar" : "Abrir"}</button>
+        </div>`;
+    }).join("")}`;
+  container.querySelectorAll("[data-dashboard-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const step = implementationSteps.find((item) => item.id === button.dataset.dashboardStep);
+      if (step?.view) showView(step.view);
     });
   });
 }
