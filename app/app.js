@@ -11974,6 +11974,7 @@ function renderActionClosureBoard() {
             <div class="row-actions">
               <button class="secondary-button" data-action-advance-closure="${index}" type="button">Avanzar cierre</button>
               <button class="secondary-button" data-action-prepare-followup="${index}" type="button">Preparar seguimiento</button>
+              <button class="secondary-button" data-action-remove="${index}" type="button">Quitar</button>
               <button data-action-focus="${index}" type="button">Ver accion</button>
             </div>
           </article>`).join("")}
@@ -11986,6 +11987,9 @@ function renderActionClosureBoard() {
   });
   container.querySelectorAll("[data-action-focus]").forEach((button) => {
     button.addEventListener("click", () => focusActionCard(Number(button.dataset.actionFocus)));
+  });
+  container.querySelectorAll("[data-action-remove]").forEach((button) => {
+    button.addEventListener("click", () => removeAction(Number(button.dataset.actionRemove)));
   });
   container.querySelectorAll("[data-action-guided-advance]").forEach((button) => {
     button.addEventListener("click", () => advanceActionClosure(Number(button.dataset.actionGuidedAdvance)));
@@ -12001,6 +12005,9 @@ function renderActionClosureBoard() {
   });
   container.querySelectorAll("[data-action-guided-evidence]").forEach((button) => {
     button.addEventListener("click", () => convertActionToEvidence(Number(button.dataset.actionGuidedEvidence)));
+  });
+  container.querySelectorAll("[data-action-guided-remove]").forEach((button) => {
+    button.addEventListener("click", () => removeAction(Number(button.dataset.actionGuidedRemove)));
   });
 }
 
@@ -12034,6 +12041,7 @@ function actionGuidanceTemplate(action, index, stage) {
           : `<button data-action-guided-advance="${index}" type="button">Completar siguiente paso</button>`}
         <button class="secondary-button" data-action-guided-evidence="${index}" type="button">Enviar como evidencia</button>
         <button class="secondary-button" data-action-guided-review type="button">Ver revision humana</button>
+        <button class="secondary-button" data-action-guided-remove="${index}" type="button">Quitar</button>
       </div>
     </section>`;
 }
@@ -12093,7 +12101,17 @@ function prepareActionFollowUp(index) {
 function focusActionCard(index) {
   showView("acciones");
   const card = document.querySelector(`[data-action-card="${index}"]`);
-  card?.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("attention-pulse");
+    setTimeout(() => card.classList.remove("attention-pulse"), 1600);
+    state.routeNotice = {
+      title: "Accion abierta para editar",
+      detail: "Baje hasta la tarjeta resaltada para cambiar campos, quitarla o cerrar con evidencia."
+    };
+    saveState();
+    renderNavigationNotice();
+  }
 }
 
 function actionPriorityScore(action) {
@@ -12149,6 +12167,7 @@ function renderActionWorkQueue() {
           </div>
           <div class="row-actions">
             <button class="secondary-button" data-queue-assign="${index}" type="button">Asignar</button>
+            <button class="secondary-button" data-queue-remove="${index}" type="button">Quitar</button>
             <button data-queue-focus="${index}" type="button">Ver accion</button>
           </div>
         </article>`).join("")}
@@ -12168,6 +12187,9 @@ function renderActionWorkQueue() {
       if (action?.relatedActivity) state.selectedActivityName = action.relatedActivity;
       focusActionCard(Number(button.dataset.queueFocus));
     });
+  });
+  container.querySelectorAll("[data-queue-remove]").forEach((button) => {
+    button.addEventListener("click", () => removeAction(Number(button.dataset.queueRemove)));
   });
 }
 
