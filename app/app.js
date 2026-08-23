@@ -542,6 +542,7 @@ function today() {
 
 function renderAll() {
   syncOrganizationNameFromCompany();
+  normalizeGenericActivityNames();
   document.querySelector("#orgName").value = state.orgName;
   document.querySelector("#ownerName").value = state.ownerName;
   document.querySelector("#currentUserRole").value = state.currentUserRole || "direccion";
@@ -13808,11 +13809,83 @@ function agentReply(text) {
   return "Puedo ayudarte con diagnostico ISO 21101, actividades, riesgos, documentos, incidentes, auditorias, evidencias y acciones.";
 }
 
+function plainText(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function riverFromCompanyContext() {
+  const text = `${state.company.operatingArea || ""} ${state.company.localContext || ""}`;
+  const match = text.match(/r[ií]o\s+[a-záéíóúñü]+/i);
+  if (!match) return "";
+  const riverName = match[0].replace(/\s+/g, " ").trim().replace(/^r[ií]o\s+/i, "");
+  return `río ${riverName.charAt(0).toUpperCase()}${riverName.slice(1)}`;
+}
+
+function inferredActivityNames() {
+  const source = plainText(`${state.company.activityDescription || ""} ${state.company.scope || ""}`);
+  const river = riverFromCompanyContext();
+  const names = [];
+  if (source.includes("rafting") || source.includes("balsa")) names.push(river ? `Rafting por ${river}` : "Rafting");
+  if (source.includes("senderismo") || source.includes("caminata") || source.includes("trekking")) names.push("Senderismo");
+  if (source.includes("cuatrimoto") || source.includes("atv")) names.push("Paseo en cuatrimotos");
+  if (source.includes("torrentismo")) names.push("Torrentismo");
+  if (source.includes("canopy") || source.includes("tirolesa")) names.push("Canopy");
+  if (source.includes("canyoning") || source.includes("canonismo")) names.push("Canonismo");
+  return [...new Set(names)];
+}
+
+function nextActivityName() {
+  const inferred = inferredActivityNames();
+  const used = new Set(state.activities.map((activity) => activity.name));
+  const available = inferred.find((name) => !used.has(name));
+  if (available) return available;
+  return `Actividad por definir ${state.activities.length + 1}`;
+}
+
+function updateActivityReferences(oldName, newName) {
+  const update = (item, field) => {
+    if (item?.[field] === oldName) item[field] = newName;
+  };
+  state.people.forEach((item) => update(item, "activity"));
+  state.trainingNeeds.forEach((item) => update(item, "activity"));
+  state.equipment.forEach((item) => update(item, "activity"));
+  state.policies.forEach((item) => update(item, "activity"));
+  state.participantEvidence.forEach((item) => update(item, "activity"));
+  state.risks.forEach((item) => update(item, "activity"));
+  state.actions.forEach((item) => {
+    update(item, "relatedActivity");
+    update(item, "activity");
+  });
+  state.formResponses.forEach((item) => update(item, "activity"));
+  if (state.selectedActivityName === oldName) state.selectedActivityName = newName;
+  if (state.selectedFormActivity === oldName) state.selectedFormActivity = newName;
+  if (state.actionFilterActivity === oldName) state.actionFilterActivity = newName;
+}
+
+function normalizeGenericActivityNames() {
+  const inferred = inferredActivityNames();
+  if (!inferred.length) return false;
+  let changed = false;
+  state.activities.forEach((activity, index) => {
+    const isGeneric = /^actividad\s+\d+$/i.test(activity.name || "") || /^actividad por definir/i.test(activity.name || "");
+    if (!isGeneric) return;
+    const replacement = inferred[index] || inferred.find((name) => !state.activities.some((item) => item.name === name)) || "";
+    if (!replacement || state.activities.some((item) => item !== activity && item.name === replacement)) return;
+    const oldName = activity.name;
+    activity.name = replacement;
+    if (!activity.place || activity.place === "Lugar por definir") activity.place = state.company.operatingArea || "Ruta por definir";
+    updateActivityReferences(oldName, replacement);
+    changed = true;
+  });
+  if (changed) saveState();
+  return changed;
+}
+
 function addActivity() {
-  const count = state.activities.length + 1;
+  const name = nextActivityName();
   state.activities.unshift({
-    name: `Actividad ${count}`,
-    place: "Lugar por definir",
+    name,
+    place: state.company.operatingArea || "Lugar por definir",
     leader: state.ownerName,
     status: "activa",
     conditions: "Condiciones operacionales por definir.",
