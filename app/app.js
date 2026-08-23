@@ -601,6 +601,21 @@ function renderAll() {
   renderCompanyImplementationProfile();
 }
 
+function renderDashboard() {
+  syncOrganizationNameFromCompany();
+  normalizeGenericActivityNames();
+  renderResumeTrail();
+  renderNavigationNotice();
+  renderMetrics();
+  renderSystemHealthSummary();
+  renderDemoReadiness();
+  renderSubscriptionSnapshot();
+  renderOperationReadinessSummary();
+  renderTodayWork();
+  renderDashboardImplementationQueue();
+  renderChapterProgress();
+}
+
 function renderMetrics() {
   const totalScore = requirements.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
   const evaluated = requirements.filter((item) => requirementCompletionScore(item.code) > 0).length;
@@ -11635,7 +11650,7 @@ function renderActionFilterBar(selectedActivity, activeActivityFilter, activityA
         <button class="secondary-button ${!activeActivityFilter ? "button-done" : ""}" data-action-filter="all" type="button">Todas</button>
         <button class="secondary-button ${activeActivityFilter ? "button-done" : ""}" data-action-filter="activity" type="button" ${selectedActivity ? "" : "disabled"}>Solo actividad</button>
         <button class="secondary-button ${focusMode === "priority" ? "button-done" : ""}" data-action-filter="priority" type="button">Prioridad 7 dias</button>
-        <button class="secondary-button" data-action-filter="compact" type="button" ${duplicateCount ? "" : "disabled"}>Compactar duplicadas</button>
+        <button class="secondary-button" data-action-filter="compact" type="button" ${duplicateCount ? "" : "disabled"}>Quitar duplicadas${duplicateCount ? ` (${duplicateCount})` : ""}</button>
         <button class="secondary-button" data-action-filter="download" type="button">Descargar</button>
         <button class="secondary-button" data-action-filter="evidence" type="button">Enviar a evidencias</button>
         <button data-action-filter="open-activity" type="button" ${selectedActivity ? "" : "disabled"}>Ver actividad</button>
@@ -12289,6 +12304,7 @@ function actionCardTemplate(item, index) {
           <button class="secondary-button" data-action-assign="${index}" type="button">Asignar</button>
           <button class="secondary-button" data-action-advance="${index}" type="button">Avanzar cierre</button>
           <button class="secondary-button" data-action-evidence="${index}" type="button">Evidencia</button>
+          <button class="secondary-button" data-action-remove="${index}" type="button">Quitar</button>
           <button data-close-action="${index}" type="button">${item.status === "cerrada" ? "Reabrir" : "Cerrar"}</button>
         </div>
       </div>
@@ -12416,6 +12432,22 @@ function toggleActionClosed(index) {
   renderAll();
 }
 
+function removeAction(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  state.actions.splice(index, 1);
+  recordAuditEvent({
+    title: "Accion eliminada",
+    detail: `${action.title || "Accion sin titulo"} fue retirada de la lista de acciones.`,
+    code: action.code || "10.1",
+    type: "accion_gestion",
+    actor: "humano"
+  });
+  addMessage("agent", `Quite la accion "${action.title || "sin titulo"}".`);
+  saveState();
+  renderAll();
+}
+
 function actionEvidenceContent(action) {
   return [
     `Accion: ${action.title || "Accion sin titulo"}`,
@@ -12508,6 +12540,9 @@ function bindActionControls(container) {
   });
   container.querySelectorAll("[data-action-evidence]").forEach((button) => {
     button.addEventListener("click", () => convertActionToEvidence(Number(button.dataset.actionEvidence)));
+  });
+  container.querySelectorAll("[data-action-remove]").forEach((button) => {
+    button.addEventListener("click", () => removeAction(Number(button.dataset.actionRemove)));
   });
   container.querySelectorAll("[data-close-action]").forEach((button) => {
     button.addEventListener("click", () => toggleActionClosed(Number(button.dataset.closeAction)));
@@ -14243,9 +14278,11 @@ function runImplementationReview() {
 }
 
 function showView(viewId) {
+  if (viewId === "panel") viewId = "dashboard";
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
   const viewRenderers = {
+    dashboard: renderDashboard,
     implementacion: renderImplementation,
     actividades: renderActivities,
     riesgos: renderRisks,
