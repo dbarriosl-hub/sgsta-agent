@@ -2686,6 +2686,26 @@ textarea {
   color: #1f2937;
 }
 
+.document-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.document-editor-label {
+  display: grid;
+  gap: 6px;
+}
+
+.document-editor-label textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.document-editor-label textarea[data-document-field="content"] {
+  min-height: 360px;
+}
+
 .document-meta {
   display: flex;
   gap: 8px;

@@ -7961,6 +7961,8 @@ function renderDocuments() {
         <div class="row-actions">
           <button class="secondary-button" data-preview-doc="${index}" type="button">Ver</button>
           <button class="secondary-button" data-toggle-doc="${index}" type="button">${doc.status === "aprobado" ? "Borrador" : "Aprobar"}</button>
+          <button class="secondary-button" data-regenerate-doc="${index}" type="button">Regenerar</button>
+          <button class="secondary-button" data-remove-doc="${index}" type="button">Quitar</button>
         </div>
       </div>`).join("")
     : `<div class="muted">No hay documentos registrados.</div>`;
@@ -7980,6 +7982,12 @@ function renderDocuments() {
       renderAll();
     });
   });
+  container.querySelectorAll("[data-regenerate-doc]").forEach((button) => {
+    button.addEventListener("click", () => regenerateDocumentDraft(Number(button.dataset.regenerateDoc)));
+  });
+  container.querySelectorAll("[data-remove-doc]").forEach((button) => {
+    button.addEventListener("click", () => removeDocument(Number(button.dataset.removeDoc)));
+  });
   renderDocumentPreview();
 }
 
@@ -7997,8 +8005,30 @@ function renderDocumentPreview() {
       <span class="badge en_proceso">${doc.code}</span>
       <span class="badge ${doc.status === "aprobado" ? "cumple" : "en_proceso"}">${doc.status}</span>
     </div>
-    <h3>${doc.title}</h3>
-    <pre>${escapeHtml(content)}</pre>`;
+    <div class="document-editor-grid">
+      <label>Titulo del documento<input data-document-field="title" type="text" value="${escapeHtml(doc.title || "")}"></label>
+      <label>Codigo interno<input data-document-field="documentCode" type="text" value="${escapeHtml(doc.documentCode || "")}" placeholder="Ej. SGSTA-DOC-001"></label>
+      <label>Requisito ISO<input data-document-field="code" type="text" value="${escapeHtml(doc.code || "7.5")}"></label>
+      <label>Version<input data-document-field="version" type="text" value="${escapeHtml(doc.version || "1")}"></label>
+    </div>
+    <label class="document-editor-label">
+      Contenido editable
+      <textarea data-document-field="content" rows="18">${escapeHtml(content)}</textarea>
+    </label>
+    <label class="document-editor-label">
+      Pedir ajuste a la IA
+      <textarea id="documentAiInstruction" rows="3" placeholder="Ej. Agrega responsabilidades del guia, control de chalecos y verificacion antes de salida.">${escapeHtml(doc.aiInstruction || "")}</textarea>
+    </label>
+    <div class="row-actions">
+      <button class="secondary-button" data-document-regenerate-current type="button">Regenerar borrador</button>
+      <button data-document-improve type="button">Mejorar con IA</button>
+    </div>`;
+  preview.querySelectorAll("[data-document-field]").forEach((field) => {
+    field.addEventListener("input", () => updateSelectedDocumentField(field, false));
+    field.addEventListener("change", () => updateSelectedDocumentField(field, true));
+  });
+  preview.querySelector("[data-document-regenerate-current]")?.addEventListener("click", () => regenerateDocumentDraft(state.selectedDocumentIndex || 0));
+  preview.querySelector("[data-document-improve]")?.addEventListener("click", improveSelectedDocumentWithInstruction);
 }
 
 function selectedDocument() {
@@ -8021,6 +8051,92 @@ function upsertControlledDocument(doc) {
   state.documents.unshift(created);
   state.selectedDocumentIndex = 0;
   return created;
+}
+
+function updateSelectedDocumentField(field, rerender = false) {
+  const doc = selectedDocument();
+  if (!doc) return;
+  doc[field.dataset.documentField] = field.value;
+  doc.status = "borrador";
+  doc.updatedAt = today();
+  state.compliance[doc.code || "7.5"] = "en_proceso";
+  saveState();
+  if (rerender) renderDocuments();
+}
+
+function documentTemplateFor(doc) {
+  const templates = documentDraftTemplates();
+  return templates.find((template) => template.title === doc?.title || template.code === doc?.code) || templates[0];
+}
+
+function regenerateDocumentDraft(index) {
+  const doc = state.documents[index];
+  if (!doc) return;
+  const template = documentTemplateFor(doc);
+  state.documents[index] = {
+    ...doc,
+    title: doc.title || template.title,
+    code: doc.code || template.code,
+    content: template.content,
+    status: "borrador",
+    regeneratedAt: today(),
+    updatedAt: today()
+  };
+  state.selectedDocumentIndex = index;
+  state.compliance[state.documents[index].code || "7.5"] = "en_proceso";
+  recordAuditEvent({
+    title: "Documento regenerado",
+    detail: `${state.documents[index].title} fue regenerado como borrador. Requiere revision humana.`,
+    code: state.documents[index].code,
+    type: "documento",
+    actor: "agente"
+  });
+  addMessage("agent", `Regeneré "${state.documents[index].title}" como borrador. Revísalo antes de aprobar.`);
+  saveState();
+  renderAll();
+}
+
+function improveSelectedDocumentWithInstruction() {
+  const doc = selectedDocument();
+  if (!doc) return;
+  const instruction = document.querySelector("#documentAiInstruction")?.value.trim();
+  if (!instruction) {
+    addMessage("agent", "Escribe que quieres agregar o ajustar en el documento.");
+    return;
+  }
+  doc.aiInstruction = instruction;
+  const current = doc.content || documentTemplateFor(doc).content || "";
+  doc.content = `${current.trim()}\n\nAJUSTE SUGERIDO POR IA\n${instruction}\n\nTexto incorporado para revision humana:\n- Revisar que el ajuste sea coherente con la actividad, los riesgos, equipos, personal y evidencias del SGSTA.\n- Confirmar responsable, aplicacion operativa y registros asociados antes de aprobar.`;
+  doc.status = "borrador";
+  doc.updatedAt = today();
+  state.compliance[doc.code || "7.5"] = "en_proceso";
+  recordAuditEvent({
+    title: "Documento ajustado por IA",
+    detail: `${doc.title} recibio instruccion de mejora: ${instruction}`,
+    code: doc.code,
+    type: "documento",
+    actor: "agente"
+  });
+  addMessage("agent", `Agregué el ajuste solicitado a "${doc.title}". Queda como borrador para revisión humana.`);
+  saveState();
+  renderAll();
+}
+
+function removeDocument(index) {
+  const doc = state.documents[index];
+  if (!doc) return;
+  state.documents.splice(index, 1);
+  state.selectedDocumentIndex = Math.max(0, Math.min(state.selectedDocumentIndex || 0, state.documents.length - 1));
+  recordAuditEvent({
+    title: "Documento eliminado",
+    detail: `${doc.title || "Documento sin titulo"} fue retirado del listado maestro.`,
+    code: doc.code || "7.5",
+    type: "documento",
+    actor: "humano"
+  });
+  addMessage("agent", `Quité el documento "${doc.title || "sin titulo"}".`);
+  saveState();
+  renderAll();
 }
 
 function downloadSelectedDocument() {
