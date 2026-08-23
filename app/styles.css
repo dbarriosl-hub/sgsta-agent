@@ -195,14 +195,16 @@ nav {
 
 .resume-trail {
   align-items: center;
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
+  background: #ecfdf5;
+  border: 1px solid #5eead4;
+  border-left: 6px solid var(--primary);
   border-radius: 8px;
+  box-shadow: var(--shadow);
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(260px, 1fr) 110px auto;
-  margin: -8px 0 18px;
-  padding: 14px 16px;
+  gap: 18px;
+  grid-template-columns: minmax(320px, 1fr) 118px auto;
+  margin: -4px 0 18px;
+  padding: 18px 20px;
 }
 
 .resume-trail h2,
@@ -212,13 +214,19 @@ nav {
 }
 
 .resume-trail h2 {
-  font-size: 18px;
+  font-size: 24px;
+  line-height: 1.15;
 }
 
 .resume-trail p {
   color: var(--muted);
   line-height: 1.4;
-  margin-top: 4px;
+  margin-top: 6px;
+  max-width: 760px;
+}
+
+.resume-trail .row-actions button {
+  min-height: 46px;
 }
 
 .resume-progress {
@@ -238,6 +246,55 @@ nav {
 
 .resume-progress small {
   color: var(--muted);
+}
+
+.dashboard-details {
+  padding: 0;
+}
+
+.dashboard-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  list-style: none;
+  padding: 16px 18px;
+}
+
+.dashboard-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-details summary span {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.dashboard-details summary small {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.dashboard-details summary::after {
+  color: var(--muted);
+  content: "Abrir";
+  font-weight: 700;
+}
+
+.dashboard-details[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-details[open] summary::after {
+  content: "Cerrar";
+}
+
+.dashboard-details-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
 }
 
 .eyebrow {

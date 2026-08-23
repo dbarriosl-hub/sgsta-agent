@@ -122,6 +122,15 @@
       <section id="resumeTrail" class="resume-trail" aria-live="polite"></section>
 
       <section id="dashboard" class="view active">
+        <section class="panel today-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Trabajo de hoy</p>
+              <h2>Ruta simple del agente</h2>
+            </div>
+          </div>
+          <div id="todayWork"></div>
+        </section>
         <div class="metrics">
           <article><span>Cumplimiento</span><strong id="metricCompliance">0%</strong></article>
           <article><span>Requisitos evaluados</span><strong id="metricEvaluated">0</strong></article>
@@ -135,18 +144,26 @@
         <section class="panel system-health-panel">
           <div id="systemHealthSummary"></div>
         </section>
-        <section class="panel demo-readiness-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">MVP comercial</p>
-              <h2>Preparacion para demo</h2>
-            </div>
+        <details class="panel dashboard-details">
+          <summary>
+            <span>Mas informacion de prueba y demo</span>
+            <small>Ver si estas validando el MVP, observaciones o suscripcion.</small>
+          </summary>
+          <div class="dashboard-details-body">
+            <section class="demo-readiness-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">MVP comercial</p>
+                  <h2>Preparacion para demo</h2>
+                </div>
+              </div>
+              <div id="demoReadiness"></div>
+            </section>
+            <section class="subscription-snapshot-panel">
+              <div id="subscriptionSnapshot"></div>
+            </section>
           </div>
-          <div id="demoReadiness"></div>
-        </section>
-        <section class="panel subscription-snapshot-panel">
-          <div id="subscriptionSnapshot"></div>
-        </section>
+        </details>
         <section class="panel operation-summary-panel">
           <div class="panel-heading">
             <div>
@@ -155,15 +172,6 @@
             </div>
           </div>
           <div id="operationReadinessSummary"></div>
-        </section>
-        <section class="panel today-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Trabajo de hoy</p>
-              <h2>Ruta simple del agente</h2>
-            </div>
-          </div>
-          <div id="todayWork"></div>
         </section>
         <div class="panel-grid">
           <section class="panel">

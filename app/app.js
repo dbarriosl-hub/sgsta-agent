@@ -1582,7 +1582,7 @@ function renderResumeTrail() {
   const resume = resumeStepStatus();
   container.innerHTML = `
     <div>
-      <p class="eyebrow">Retomar flujo</p>
+      <p class="eyebrow">Ahora haz esto</p>
       <h2>${escapeHtml(resume.title)}</h2>
       <p>${escapeHtml(resume.detail)}</p>
     </div>
