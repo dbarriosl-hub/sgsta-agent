@@ -6358,13 +6358,13 @@ function renderPeople() {
             <small>${row.missing.length ? `Falta: ${row.missing.join(", ")}` : "Actividad cubierta con guia competente."}</small>
             <div class="row-actions">
               <button class="secondary-button" data-add-guide-activity="${escapeHtml(row.activity.name)}" type="button">Asignar guia</button>
-              <button data-person-need-activity="${escapeHtml(row.activity.name)}" type="button">Crear necesidad</button>
+              <button data-person-need-activity="${escapeHtml(row.activity.name)}" type="button">Crear capacitacion pendiente</button>
             </div>
           </article>`).join("")}
       </div>
       <div class="row-actions">
         <button class="secondary-button" data-people-download type="button">Descargar matriz</button>
-        <button data-people-create-needs type="button">Crear necesidades</button>
+        <button data-people-create-needs type="button">Crear capacitaciones pendientes</button>
       </div>
     </article>
     <div class="compact-heading">
@@ -6604,7 +6604,14 @@ function createCompetencyTrainingNeeds() {
     actor: "agente"
   });
   addMessage("agent", created ? `Cree ${created} necesidad(es) de capacitacion desde la matriz de competencia.` : "La matriz no encontro nuevas necesidades o ya estaban abiertas.");
+  state.routeNotice = {
+    title: created ? "Capacitaciones pendientes creadas" : "Capacitaciones ya registradas",
+    detail: created
+      ? `Cree ${created} registro(s) en Capacitacion. Ahora programa fecha, evaluacion, certificado y evidencia.`
+      : "No cree nuevos registros porque esas necesidades ya estaban abiertas."
+  };
   saveState();
+  showView("capacitacion");
   renderAll();
 }
 
@@ -6628,14 +6635,22 @@ function createCompetencyNeedForActivity(activityName) {
       evidence: ""
     });
     addMessage("agent", `Cree una necesidad de competencia para ${activityName}.`);
+    state.routeNotice = {
+      title: "Capacitacion pendiente creada",
+      detail: `Cree una capacitacion para ${activityName}. Ahora revisa objetivo, fecha, evaluacion, certificado y evidencia.`
+    };
   } else {
     addMessage("agent", `La necesidad de competencia para ${activityName} ya estaba abierta.`);
+    state.routeNotice = {
+      title: "Capacitacion ya estaba abierta",
+      detail: `Ya existia una capacitacion pendiente para ${activityName}. Te llevo a Capacitacion para revisarla.`
+    };
   }
   state.compliance["7.2"] = "en_proceso";
   state.compliance["7.3"] = "en_proceso";
   saveState();
-  renderPeople();
-  renderTraining();
+  showView("capacitacion");
+  renderAll();
 }
 
 function renderCompetencyMatrix() {
