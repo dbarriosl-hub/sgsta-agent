@@ -548,6 +548,7 @@ function renderAll() {
   const planSelect = document.querySelector("#currentPlan");
   if (planSelect) planSelect.value = state.currentPlan || "profesional";
   fillCompanyForm();
+  renderResumeTrail();
   renderMetrics();
   renderSystemHealthSummary();
   renderDemoReadiness();
@@ -1468,6 +1469,134 @@ function todayWorkItems() {
   const openActions = state.actions.filter((item) => item.status !== "cerrada").length;
   const reviewDecisions = managementReviewOperationalDecisions().filter((decision) => decision.priority !== "baja");
   return { activityIntake, closure, activity, reviewForms, openActions, reviewDecisions };
+}
+
+function resumeStepStatus() {
+  const progress = implementationProgress();
+  const companyGaps = companyProfileGaps();
+  const baseCompanyGaps = companyGaps.filter((gap) => !gap.includes("por actividad"));
+  const work = todayWorkItems();
+  const reviewDrafts = state.formResponses.filter((item) => ["borrador", "revision"].includes(normalizedFormStatus(item.status)));
+  const inReview = reviewDrafts.filter((item) => normalizedFormStatus(item.status) === "revision");
+  const firstReview = inReview[0] || reviewDrafts[0];
+  if (firstReview) {
+    return {
+      phase: "Revision humana",
+      title: inReview.length ? "Aprobar formularios en revision" : "Enviar borradores a revision",
+      detail: `${reviewDrafts.length} formulario(s) necesitan revision/aprobacion para contar como evidencia. Siguiente: ${firstReview.form || firstReview.table}.`,
+      pct: progress.pct,
+      primary: { label: "Abrir formularios", view: "formularios", table: firstReview.table, activity: firstReview.activity || "" },
+      secondary: { label: "Revision humana", view: "revision_humana" }
+    };
+  }
+  if (baseCompanyGaps.length) {
+    return {
+      phase: "Planear",
+      title: "Completar perfil de empresa",
+      detail: `Falta: ${baseCompanyGaps.slice(0, 3).join(", ")}${baseCompanyGaps.length > 3 ? "..." : ""}. El agente necesita esto para generar documentos y riesgos con contexto.`,
+      pct: progress.pct,
+      primary: { label: "Abrir empresa", view: "empresa" },
+      secondary: { label: "Actualizar perfil", view: "empresa", command: "profile" }
+    };
+  }
+  if (!state.activities.length) {
+    return {
+      phase: "Hacer",
+      title: "Registrar la primera actividad",
+      detail: "Crea una actividad real como rafting, senderismo o cuatrimotos. Luego el agente revisa riesgos, guia, equipos, seguro y participantes.",
+      pct: progress.pct,
+      primary: { label: "Crear actividad", view: "actividades", command: "new_activity" },
+      secondary: { label: "Ver implementacion", view: "implementacion" }
+    };
+  }
+  if (work.activityIntake) {
+    return {
+      phase: "Hacer",
+      title: `Completar ${work.activityIntake.name}`,
+      detail: `Falta ${work.activityIntake.missing[0] || "un dato operativo"}. ${work.activityIntake.nextQuestion}`,
+      pct: progress.pct,
+      primary: { label: "Abrir actividad", view: "actividades", activity: work.activityIntake.name },
+      secondary: { label: "Crear acciones", view: "acciones", command: "activity_intake_actions", activity: work.activityIntake.name }
+    };
+  }
+  if (work.activity) {
+    const gap = work.activity.readiness.gaps[0];
+    return {
+      phase: "Hacer",
+      title: `Cerrar brechas de ${work.activity.activity.name}`,
+      detail: gap ? `${gap.label}: ${gap.detail}` : "Revisa los controles antes de ofertar.",
+      pct: progress.pct,
+      primary: { label: "Ver brechas", view: "brechas_actividad", activity: work.activity.activity.name },
+      secondary: { label: "Crear accion", view: "acciones", command: "activity_gap_action", activity: work.activity.activity.name, gapKey: gap?.key || "" }
+    };
+  }
+  if (state.actions.some((item) => item.status !== "cerrada")) {
+    return {
+      phase: "Actuar",
+      title: "Cerrar acciones abiertas",
+      detail: "Hay acciones pendientes. Asigna responsable, fecha, seguimiento, evidencia y verificacion de eficacia.",
+      pct: progress.pct,
+      primary: { label: "Abrir acciones", view: "acciones" },
+      secondary: { label: "Revision humana", view: "revision_humana" }
+    };
+  }
+  if (!state.managementReviews.length) {
+    return {
+      phase: "Verificar",
+      title: "Preparar revision por direccion",
+      detail: "Consolida acciones, riesgos, recursos, capacitaciones y decisiones para que direccion revise el SGSTA.",
+      pct: progress.pct,
+      primary: { label: "Preparar 9.3", view: "revision", command: "management_review" },
+      secondary: { label: "Ver evidencias", view: "evidencias" }
+    };
+  }
+  return {
+    phase: "Seguimiento",
+    title: "Sistema en vigilancia",
+    detail: "No hay un bloqueo principal visible. Mantén vigencias, evidencias, acciones y revision periodica.",
+    pct: progress.pct,
+    primary: { label: "Ver panel", view: "dashboard" },
+    secondary: { label: "Ejecutar monitor", view: "monitor" }
+  };
+}
+
+function runResumeAction(action) {
+  if (!action) return;
+  if (action.activity) {
+    state.selectedActivityName = action.activity;
+    state.selectedFormActivity = action.activity;
+  }
+  if (action.table) state.selectedFormTable = action.table;
+  if (action.command === "new_activity") addActivity();
+  if (action.command === "profile") generateCompanyImplementationProfile();
+  if (action.command === "activity_intake_actions" && action.activity) createActivityIntakeActions(action.activity);
+  if (action.command === "activity_gap_action" && action.activity && action.gapKey) createActivityGapAction(action.activity, action.gapKey);
+  if (action.command === "management_review") addManagementReview();
+  showView(action.view || "dashboard");
+  renderAll();
+}
+
+function renderResumeTrail() {
+  const container = document.querySelector("#resumeTrail");
+  if (!container) return;
+  const resume = resumeStepStatus();
+  container.innerHTML = `
+    <div>
+      <p class="eyebrow">Retomar flujo</p>
+      <h2>${escapeHtml(resume.title)}</h2>
+      <p>${escapeHtml(resume.detail)}</p>
+    </div>
+    <div class="resume-progress">
+      <span class="badge phva">${escapeHtml(resume.phase)}</span>
+      <strong>${resume.pct}%</strong>
+      <small>avance PHVA</small>
+    </div>
+    <div class="row-actions">
+      <button data-resume-action="primary" type="button">${escapeHtml(resume.primary.label)}</button>
+      <button class="secondary-button" data-resume-action="secondary" type="button">${escapeHtml(resume.secondary.label)}</button>
+    </div>`;
+  container.querySelector("[data-resume-action='primary']")?.addEventListener("click", () => runResumeAction(resume.primary));
+  container.querySelector("[data-resume-action='secondary']")?.addEventListener("click", () => runResumeAction(resume.secondary));
 }
 
 function renderTodayWork() {

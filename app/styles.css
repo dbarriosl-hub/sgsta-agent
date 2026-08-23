@@ -193,6 +193,53 @@ nav {
   margin-bottom: 24px;
 }
 
+.resume-trail {
+  align-items: center;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 1fr) 110px auto;
+  margin: -8px 0 18px;
+  padding: 14px 16px;
+}
+
+.resume-trail h2,
+.resume-trail p,
+.resume-trail .eyebrow {
+  margin: 0;
+}
+
+.resume-trail h2 {
+  font-size: 18px;
+}
+
+.resume-trail p {
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.resume-progress {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  padding: 8px;
+  text-align: center;
+}
+
+.resume-progress strong {
+  font-size: 24px;
+}
+
+.resume-progress small {
+  color: var(--muted);
+}
+
 .eyebrow {
   margin: 0 0 4px;
   text-transform: uppercase;
@@ -4613,6 +4660,7 @@ textarea {
   .activity-offer-guide,
   .activity-offer-grid,
   .activity-intake-grid,
+  .resume-trail,
   .form-filters,
   .activity-form-tools,
   .commercial-card,
@@ -4634,6 +4682,14 @@ textarea {
   .package-checklist,
   .departure-grid {
     grid-template-columns: 1fr;
+  }
+
+  .resume-trail {
+    align-items: stretch;
+  }
+
+  .resume-trail .row-actions {
+    justify-content: flex-start;
   }
 
   .demo-readiness-main {
