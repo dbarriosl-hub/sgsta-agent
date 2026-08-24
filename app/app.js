@@ -220,9 +220,9 @@ const defaultState = {
     { activity: "Senderismo", kind: "Formulario externo", consent: "pendiente", status: "pendiente", authorizedParticipants: "" }
   ],
   risks: [
-    { title: "Caida durante recorrido", activity: "Senderismo", probability: 3, impact: 4, control: "Charla de seguridad y verificacion de calzado" },
-    { title: "Caida al agua o golpe con roca", activity: "Rafting", probability: 3, impact: 5, control: "Chaleco, casco, guia especializado y verificacion de caudal" },
-    { title: "Colision o volcamiento", activity: "Paseo en cuatrimotos", probability: 3, impact: 5, control: "Casco, induccion, velocidad controlada y ruta definida" }
+    { title: "Caida durante recorrido", activity: "Senderismo", probability: 3, impact: 4, control: "Charla de seguridad y verificacion de calzado", lastReviewDate: "", reviewComment: "" },
+    { title: "Caida al agua o golpe con roca", activity: "Rafting", probability: 3, impact: 5, control: "Chaleco, casco, guia especializado y verificacion de caudal", lastReviewDate: "", reviewComment: "" },
+    { title: "Colision o volcamiento", activity: "Paseo en cuatrimotos", probability: 3, impact: 5, control: "Casco, induccion, velocidad controlada y ruta definida", lastReviewDate: "", reviewComment: "" }
   ],
   documents: [
     { title: "Politica de seguridad", code: "5.2", status: "borrador", content: "" },
@@ -5142,7 +5142,7 @@ function addRiskForActivity(activityName) {
     risk.activity === activityName &&
     String(risk.title || "").startsWith("Riesgo por evaluar")
   );
-  if (!existing) state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir" });
+  if (!existing) state.risks.unshift({ title: `Riesgo por evaluar en ${activityName}`, activity: activityName, probability: 3, impact: 3, control: "Control especifico por definir", lastReviewDate: today(), reviewComment: "Pendiente completar y revisar el riesgo." });
   state.compliance["6.1.2"] = "en_proceso";
   createActivityQuickAction(`Completar matriz de riesgos de ${activityName}`, "6.1.2", "preventiva", activityName);
   showActivityQuickResult(activityName, existing ? "Ya habia un riesgo pendiente. Te llevo a ese bloque para completarlo." : "Riesgo agregado. Ahora edita el riesgo, probabilidad, impacto y control especifico.", "risks");
@@ -5159,7 +5159,9 @@ function openRisksFromActivity(activityName) {
       activity: activityName,
       probability: 3,
       impact: 3,
-      control: "Control especifico por definir"
+      control: "Control especifico por definir",
+      lastReviewDate: today(),
+      reviewComment: "Pendiente completar y revisar el riesgo."
     });
   }
   state.selectedActivityName = activityName;
@@ -5282,7 +5284,9 @@ function generateRiskMapWithAgent() {
         approvalStatus: "borrador",
         requiresApproval: true,
         source: "agente",
-        createdAt: today()
+        createdAt: today(),
+        lastReviewDate: today(),
+        reviewComment: "Borrador sugerido por el agente; revisar controles, responsable y nivel antes de aprobar."
       };
       const key = normalizedRiskKey(risk);
       if (existing.has(key)) return;
@@ -5610,6 +5614,8 @@ function activityRiskRows(activityName) {
             ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
           </select>
         </label>
+        <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(risk.lastReviewDate || risk.updatedAt || "")}"></label>
+        <label>Comentario<textarea data-risk-field="${index}:reviewComment">${escapeHtml(risk.reviewComment || "")}</textarea></label>
         <span class="badge ${badge}">nivel ${level}</span>
         <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
       </div>`;
@@ -5623,6 +5629,7 @@ function updateActivityRiskField(field) {
   const previousLevel = riskLevel(risk);
   risk[key] = ["probability", "impact"].includes(key) ? Number(field.value) : field.value;
   risk.updatedAt = today();
+  if (key !== "lastReviewDate" && !risk.lastReviewDate) risk.lastReviewDate = today();
   risk.approvalStatus = risk.approvalStatus === "aprobado" ? "revision" : (risk.approvalStatus || "revision");
   risk.requiresApproval = true;
   state.compliance["6.1.2"] = "en_proceso";
@@ -5673,6 +5680,7 @@ function approveRisk(index) {
     risk.approvalStatus = "revision";
     risk.requiresApproval = true;
     risk.updatedAt = today();
+    risk.lastReviewDate = today();
     addMessage("agent", `Reabri el riesgo "${risk.title}" para revision humana.`);
   } else {
     risk.approvalStatus = "aprobado";
@@ -5680,6 +5688,7 @@ function approveRisk(index) {
     risk.approvedBy = state.ownerName || "Responsable SGSTA";
     risk.approvedAt = today();
     risk.updatedAt = today();
+    risk.lastReviewDate = today();
     state.compliance["6.1.2"] = state.risks.length && state.risks.every((item) => riskApprovalLabel(item) === "aprobado") ? "cumple" : "en_proceso";
     addMessage("agent", `Riesgo aprobado: "${risk.title}". Quedo trazabilidad de aprobacion humana.`);
   }
@@ -8588,6 +8597,8 @@ function riskEditRow(risk, index) {
           ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
         </select>
       </label>
+      <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(risk.lastReviewDate || risk.updatedAt || "")}"></label>
+      <label>Comentario<textarea data-risk-field="${index}:reviewComment" placeholder="Observacion de la revision">${escapeHtml(risk.reviewComment || "")}</textarea></label>
       <span class="badge ${badge}" title="Nivel = probabilidad x impacto">${riskLabel(level)} (${level})</span>
       <span class="badge ${approvalBadge}" title="Decision humana">${approval}</span>
       <div class="row-actions">
@@ -15311,7 +15322,17 @@ function addParticipantEvidence() {
 
 function addRisk() {
   const activity = primaryActivityName();
-  state.risks.unshift({ title: "Riesgo por evaluar", activity, probability: 3, impact: 3, control: "Control por definir", approvalStatus: "borrador", requiresApproval: true });
+  state.risks.unshift({
+    title: "Riesgo por evaluar",
+    activity,
+    probability: 3,
+    impact: 3,
+    control: "Control por definir",
+    approvalStatus: "borrador",
+    requiresApproval: true,
+    lastReviewDate: today(),
+    reviewComment: "Pendiente completar y revisar el riesgo."
+  });
   state.compliance["6.1.2"] = "en_proceso";
   createActivityQuickAction(`Completar tratamiento del nuevo riesgo de ${activity}`, "6.1.2", "preventiva", activity);
   state.selectedActivityName = activity;
@@ -15380,7 +15401,7 @@ function documentDraftTemplates() {
   const activity = mainActivity.name || "Actividad por definir";
   const specificControls = serviceSpecificControls(activity);
   const activityLines = state.activities.map((item) => `- ${item.name}: ${item.place || "lugar por definir"}. Lider: ${item.leader || "por definir"}. Condiciones: ${item.conditions || "por definir"}.`).join("\n") || "- Actividades por definir.";
-  const riskLines = state.risks.map((item) => `- ${item.activity || "General"}: ${item.title}. Nivel ${riskLevel(item)}. Control: ${item.control || "por definir"}.`).join("\n") || "- Riesgos por identificar.";
+  const riskLines = state.risks.map((item) => `- ${item.activity || "General"}: ${item.title}. Nivel ${riskLevel(item)}. Control: ${item.control || "por definir"}. Ultima revision: ${item.lastReviewDate || item.updatedAt || "por programar"}. Comentario: ${item.reviewComment || "sin comentario"}.`).join("\n") || "- Riesgos por identificar.";
   const equipmentLines = state.equipment.map((item) => `- ${item.activity || "General"}: ${item.equipmentId || "ID por definir"} - ${item.name || "equipo por definir"} (${item.type || "equipo"}), estado ${item.status || "por definir"}, ultima inspeccion ${item.inspectionDate || "por registrar"}, proxima inspeccion ${nextEquipmentInspection(item) || "por programar"}, ultimo mantenimiento ${item.maintenanceDate || "por registrar"}.`).join("\n") || "- Equipos por inventariar.";
   const staffLines = state.people.map((item) => `- ${item.name || "Persona por definir"}: ${item.role || "rol por definir"} - Actividad: ${item.activity || "General"} - Competencia: ${item.competency || "por verificar"} - Estado: ${item.status || "pendiente"}.`).join("\n") || "- Personal/guia por asignar y verificar.";
   const trainingLines = state.trainingNeeds.map((item) => `- ${item.activity || "General"}: ${item.topic}. Prioridad ${item.priority || "media"}, estado ${item.status || "pendiente"}.`).join("\n") || "- Capacitaciones por definir.";

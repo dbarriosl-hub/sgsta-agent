@@ -4396,7 +4396,7 @@ textarea {
 
 .risk-edit-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) 92px 92px minmax(180px, 1.2fr) minmax(150px, 0.8fr) 140px 90px 90px;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 10px;
   align-items: end;
   border: 1px solid var(--line);
@@ -4407,11 +4407,16 @@ textarea {
 }
 
 .risk-edit-row-wide {
-  grid-template-columns: minmax(180px, 1.2fr) minmax(150px, 0.8fr) 92px 92px minmax(180px, 1.2fr) minmax(140px, 0.7fr) 140px 100px minmax(160px, auto);
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
 }
 
 .risk-edit-row textarea {
   min-height: 40px;
+}
+
+.risk-edit-row .row-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
 }
 
 .equipment-edit-row {
