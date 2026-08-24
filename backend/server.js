@@ -223,6 +223,10 @@ function dueSeverity(value, warningDays = 30) {
   return { severity: "baja", label: `vigente por ${days} dia(s)`, days };
 }
 
+function nextEquipmentInspection(equipment = {}) {
+  return equipment.nextInspection || equipment.nextCheck || "";
+}
+
 function buildAlerts() {
   const alerts = [];
   const pendingForms = visibleFormCatalog().length - state.formResponses.filter((item) => !internalFormTables.has(item.table)).length;
@@ -259,16 +263,17 @@ function buildAlerts() {
     });
   });
   list(state.equipment).forEach((equipment) => {
-    const due = dueSeverity(equipment.nextCheck, 15);
+    const inspectionDue = nextEquipmentInspection(equipment);
+    const due = dueSeverity(inspectionDue, 15);
     if (equipment.status === "operativo" && due.severity === "baja") return;
     alerts.push({
-      title: due.days !== null && due.days < 0 ? "Revision de equipo vencida" : "Equipo requiere control",
-      detail: `${equipment.name} esta ${equipment.status}. Revision: ${equipment.nextCheck || "Por programar"} (${due.label}).`,
+      title: due.days !== null && due.days < 0 ? "Inspeccion de equipo vencida" : "Equipo requiere control",
+      detail: `${equipment.name || "Equipo sin nombre"} esta ${equipment.status}. Proxima inspeccion: ${inspectionDue || "Por programar"} (${due.label}).`,
       code: "7.1",
       severity: equipment.status !== "operativo" || due.severity === "alta" ? "alta" : "media",
       origin: "equipos",
       actionTitle: `Programar inspeccion o mantenimiento de ${equipment.name}`,
-      dueDate: equipment.nextCheck
+      dueDate: inspectionDue
     });
   });
   list(state.trainingNeeds).filter((item) => item.status !== "cerrada").forEach((training) => {
@@ -549,9 +554,9 @@ function buildAgentFindings() {
     findings.push({ title: "Necesidades de capacitacion abiertas", detail: `${trainingOpen.length} necesidad(es) deben programarse, ejecutarse y evaluarse.`, priority: "media", code: "7.3", actionType: "tarea", origin: "capacitacion", actionTitle: "Programar y evaluar capacitaciones pendientes" });
   }
 
-  const equipmentPending = list(state.equipment).filter((item) => item.status !== "operativo" || item.nextCheck === "Por programar");
+  const equipmentPending = list(state.equipment).filter((item) => item.status !== "operativo" || !nextEquipmentInspection(item) || String(nextEquipmentInspection(item)).toLowerCase().includes("por "));
   if (equipmentPending.length) {
-    findings.push({ title: "Equipos sin control operacional completo", detail: `${equipmentPending.length} equipo(s) requieren inspeccion, mantenimiento o fecha de revision.`, priority: "alta", code: "8.1", actionType: "preventiva", origin: "equipo", actionTitle: "Completar inspeccion y mantenimiento de equipos" });
+    findings.push({ title: "Equipos sin control operacional completo", detail: `${equipmentPending.length} equipo(s) requieren ID, estado operativo, inspeccion, mantenimiento o evidencia.`, priority: "alta", code: "8.1", actionType: "preventiva", origin: "equipo", actionTitle: "Completar inspeccion y mantenimiento de equipos" });
   }
 
   const policiesPending = list(state.policies).filter((item) => item.status !== "vigente");

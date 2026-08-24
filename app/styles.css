@@ -4393,7 +4393,7 @@ textarea {
 
 .equipment-edit-row {
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) minmax(130px, 0.7fr) 130px 140px minmax(150px, 0.8fr) minmax(150px, 0.8fr) 90px 90px;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 10px;
   align-items: end;
   border: 1px solid var(--line);
@@ -4805,6 +4805,19 @@ textarea {
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.operator-note {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+}
+
+.operator-note strong {
+  color: var(--text);
 }
 
 .training-edit-grid {

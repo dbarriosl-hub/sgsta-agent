@@ -207,10 +207,10 @@ const defaultState = {
     { topic: "Primeros auxilios y respuesta a emergencias", activity: "Senderismo", origin: "competencia", priority: "alta", status: "pendiente", code: "7.2" }
   ],
   equipment: [
-    { name: "Botiquin principal", type: "Emergencia", activity: "Senderismo", status: "operativo", nextCheck: "Por programar" },
-    { name: "Radios de comunicacion", type: "Comunicacion", activity: "Senderismo", status: "revision", nextCheck: "Por programar" },
-    { name: "Chalecos salvavidas", type: "Seguridad acuatica", activity: "Rafting", status: "revision", nextCheck: "Por programar" },
-    { name: "Cascos para cuatrimoto", type: "Proteccion personal", activity: "Paseo en cuatrimotos", status: "revision", nextCheck: "Por programar" }
+    { equipmentId: "BOT-001", name: "Botiquin principal", type: "Emergencia", activity: "Senderismo", status: "operativo", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", evidence: "" },
+    { equipmentId: "RAD-001", name: "Radios de comunicacion", type: "Comunicacion", activity: "Senderismo", status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", evidence: "" },
+    { equipmentId: "CHA-001", name: "Chalecos salvavidas", type: "Seguridad acuatica", activity: "Rafting", status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", evidence: "" },
+    { equipmentId: "CAS-001", name: "Cascos para cuatrimoto", type: "Proteccion personal", activity: "Paseo en cuatrimotos", status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", evidence: "" }
   ],
   policies: [
     { number: "POL-001", insurer: "Aseguradora ejemplo", coverage: "Responsabilidad civil para senderismo", activity: "Senderismo", due: "Por definir", status: "pendiente" }
@@ -1417,10 +1417,10 @@ function loadPilotExampleData() {
     { topic: "Simulacro de rescate acuatico", activity: "Rafting Rio Claro", origin: "emergencias", priority: "media", status: "realizada", code: "8.2", evaluation: "aprobada", certificate: "acta_simulacro_rescate.pdf", evidence: "registro_simulacro.pdf" }
   ];
   state.equipment = [
-    { name: "Balsa 6 personas", type: "Rafting", activity: "Rafting Rio Claro", status: "operativo", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "inspeccion_balsa_mayo.pdf" },
-    { name: "Chalecos salvavidas", type: "EPP acuatico", activity: "Rafting Rio Claro", status: "operativo", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "checklist_chalecos.pdf" },
-    { name: "Radios VHF", type: "Comunicacion", activity: "Caminata Bosque Alto", status: "operativo", nextCheck: "20/06/2026", inspectionDate: "05/05/2026", maintenanceDate: "05/05/2026", evidence: "prueba_radios.pdf" },
-    { name: "Cuatrimoto 01", type: "Vehiculo recreativo", activity: "Ruta Cuatrimotos Mirador", status: "revision", nextCheck: "Por programar", inspectionDate: "", maintenanceDate: "", evidence: "" }
+    { equipmentId: "BAL-001", name: "Balsa 6 personas", type: "Rafting", activity: "Rafting Rio Claro", status: "operativo", nextInspection: "30/06/2026", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "inspeccion_balsa_mayo.pdf" },
+    { equipmentId: "CHA-001", name: "Chalecos salvavidas", type: "EPP acuatico", activity: "Rafting Rio Claro", status: "operativo", nextInspection: "30/06/2026", nextCheck: "30/06/2026", inspectionDate: "01/05/2026", maintenanceDate: "20/04/2026", evidence: "checklist_chalecos.pdf" },
+    { equipmentId: "RAD-001", name: "Radios VHF", type: "Comunicacion", activity: "Caminata Bosque Alto", status: "operativo", nextInspection: "20/06/2026", nextCheck: "20/06/2026", inspectionDate: "05/05/2026", maintenanceDate: "05/05/2026", evidence: "prueba_radios.pdf" },
+    { equipmentId: "CUA-001", name: "Cuatrimoto 01", type: "Vehiculo recreativo", activity: "Ruta Cuatrimotos Mirador", status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", evidence: "" }
   ];
   state.policies = [
     { number: "RC-2026-001", insurer: "Aseguradora Andina", coverage: "Responsabilidad civil y accidentes", activity: "Rafting Rio Claro", due: "31/12/2026", status: "vigente", document: "poliza_rc_2026.pdf" },
@@ -4709,7 +4709,7 @@ function activityGapItems(activityName) {
   const stats = activityFormStats(activityName);
   const controls = activityControlStatus(activityName);
   const highRisks = related.risks.filter((risk) => riskLevel(risk) >= 12);
-  const equipmentPending = related.equipment.filter((item) => item.status !== "operativo" || !item.nextCheck || String(item.nextCheck).toLowerCase().includes("por "));
+  const equipmentPending = related.equipment.filter((item) => item.status !== "operativo" || !nextEquipmentInspection(item) || String(nextEquipmentInspection(item)).toLowerCase().includes("por "));
   const peoplePending = related.people.filter((person) => person.competence !== "cumple" || !person.training || String(person.training).toLowerCase().includes("pendiente") || !person.evidence || !person.certificateDue);
   const trainingPending = related.training.filter((item) => item.status !== "cerrada" && item.status !== "realizada");
   const policiesPending = related.policies.filter((policy) => !policyIsComplete(policy));
@@ -5185,7 +5185,7 @@ function addEquipmentForActivity(activityName) {
     (!equipment.name || String(equipment.name || "").startsWith("Equipo ")) &&
     equipment.status === "revision"
   );
-  if (!existing) state.equipment.unshift({ name: "", type: "", description: "", activity: activityName, status: "revision", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
+  if (!existing) state.equipment.unshift({ equipmentId: "", name: "", type: "", description: "", activity: activityName, status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createActivityQuickAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", activityName);
@@ -5569,39 +5569,49 @@ function activityEquipmentRows(activityName) {
   if (!equipmentItems.length) return `<div class="muted">No hay equipos especificos para esta actividad.</div>`;
   return equipmentItems.map(({ equipment, index }) => {
     const complete = equipmentIsComplete(equipment);
+    const inspectionDue = nextEquipmentInspection(equipment);
     return `
       <div class="equipment-edit-row">
-        <label>Equipo<input data-equipment-field="${index}:name" type="text" value="${escapeHtml(equipment.name || "")}"></label>
-        <label>Tipo<input data-equipment-field="${index}:type" type="text" value="${escapeHtml(equipment.type || "")}"></label>
+        <label>ID / codigo<input data-equipment-field="${index}:equipmentId" type="text" value="${escapeHtml(equipment.equipmentId || "")}" placeholder="BAL-001"></label>
+        <label>Equipo<input data-equipment-field="${index}:name" type="text" value="${escapeHtml(equipment.name || "")}" placeholder="Balsa, casco, chaleco"></label>
+        <label>Tipo / cantidad<input data-equipment-field="${index}:type" type="text" value="${escapeHtml(equipment.type || "")}" placeholder="12 unidades"></label>
         <label>Estado
           <select data-equipment-field="${index}:status">
             ${["operativo", "revision", "mantenimiento", "fuera_servicio"].map((value) => `<option value="${value}" ${(equipment.status || "revision") === value ? "selected" : ""}>${value}</option>`).join("")}
           </select>
         </label>
-        <label>Proxima revision<input data-equipment-field="${index}:nextCheck" type="text" value="${escapeHtml(equipment.nextCheck || "")}"></label>
+        <label>Ultima inspeccion<input data-equipment-field="${index}:inspectionDate" type="date" value="${escapeHtml(dateInputValue(equipment.inspectionDate))}"></label>
+        <label>Proxima inspeccion<input data-equipment-field="${index}:nextInspection" type="date" value="${escapeHtml(dateInputValue(inspectionDue))}"></label>
+        <label>Ultimo mantenimiento<input data-equipment-field="${index}:maintenanceDate" type="date" value="${escapeHtml(dateInputValue(equipment.maintenanceDate))}"></label>
         <label>Responsable<input data-equipment-field="${index}:responsible" type="text" value="${escapeHtml(equipment.responsible || "")}"></label>
-        <label>Inspeccion<input data-equipment-field="${index}:inspectionDate" type="text" value="${escapeHtml(equipment.inspectionDate || "")}"></label>
-        <label>Mantenimiento<input data-equipment-field="${index}:maintenanceDate" type="text" value="${escapeHtml(equipment.maintenanceDate || "")}"></label>
-        <label>Evidencia<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}"></label>
+        <label>Evidencia / link<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}" placeholder="foto, checklist o link"></label>
         <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : "pendiente"}</span>
         <button class="secondary-button" data-remove="equipment:${index}" type="button">Quitar</button>
       </div>`;
   }).join("");
 }
 
+function nextEquipmentInspection(equipment = {}) {
+  return equipment.nextInspection || equipment.nextCheck || "";
+}
+
 function equipmentIsComplete(equipment) {
   const namedOk = equipment.name && !String(equipment.name).toLowerCase().startsWith("equipo ");
-  const nextOk = equipment.nextCheck && !String(equipment.nextCheck).toLowerCase().includes("por ");
-  return namedOk && equipment.status === "operativo" && nextOk && equipment.inspectionDate && equipment.maintenanceDate && equipment.evidence;
+  const idOk = equipment.equipmentId && !String(equipment.equipmentId).toLowerCase().includes("por ");
+  const nextInspection = nextEquipmentInspection(equipment);
+  const nextOk = nextInspection && !String(nextInspection).toLowerCase().includes("por ");
+  return idOk && namedOk && equipment.status === "operativo" && nextOk && equipment.inspectionDate && equipment.maintenanceDate && equipment.evidence;
 }
 
 function equipmentGapReason(equipment) {
   const missing = [];
+  if (!equipment.equipmentId || String(equipment.equipmentId).toLowerCase().includes("por ")) missing.push("ID/codigo");
   if (!equipment.name || String(equipment.name).toLowerCase().startsWith("equipo ")) missing.push("nombre especifico");
   if (equipment.status !== "operativo") missing.push("estado operativo");
-  if (!equipment.nextCheck || String(equipment.nextCheck).toLowerCase().includes("por ")) missing.push("proxima revision");
-  if (!equipment.inspectionDate) missing.push("inspeccion");
-  if (!equipment.maintenanceDate) missing.push("mantenimiento");
+  const nextInspection = nextEquipmentInspection(equipment);
+  if (!equipment.inspectionDate) missing.push("ultima inspeccion");
+  if (!nextInspection || String(nextInspection).toLowerCase().includes("por ")) missing.push("proxima inspeccion");
+  if (!equipment.maintenanceDate) missing.push("ultimo mantenimiento");
   if (!equipment.evidence) missing.push("evidencia");
   return missing.length ? `Falta ${missing.join(", ")}.` : "Equipo completo para operar.";
 }
@@ -5611,6 +5621,7 @@ function updateActivityEquipmentField(field) {
   const equipment = state.equipment[Number(rawIndex)];
   if (!equipment) return;
   equipment[key] = field.value;
+  if (key === "nextInspection") equipment.nextCheck = field.value;
   equipment.updatedAt = today();
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
@@ -7360,8 +7371,8 @@ function detectEquipmentGaps() {
         origin: "equipo",
         priority: equipment.status === "fuera_servicio" || equipment.status === "mantenimiento" ? "alta" : "media",
         responsible: equipment.responsible || state.ownerName || "",
-        dueDate: equipment.nextCheck || "",
-        cause: `Equipo de ${itemActivityName(equipment)} requiere estado operativo, inspeccion, mantenimiento y evidencia.`,
+        dueDate: nextEquipmentInspection(equipment) || "",
+        cause: `Equipo de ${itemActivityName(equipment)} requiere ID/codigo, estado operativo, ultima inspeccion, proxima inspeccion, mantenimiento y evidencia.`,
         immediateCorrection: "",
         followUp: "",
         efficacyVerification: "",
@@ -7574,9 +7585,10 @@ function renderEquipment() {
           </div>
         </div>
         <strong>${escapeHtml(title)}</strong>
-        <div class="muted">${escapeHtml(item.type || "Tipo por definir")} - Actividad: ${escapeHtml(activityValue)} - Proxima revision: ${item.nextCheck || "Por programar"}</div>
+        <div class="muted">${escapeHtml(item.equipmentId || "ID por definir")} - ${escapeHtml(item.type || "Tipo por definir")} - Actividad: ${escapeHtml(activityValue)} - Proxima inspeccion: ${nextEquipmentInspection(item) || "Por programar"}</div>
         <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Equipo listo" : "Equipo pendiente"}</strong><span>${gapReason}</span></div>
         <div class="training-edit-grid">
+          <label>ID / codigo<input data-equipment-main-field="${index}:equipmentId" type="text" value="${escapeHtml(item.equipmentId || "")}" placeholder="Ej. BAL-001, CAS-012, CH-023"></label>
           <label>Nombre real del equipo<input data-equipment-main-field="${index}:name" type="text" value="${escapeHtml(item.name || "")}" placeholder="Ej. Balsa, set de 12 cascos, chalecos salvavidas"></label>
           <label>Tipo / cantidad<input data-equipment-main-field="${index}:type" type="text" value="${escapeHtml(item.type || "")}" placeholder="Ej. Equipo de rio, 12 unidades"></label>
           <label>Actividad
@@ -7590,12 +7602,12 @@ function renderEquipment() {
               ${["operativo", "revision", "mantenimiento", "fuera_servicio"].map((value) => `<option value="${value}" ${(item.status || "revision") === value ? "selected" : ""}>${value}</option>`).join("")}
             </select>
           </label>
-          <label>Proxima revision<input data-equipment-main-field="${index}:nextCheck" type="date" value="${escapeHtml(dateInputValue(item.nextCheck))}"></label>
           <label>Ultima inspeccion<input data-equipment-main-field="${index}:inspectionDate" type="date" value="${escapeHtml(dateInputValue(item.inspectionDate))}"></label>
+          <label>Proxima inspeccion<input data-equipment-main-field="${index}:nextInspection" type="date" value="${escapeHtml(dateInputValue(nextEquipmentInspection(item)))}"></label>
           <label>Ultimo mantenimiento<input data-equipment-main-field="${index}:maintenanceDate" type="date" value="${escapeHtml(dateInputValue(item.maintenanceDate))}"></label>
           <label>Responsable<input data-equipment-main-field="${index}:responsible" type="text" value="${escapeHtml(item.responsible || "")}"></label>
           <label>Evidencia / enlace<input data-equipment-main-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || "")}" placeholder="Link, foto, acta o soporte"></label>
-          <label class="wideish">Descripcion / observaciones<input data-equipment-main-field="${index}:description" type="text" value="${escapeHtml(item.description || "")}" placeholder="Ej. Balsa para 6 pasajeros, requiere revision visual antes de cada salida"></label>
+          <label class="wideish">Descripcion / observaciones<input data-equipment-main-field="${index}:description" type="text" value="${escapeHtml(item.description || "")}" placeholder="Ej. Balsa para 6 pasajeros, revisar valvulas, piso, remos y cuerdas antes de cada salida"></label>
         </div>
       </div>`;
     }).join("")
@@ -7606,6 +7618,7 @@ function renderEquipment() {
       const item = state.equipment[Number(index)];
       if (!item) return;
       item[key] = field.value;
+      if (key === "nextInspection") item.nextCheck = field.value;
       item.updatedAt = today();
       state.compliance["7.1"] = "en_proceso";
       state.compliance["8.1"] = "en_proceso";
@@ -13597,16 +13610,17 @@ function buildSystemAlerts() {
     });
   });
   state.equipment.forEach((equipment) => {
-    const due = dueSeverity(equipment.nextCheck, 15);
+    const inspectionDue = nextEquipmentInspection(equipment);
+    const due = dueSeverity(inspectionDue, 15);
     if (equipment.status === "operativo" && due.severity === "baja") return;
     alerts.push({
-      title: due.days !== null && due.days < 0 ? "Revision de equipo vencida" : "Equipo requiere control",
-      detail: `${equipment.name} esta ${equipment.status} y su proxima revision es ${equipment.nextCheck}. ${due.label}.`,
+      title: due.days !== null && due.days < 0 ? "Inspeccion de equipo vencida" : "Equipo requiere control",
+      detail: `${equipment.name || "Equipo sin nombre"} esta ${equipment.status} y su proxima inspeccion es ${inspectionDue || "por programar"}. ${due.label}.`,
       code: "7.1",
       severity: equipment.status !== "operativo" || due.severity === "alta" ? "alta" : "media",
       origin: "equipos",
       actionTitle: `Programar inspeccion o mantenimiento de ${equipment.name}`,
-      dueDate: equipment.nextCheck
+      dueDate: inspectionDue
     });
   });
   state.trainingNeeds.filter((item) => item.status !== "cerrada").forEach((training) => {
@@ -13780,16 +13794,17 @@ function buildAgendaItems() {
     });
   });
   state.equipment.forEach((equipment) => {
-    const due = dueSeverity(equipment.nextCheck, 15);
+    const inspectionDue = nextEquipmentInspection(equipment);
+    const due = dueSeverity(inspectionDue, 15);
     if (due.severity !== "baja" || equipment.status !== "operativo") {
       items.push({
-        title: `Revision de equipo: ${equipment.name}`,
+        title: `Inspeccion de equipo: ${equipment.name}`,
         detail: `${equipment.type} - estado ${equipment.status}. ${due.label}.`,
         code: "7.1",
-        date: equipment.nextCheck || "Por programar",
+        date: inspectionDue || "Por programar",
         priority: equipment.status !== "operativo" || due.severity === "alta" ? "alta" : "media",
         origin: "equipos",
-        actionTitle: `Programar revision de ${equipment.name}`
+        actionTitle: `Programar inspeccion de ${equipment.name}`
       });
     }
   });
@@ -14745,11 +14760,11 @@ function buildAgentFindings() {
       actionTitle: "Programar y evaluar capacitaciones pendientes"
     });
   }
-  const equipmentPending = state.equipment.filter((item) => item.status !== "operativo" || item.nextCheck === "Por programar");
+  const equipmentPending = state.equipment.filter((item) => item.status !== "operativo" || !nextEquipmentInspection(item) || String(nextEquipmentInspection(item)).toLowerCase().includes("por "));
   if (equipmentPending.length) {
     findings.push({
       title: "Equipos sin control operacional completo",
-      detail: `${equipmentPending.length} equipo(s) requieren inspeccion, mantenimiento o fecha de revision.`,
+      detail: `${equipmentPending.length} equipo(s) requieren ID, estado operativo, inspeccion, mantenimiento o evidencia.`,
       priority: "alta",
       code: "8.1",
       actionType: "preventiva",
@@ -15052,7 +15067,7 @@ function addTrainingNeed() {
 }
 
 function addEquipment() {
-  state.equipment.unshift({ name: "", type: "", description: "", activity: primaryActivityName(), status: "revision", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
+  state.equipment.unshift({ equipmentId: "", name: "", type: "", description: "", activity: primaryActivityName(), status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createAction("Programar inspeccion y mantenimiento de equipo", "7.1", "preventiva", "equipo vencido");
@@ -15157,7 +15172,7 @@ function documentDraftTemplates() {
   const specificControls = serviceSpecificControls(activity);
   const activityLines = state.activities.map((item) => `- ${item.name}: ${item.place || "lugar por definir"}. Lider: ${item.leader || "por definir"}. Condiciones: ${item.conditions || "por definir"}.`).join("\n") || "- Actividades por definir.";
   const riskLines = state.risks.map((item) => `- ${item.activity || "General"}: ${item.title}. Nivel ${riskLevel(item)}. Control: ${item.control || "por definir"}.`).join("\n") || "- Riesgos por identificar.";
-  const equipmentLines = state.equipment.map((item) => `- ${item.activity || "General"}: ${item.name} (${item.type || "equipo"}), estado ${item.status || "por definir"}, proxima revision ${item.nextCheck || "por programar"}.`).join("\n") || "- Equipos por inventariar.";
+  const equipmentLines = state.equipment.map((item) => `- ${item.activity || "General"}: ${item.equipmentId || "ID por definir"} - ${item.name || "equipo por definir"} (${item.type || "equipo"}), estado ${item.status || "por definir"}, ultima inspeccion ${item.inspectionDate || "por registrar"}, proxima inspeccion ${nextEquipmentInspection(item) || "por programar"}, ultimo mantenimiento ${item.maintenanceDate || "por registrar"}.`).join("\n") || "- Equipos por inventariar.";
   const staffLines = state.people.map((item) => `- ${item.name || "Persona por definir"}: ${item.role || "rol por definir"} - Actividad: ${item.activity || "General"} - Competencia: ${item.competency || "por verificar"} - Estado: ${item.status || "pendiente"}.`).join("\n") || "- Personal/guia por asignar y verificar.";
   const trainingLines = state.trainingNeeds.map((item) => `- ${item.activity || "General"}: ${item.topic}. Prioridad ${item.priority || "media"}, estado ${item.status || "pendiente"}.`).join("\n") || "- Capacitaciones por definir.";
   const policyLines = state.policies.map((item) => `- ${item.activity || "General"}: ${item.number || "poliza por definir"} - ${item.coverage || "cobertura por definir"} (${item.status || "pendiente"}).`).join("\n") || "- Polizas por validar.";
