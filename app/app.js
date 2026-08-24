@@ -5187,16 +5187,11 @@ function generateRiskMapWithAgent() {
 }
 
 function addEquipmentForActivity(activityName) {
-  const existing = state.equipment.find((equipment) =>
-    equipment.activity === activityName &&
-    (!equipment.name || String(equipment.name || "").startsWith("Equipo ")) &&
-    equipment.status === "revision"
-  );
-  if (!existing) state.equipment.unshift({ equipmentId: "", name: "", type: "", description: "", activity: activityName, status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
+  state.equipment.unshift({ equipmentId: "", name: "", type: "", description: "", activity: activityName, status: "revision", nextInspection: "", nextCheck: "", inspectionDate: "", maintenanceDate: "", responsible: "", evidence: "" });
   state.compliance["7.1"] = "en_proceso";
   state.compliance["8.1"] = "en_proceso";
   createActivityQuickAction(`Programar inspeccion de equipos de ${activityName}`, "7.1", "preventiva", activityName);
-  showActivityQuickResult(activityName, existing ? "Ya habia un equipo pendiente. Te llevo al inventario para completarlo." : "Equipo agregado. Escribe el nombre real, por ejemplo balsa, set de 12 cascos o chalecos salvavidas.", "equipment");
+  showActivityQuickResult(activityName, "Equipo nuevo agregado. Escribe el nombre real, por ejemplo balsa, set de 12 cascos o chalecos salvavidas.", "equipment");
 }
 
 function addGuideForActivity(activityName) {
@@ -5577,6 +5572,7 @@ function activityEquipmentRows(activityName) {
   return equipmentItems.map(({ equipment, index }) => {
     const complete = equipmentIsComplete(equipment);
     const inspectionDue = nextEquipmentInspection(equipment);
+    const gapReason = equipmentGapReason(equipment);
     return `
       <div class="equipment-edit-row">
         <label>ID / codigo<input data-equipment-field="${index}:equipmentId" type="text" value="${escapeHtml(equipment.equipmentId || "")}" placeholder="BAL-001"></label>
@@ -5592,9 +5588,10 @@ function activityEquipmentRows(activityName) {
         <label>Ultimo mantenimiento<input data-equipment-field="${index}:maintenanceDate" type="date" value="${escapeHtml(dateInputValue(equipment.maintenanceDate))}"></label>
         <label>Responsable<input data-equipment-field="${index}:responsible" type="text" value="${escapeHtml(equipment.responsible || "")}"></label>
         <label>Evidencia / link<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}" placeholder="foto, checklist o link"></label>
-        <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : "pendiente"}</span>
+        <span class="badge ${complete ? "cumple" : "no_cumple"}" title="${escapeHtml(gapReason)}">${complete ? "listo" : "pendiente"}</span>
         <button class="secondary-button" data-duplicate-equipment-activity="${index}" type="button">Duplicar</button>
         <button class="secondary-button" data-remove="equipment:${index}" type="button">Quitar</button>
+        ${complete ? "" : `<small class="muted wideish">${gapReason}</small>`}
       </div>`;
   }).join("");
 }
@@ -5604,11 +5601,14 @@ function nextEquipmentInspection(equipment = {}) {
 }
 
 function equipmentIsComplete(equipment) {
-  const namedOk = equipment.name && !String(equipment.name).toLowerCase().startsWith("equipo ");
-  const idOk = equipment.equipmentId && !String(equipment.equipmentId).toLowerCase().includes("por ");
+  const namedOk = String(equipment.name || "").trim() && !String(equipment.name || "").trim().toLowerCase().startsWith("equipo ");
+  const idOk = String(equipment.equipmentId || "").trim() && !String(equipment.equipmentId || "").toLowerCase().includes("por ");
   const nextInspection = nextEquipmentInspection(equipment);
-  const nextOk = nextInspection && !String(nextInspection).toLowerCase().includes("por ");
-  return idOk && namedOk && equipment.status === "operativo" && nextOk && equipment.inspectionDate && equipment.maintenanceDate && equipment.evidence;
+  const nextOk = String(nextInspection || "").trim() && !String(nextInspection || "").toLowerCase().includes("por ");
+  const inspectionOk = String(equipment.inspectionDate || "").trim();
+  const maintenanceOk = String(equipment.maintenanceDate || "").trim();
+  const evidenceOk = String(equipment.evidence || "").trim();
+  return idOk && namedOk && equipment.status === "operativo" && nextOk && inspectionOk && maintenanceOk && evidenceOk;
 }
 
 function equipmentGapReason(equipment) {
@@ -6755,7 +6755,10 @@ function renderActivities() {
             <p class="eyebrow">Equipos de la actividad</p>
             <h2>Inventario editable</h2>
           </div>
-          <span class="badge ${selectedRelated.equipment.every((item) => item.status === "operativo") && selectedRelated.equipment.length ? "cumple" : "no_cumple"}">${selectedRelated.equipment.length}</span>
+          <div class="row-actions">
+            <span class="badge ${selectedRelated.equipment.every(equipmentIsComplete) && selectedRelated.equipment.length ? "cumple" : "no_cumple"}">${selectedRelated.equipment.length}</span>
+            <button class="secondary-button" data-add-equipment-activity="${escapeHtml(selectedActivity.name)}" type="button">Agregar equipo nuevo</button>
+          </div>
         </div>
         ${activityEquipmentRows(selectedActivity.name)}
       </div>
@@ -6823,7 +6826,9 @@ function renderActivities() {
     });
   });
   container.querySelector("[data-add-risk-activity]")?.addEventListener("click", (event) => addRiskForActivity(event.currentTarget.dataset.addRiskActivity));
-  container.querySelector("[data-add-equipment-activity]")?.addEventListener("click", (event) => addEquipmentForActivity(event.currentTarget.dataset.addEquipmentActivity));
+  container.querySelectorAll("[data-add-equipment-activity]").forEach((button) => {
+    button.addEventListener("click", (event) => addEquipmentForActivity(event.currentTarget.dataset.addEquipmentActivity));
+  });
   container.querySelector("[data-add-guide-activity]")?.addEventListener("click", (event) => addGuideForActivity(event.currentTarget.dataset.addGuideActivity));
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
