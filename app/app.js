@@ -216,7 +216,7 @@ const defaultState = {
     { number: "POL-001", insurer: "Aseguradora ejemplo", coverage: "Responsabilidad civil para senderismo", activity: "Senderismo", due: "Por definir", status: "pendiente" }
   ],
   participantEvidence: [
-    { activity: "Senderismo", kind: "Formulario externo", consent: "pendiente", status: "pendiente" }
+    { activity: "Senderismo", kind: "Formulario externo", consent: "pendiente", status: "pendiente", authorizedParticipants: "" }
   ],
   risks: [
     { title: "Caida durante recorrido", activity: "Senderismo", probability: 3, impact: 4, control: "Charla de seguridad y verificacion de calzado" },
@@ -4369,7 +4369,13 @@ function participantEvidenceIsComplete(item) {
   const statusOk = ["recibida", "aprobada"].includes(String(item.status || "").toLowerCase());
   const supportOk = item.link || item.evidence || item.document;
   const communicationOk = item.infoProvided || item.communicationNotes || item.participantInfoRequested;
-  return consentOk && statusOk && supportOk && communicationOk;
+  const authorizedOk = participantAuthorizedCount(item) > 0;
+  return consentOk && statusOk && supportOk && communicationOk && authorizedOk;
+}
+
+function participantAuthorizedCount(item) {
+  const count = Number(item?.authorizedParticipants);
+  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 function participantGapReason(item) {
@@ -4379,6 +4385,7 @@ function participantGapReason(item) {
   if (!["recibido", "aprobado"].includes(consent)) missing.push("consentimiento");
   if (!["recibida", "aprobada"].includes(status)) missing.push("estado recibido/aprobado");
   if (!item.link && !item.evidence && !item.document) missing.push("enlace o soporte externo");
+  if (!participantAuthorizedCount(item)) missing.push("total de participantes autorizados");
   if (!item.kind) missing.push("tipo de soporte");
   if (!item.infoProvided && !item.communicationNotes && !item.participantInfoRequested) missing.push("informacion comunicada ISO 21103");
   return missing.length ? `Falta ${missing.join(", ")}.` : "Evidencia externa completa.";
@@ -5846,6 +5853,7 @@ function activityParticipantRows(activityName) {
           </select>
         </label>
         <label>Fecha<input data-participant-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
+        <label>Total autorizados<input data-participant-field="${index}:authorizedParticipants" type="number" min="0" value="${escapeHtml(item.authorizedParticipants || "")}" placeholder="Solo numero"></label>
         <label>Evidencia<input data-participant-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || item.document || "")}"></label>
         <label class="wideish">Informacion comunicada<input data-participant-field="${index}:infoProvided" type="text" value="${escapeHtml(item.infoProvided || "")}"></label>
         <label class="wideish">Datos solicitados<input data-participant-field="${index}:participantInfoRequested" type="text" value="${escapeHtml(item.participantInfoRequested || "")}"></label>
@@ -8109,8 +8117,15 @@ function renderParticipantEvidence() {
     const complete = state.participantEvidence.filter(participantEvidenceIsComplete).length;
     const pending = state.participantEvidence.length - complete;
     const missingActivities = Math.max(0, state.activities.length - coveredActivities);
+    const authorizedByActivity = new Map();
+    state.participantEvidence.forEach((item) => {
+      const activity = itemActivityName(item);
+      authorizedByActivity.set(activity, Math.max(authorizedByActivity.get(activity) || 0, participantAuthorizedCount(item)));
+    });
+    const authorizedTotal = [...authorizedByActivity.values()].reduce((sum, count) => sum + count, 0);
     summary.innerHTML = `
       <div class="report-card"><span>Actividades ISO 21103</span><strong>${coveredActivities}/${state.activities.length}</strong></div>
+      <div class="report-card"><span>Participantes autorizados</span><strong>${authorizedTotal}</strong></div>
       <div class="report-card"><span>Evidencias completas</span><strong>${complete}</strong></div>
       <div class="report-card"><span>Evidencias pendientes</span><strong>${pending}</strong></div>
       <div class="report-card"><span>Actividades incompletas</span><strong>${missingActivities}</strong></div>`;
@@ -8131,7 +8146,7 @@ function renderParticipantEvidence() {
           </div>
         </div>
         <strong>${item.activity || "Actividad por definir"}</strong>
-        <div class="muted">${item.kind || "Soporte externo"} - Etapa: ${item.phase || "antes"} - Consentimiento: ${item.consent || "pendiente"} - Enlace: ${item.link || "por definir"}</div>
+        <div class="muted">${item.kind || "Soporte externo"} - Etapa: ${item.phase || "antes"} - Consentimiento: ${item.consent || "pendiente"} - Autorizados: ${item.authorizedParticipants || "por registrar"} - Enlace: ${item.link || "por definir"}</div>
         <div class="action-close-readiness ${complete ? "ready" : "pending"}"><strong>${complete ? "Evidencia lista" : "Brecha de participantes"}</strong><span>${participantGapReason(item)}</span></div>
         <div class="training-edit-grid">
           <label>Actividad<input data-participant-main-field="${index}:activity" type="text" value="${escapeHtml(item.activity || "")}"></label>
@@ -8152,6 +8167,7 @@ function renderParticipantEvidence() {
             </select>
           </label>
           <label>Fecha<input data-participant-main-field="${index}:date" type="text" value="${escapeHtml(item.date || "")}"></label>
+          <label>Total autorizados<input data-participant-main-field="${index}:authorizedParticipants" type="number" min="0" value="${escapeHtml(item.authorizedParticipants || "")}" placeholder="Solo numero"></label>
           <label>Enlace externo<input data-participant-main-field="${index}:link" type="text" value="${escapeHtml(item.link || "")}"></label>
           <label>Evidencia<input data-participant-main-field="${index}:evidence" type="text" value="${escapeHtml(item.evidence || item.document || "")}"></label>
           <label>Informacion comunicada<input data-participant-main-field="${index}:infoProvided" type="text" value="${escapeHtml(item.infoProvided || "")}"></label>
@@ -8224,6 +8240,7 @@ function participantJourneyText() {
       `- Durante: ${row.coverage.during ? "cubierto" : "pendiente"}`,
       `- Despues: ${row.coverage.after ? "cubierto" : "pendiente"}`,
       `- Evidencias completas: ${row.completeEvidences.length}/${row.evidences.length}`,
+      `- Participantes autorizados registrados: ${row.evidences.reduce((max, item) => Math.max(max, participantAuthorizedCount(item)), 0)}`,
       `- Brechas: ${row.missing.join(", ") || "sin brechas visibles"}`,
       ""
     ])
@@ -15152,6 +15169,7 @@ function addParticipantEvidence() {
     date: "",
     link: "",
     evidence: "",
+    authorizedParticipants: "",
     infoProvided: "Descripcion de actividad, requisitos de participacion, riesgos, equipo requerido, seguro y conducta esperada.",
     participantInfoRequested: "Confirmacion de lectura, consentimiento y datos minimos en formulario externo.",
     communicationNotes: "No guardar datos sensibles en la plataforma; conservar solo enlace o evidencia externa."
@@ -15237,7 +15255,7 @@ function documentDraftTemplates() {
   const trainingLines = state.trainingNeeds.map((item) => `- ${item.activity || "General"}: ${item.topic}. Prioridad ${item.priority || "media"}, estado ${item.status || "pendiente"}.`).join("\n") || "- Capacitaciones por definir.";
   const policyLines = state.policies.map((item) => `- ${item.activity || "General"}: ${item.number || "poliza por definir"} - ${item.coverage || "cobertura por definir"} (${item.status || "pendiente"}).`).join("\n") || "- Polizas por validar.";
   const participantLines = state.activities.map((item) => `- ${item.name}: ${item.participantRequirements || "condiciones de participacion por definir"}.`).join("\n") || "- Condiciones de participantes por definir.";
-  const participantEvidenceLines = state.participantEvidence.map((item) => `- ${item.activity || "General"} / ${item.phase || "fase por definir"}: ${item.kind || "soporte por definir"} - Estado: ${item.status || "pendiente"} - Enlace/evidencia: ${item.link || item.evidence || "por registrar"}.`).join("\n") || "- Evidencias externas de participantes por definir.";
+  const participantEvidenceLines = state.participantEvidence.map((item) => `- ${item.activity || "General"} / ${item.phase || "fase por definir"}: ${item.kind || "soporte por definir"} - Participantes autorizados: ${item.authorizedParticipants || "por registrar"} - Estado: ${item.status || "pendiente"} - Enlace/evidencia: ${item.link || item.evidence || "por registrar"}.`).join("\n") || "- Evidencias externas de participantes por definir.";
   const emergencyScenarios = state.risks.filter((risk) => riskLevel(risk) >= 9).map((risk) => `- ${risk.activity || "General"}: ${risk.title}. Control base: ${risk.control || "por definir"}.`).join("\n") || "- Lesion, perdida de comunicacion, cambio climatico, falla de equipo o incidente durante la actividad.";
   const emergencyProfile = emergencyProfileText(mainActivity);
   const emergencyPending = emergencyProfileMissingItems(mainActivity);
