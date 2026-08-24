@@ -5586,6 +5586,7 @@ function activityEquipmentRows(activityName) {
         <label>Responsable<input data-equipment-field="${index}:responsible" type="text" value="${escapeHtml(equipment.responsible || "")}"></label>
         <label>Evidencia / link<input data-equipment-field="${index}:evidence" type="text" value="${escapeHtml(equipment.evidence || "")}" placeholder="foto, checklist o link"></label>
         <span class="badge ${complete ? "cumple" : "no_cumple"}">${complete ? "listo" : "pendiente"}</span>
+        <button class="secondary-button" data-duplicate-equipment-activity="${index}" type="button">Duplicar</button>
         <button class="secondary-button" data-remove="equipment:${index}" type="button">Quitar</button>
       </div>`;
   }).join("");
@@ -5647,6 +5648,50 @@ function updateActivityEquipmentField(field) {
       });
     }
   }
+  saveState();
+  renderAll();
+}
+
+function equipmentIdPrefixFromName(name = "") {
+  const cleaned = String(name || "EQ").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase();
+  return cleaned || "EQ";
+}
+
+function nextEquipmentDuplicateId(equipment = {}) {
+  const existingIds = new Set(state.equipment.map((item) => String(item.equipmentId || "").toUpperCase()).filter(Boolean));
+  const current = String(equipment.equipmentId || "").trim().toUpperCase();
+  const match = current.match(/^(.*?)(\d+)$/);
+  const prefix = match ? match[1] : `${equipmentIdPrefixFromName(equipment.name)}-`;
+  const start = match ? Number(match[2]) + 1 : 1;
+  const width = match ? match[2].length : 3;
+  for (let number = start; number < start + 1000; number += 1) {
+    const candidate = `${prefix}${String(number).padStart(width, "0")}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  return `${prefix}${Date.now()}`;
+}
+
+function duplicateEquipment(index) {
+  syncEquipmentFieldsFromView(index);
+  const source = state.equipment[index];
+  if (!source) return;
+  const copy = {
+    ...source,
+    equipmentId: nextEquipmentDuplicateId(source),
+    createdAt: today(),
+    updatedAt: today()
+  };
+  state.equipment.splice(index + 1, 0, copy);
+  state.compliance["7.1"] = "en_proceso";
+  state.compliance["8.1"] = "en_proceso";
+  recordAuditEvent({
+    title: "Equipo duplicado",
+    detail: `${source.name || "Equipo"} fue duplicado como ${copy.equipmentId}.`,
+    code: "7.1",
+    type: "equipo",
+    actor: "humano"
+  });
+  addMessage("agent", `Duplique "${source.name || "equipo"}" con ID ${copy.equipmentId}. Revisa si necesitas cambiar nombre, evidencia o estado.`);
   saveState();
   renderAll();
 }
@@ -6824,6 +6869,9 @@ function renderActivities() {
   container.querySelectorAll("[data-equipment-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityEquipmentField(field));
   });
+  container.querySelectorAll("[data-duplicate-equipment-activity]").forEach((button) => {
+    button.addEventListener("click", () => duplicateEquipment(Number(button.dataset.duplicateEquipmentActivity)));
+  });
   container.querySelectorAll("[data-person-field]").forEach((field) => {
     field.addEventListener("change", () => updateActivityPersonField(field));
   });
@@ -7581,6 +7629,7 @@ function renderEquipment() {
           <div class="row-actions">
             <button class="secondary-button" data-equipment-action="${index}" type="button">Crear accion</button>
             <button class="secondary-button" data-toggle-equipment="${index}" type="button">${item.status === "operativo" ? "Revision" : "Operativo"}</button>
+            <button class="secondary-button" data-duplicate-equipment="${index}" type="button">Duplicar</button>
             <button class="secondary-button" data-remove-equipment="${index}" type="button">Quitar</button>
           </div>
         </div>
@@ -7653,6 +7702,9 @@ function renderEquipment() {
       renderOperationReadinessSummary();
     });
   });
+  container.querySelectorAll("[data-duplicate-equipment]").forEach((button) => {
+    button.addEventListener("click", () => duplicateEquipment(Number(button.dataset.duplicateEquipment)));
+  });
   container.querySelectorAll("[data-remove-equipment]").forEach((button) => {
     button.addEventListener("click", () => removeEquipment(Number(button.dataset.removeEquipment)));
   });
@@ -7683,6 +7735,14 @@ function syncEquipmentFieldsFromView(index) {
     const item = state.equipment[index];
     if (!item) return;
     item[key] = field.value;
+    if (key === "nextInspection") item.nextCheck = field.value;
+  });
+  document.querySelectorAll(`[data-equipment-field^="${index}:"]`).forEach((field) => {
+    const [, key] = field.dataset.equipmentField.split(":");
+    const item = state.equipment[index];
+    if (!item) return;
+    item[key] = field.value;
+    if (key === "nextInspection") item.nextCheck = field.value;
   });
 }
 
