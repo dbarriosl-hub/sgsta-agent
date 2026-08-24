@@ -184,6 +184,7 @@ const defaultState = {
   company: {
     legalName: "Mi empresa de turismo",
     nit: "",
+    rnt: "",
     country: "Colombia",
     region: "",
     city: "",
@@ -1390,6 +1391,7 @@ function loadPilotExampleData() {
   state.company = {
     legalName: "EcoAventura Andina SAS",
     nit: "900000000-1",
+    rnt: "RNT-000000",
     country: "Colombia",
     region: "Santander",
     city: "San Gil",
@@ -3878,6 +3880,7 @@ function fillCompanyForm() {
   const fields = {
     companyLegalName: "legalName",
     companyNit: "nit",
+    companyRnt: "rnt",
     companyCountry: "country",
     companyRegion: "region",
     companyCity: "city",
@@ -3904,9 +3907,99 @@ function isRealResponsibleName() {
   return Boolean(name && name !== "responsable sgsta" && name !== "responsable");
 }
 
+function defaultCompanyStakeholders() {
+  return [
+    "Clientes",
+    "Gobierno local",
+    "Gobierno nacional",
+    "Entidades de rescate y emergencias locales",
+    "Guias y otros empleados",
+    "Comunidad",
+    "Proveedores"
+  ];
+}
+
+function mergeStakeholderText(value = "") {
+  const existing = String(value || "")
+    .split(/[,;\n-]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const normalized = new Map();
+  [...defaultCompanyStakeholders(), ...existing].forEach((item) => {
+    const key = item.toLowerCase();
+    if (!normalized.has(key)) normalized.set(key, item);
+  });
+  return Array.from(normalized.values()).join(" - ");
+}
+
+function localCompanyContextImprovement(company = state.company) {
+  const location = [company.city, company.region, company.country].filter(Boolean).join(", ");
+  const activityText = company.activityDescription || "las actividades de turismo de aventura registradas";
+  const operatingBase = String(company.operatingArea || "").trim();
+  const localBase = String(company.localContext || "").trim();
+  return {
+    operatingArea: operatingBase
+      ? `La zona de operacion comprende ${operatingBase}. Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad.`
+      : `Zona de operacion por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
+    localContext: localBase
+      ? `El entorno y las condiciones locales consideradas para el SGSTA incluyen: ${localBase}. Estos factores deben revisarse antes de ofertar u operar ${activityText}.`
+      : `Pendiente documentar condiciones locales que puedan afectar la seguridad: clima, acceso, comunicaciones, estado de vias, caudal, terreno, comunidad y disponibilidad de apoyo externo.`,
+    stakeholders: mergeStakeholderText(company.stakeholders)
+  };
+}
+
+function applyCompanyContextImprovement(values = {}) {
+  const improved = {
+    ...localCompanyContextImprovement(),
+    ...values
+  };
+  state.company.operatingArea = improved.operatingArea || state.company.operatingArea;
+  state.company.localContext = improved.localContext || state.company.localContext;
+  state.company.stakeholders = improved.stakeholders || state.company.stakeholders;
+  state.company.profileSummary = buildCompanyImplementationProfile();
+  fillCompanyForm();
+  syncOrganizationNameFromCompany();
+  saveState();
+  renderMetrics();
+  renderChapterProgress();
+  renderCompanyIntakeGuide();
+  renderCompanyImplementationProfile();
+}
+
+async function improveCompanyContextWithAi() {
+  const button = document.querySelector("#improveCompanyContextAi");
+  const originalText = button?.textContent || "Mejorar contexto con IA";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Mejorando...";
+  }
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/agent/company/improve-context`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company: state.company })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    applyCompanyContextImprovement(result.values || {});
+    addMessage("agent", result.ai?.used
+      ? "Mejore la redaccion de zona de operacion, entorno y partes interesadas con IA. Revise el texto antes de usarlo como evidencia."
+      : "Aplique una mejora basica del contexto porque la IA no respondio. Revise el texto antes de usarlo.");
+  } catch (error) {
+    applyCompanyContextImprovement(localCompanyContextImprovement());
+    addMessage("agent", "No pude usar la IA en este momento, pero organice el contexto con una mejora basica para que puedas seguir.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
 function companyProfileGaps() {
   const gaps = [];
   if (!isRealCompanyName()) gaps.push("nombre legal");
+  if (!String(state.company.rnt || "").trim()) gaps.push("RNT");
   if (!state.company.city && !state.company.operatingArea) gaps.push("ubicacion/zona de operacion");
   if (!state.company.scope) gaps.push("alcance");
   if (!state.company.stakeholders) gaps.push("partes interesadas");
@@ -3926,9 +4019,9 @@ function companyIntakeItems() {
     {
       id: "identidad",
       label: "Identidad",
-      question: "Como se llama legalmente la empresa y quien responde por el SGSTA?",
-      done: isRealCompanyName() && isRealResponsibleName(),
-      action: "Completar nombre legal y responsable SGSTA",
+      question: "Como se llama legalmente la empresa, cual es su RNT y quien responde por el SGSTA?",
+      done: isRealCompanyName() && isRealResponsibleName() && Boolean(String(state.company.rnt || "").trim()),
+      action: "Completar nombre legal, RNT y responsable SGSTA",
       view: "empresa",
       code: "4.1"
     },
@@ -3988,6 +4081,7 @@ function companyIntakeText() {
     "Guia de entrevista inicial - SGSTA Agent",
     "",
     `Empresa: ${state.company.legalName || state.orgName || "Por definir"}`,
+    `RNT: ${state.company.rnt || "Por definir"}`,
     `Responsable: ${state.ownerName || "Por definir"}`,
     `Estado: ${completed}/${items.length} bloques completos.`,
     "",
@@ -4235,6 +4329,8 @@ function renderCompanyIntakeGuide() {
 
 function buildCompanyImplementationProfile() {
   const org = state.company.legalName || state.orgName || "Organizacion por definir";
+  const nit = state.company.nit || "NIT por definir";
+  const rnt = state.company.rnt || "RNT por definir";
   const location = [state.company.city, state.company.region, state.company.country].filter(Boolean).join(", ") || "Ubicacion por definir";
   const operatingArea = state.company.operatingArea || "Zona/ruta de operacion pendiente de definir";
   const activities = state.activities.map((activity) => {
@@ -4243,7 +4339,7 @@ function buildCompanyImplementationProfile() {
     return `- ${activity.name}: ${activity.place || "lugar por definir"}. Lider: ${activity.leader || "por definir"}. Riesgos: ${related.risks.length}; equipos: ${related.equipment.length}; guias/personas: ${related.people.length}; seguros: ${related.policies.length}; participantes/evidencias: ${related.participants.length}. ${highRisks.length ? `Riesgos altos: ${highRisks.join(", ")}.` : ""}`;
   }).join("\n") || "- Actividades por definir.";
   const gaps = companyProfileGaps();
-  return `PERFIL DE IMPLEMENTACION SGSTA\n\nOrganizacion: ${org}\nUbicacion administrativa: ${location}\nZona/ruta de operacion: ${operatingArea}\nAlcance: ${state.company.scope || "Pendiente de definir"}\nPartes interesadas: ${state.company.stakeholders || "Pendientes de definir"}\nContexto local: ${state.company.localContext || "Pendiente de documentar"}\nActividades declaradas: ${state.company.activityDescription || "Pendientes de describir"}\n\nActividades operativas:\n${activities}\n\nDatos faltantes para que el agente trabaje mejor:\n${gaps.length ? gaps.map((gap) => `- ${gap}`).join("\n") : "- No hay faltantes principales visibles."}\n\nUso del agente:\nEste perfil debe alimentar borradores, formularios, matriz de riesgos, plan de capacitacion, revision por direccion y paquetes de evidencia. La aprobacion final siempre es humana.`;
+  return `PERFIL DE IMPLEMENTACION SGSTA\n\nOrganizacion: ${org}\nNIT: ${nit}\nRNT: ${rnt}\nUbicacion administrativa: ${location}\nZona/ruta de operacion: ${operatingArea}\nAlcance: ${state.company.scope || "Pendiente de definir"}\nPartes interesadas: ${state.company.stakeholders || "Pendientes de definir"}\nContexto local: ${state.company.localContext || "Pendiente de documentar"}\nActividades declaradas: ${state.company.activityDescription || "Pendientes de describir"}\n\nActividades operativas:\n${activities}\n\nDatos faltantes para que el agente trabaje mejor:\n${gaps.length ? gaps.map((gap) => `- ${gap}`).join("\n") : "- No hay faltantes principales visibles."}\n\nUso del agente:\nEste perfil debe alimentar borradores, formularios, matriz de riesgos, plan de capacitacion, revision por direccion y paquetes de evidencia. La aprobacion final siempre es humana.`;
 }
 
 function renderCompanyImplementationProfile() {
@@ -11160,6 +11256,7 @@ function suggestedValueForField(name, context) {
   if (name.includes("organizacion") || name.includes("empresa")) return org;
   if (name.includes("usuario") || name.includes("responsable") || name.includes("representante")) return state.ownerName || "Responsable por definir";
   if (name.includes("nit")) return state.company.nit || "NIT por definir";
+  if (name.includes("rnt")) return state.company.rnt || "RNT por definir";
   if (name.includes("correo")) return "correo@organizacion.com";
   if (name.includes("telefono")) return state.company.phone || "Telefono por definir";
   if (name.includes("direccion") || name.includes("ubicacion") || name.includes("lugar")) return state.company.city || "Ubicacion por definir";
@@ -14625,6 +14722,7 @@ function cleanNewCompanyState() {
   next.company = {
     legalName: "Mi empresa de turismo",
     nit: "",
+    rnt: "",
     country: "Colombia",
     region: "",
     city: "",
@@ -15586,6 +15684,7 @@ document.querySelector("#currentPlan").addEventListener("change", () => {
 document.querySelector("#companyForm").addEventListener("input", () => {
   state.company.legalName = document.querySelector("#companyLegalName").value;
   state.company.nit = document.querySelector("#companyNit").value;
+  state.company.rnt = document.querySelector("#companyRnt").value;
   state.company.country = document.querySelector("#companyCountry").value;
   state.company.region = document.querySelector("#companyRegion").value;
   state.company.city = document.querySelector("#companyCity").value;
@@ -15606,6 +15705,7 @@ document.querySelector("#companyForm").addEventListener("input", () => {
 });
 
 document.querySelector("#generateCompanyProfile").addEventListener("click", generateCompanyImplementationProfile);
+document.querySelector("#improveCompanyContextAi").addEventListener("click", improveCompanyContextWithAi);
 
 document.querySelector("#chatForm").addEventListener("submit", (event) => {
   event.preventDefault();

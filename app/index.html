@@ -355,6 +355,7 @@
           <form id="companyForm" class="form-grid">
             <label>Nombre legal<input id="companyLegalName" type="text"></label>
             <label>NIT o identificacion<input id="companyNit" type="text"></label>
+            <label>RNT<input id="companyRnt" type="text" placeholder="Registro Nacional de Turismo"></label>
             <label>Pais<input id="companyCountry" type="text"></label>
             <label>Departamento / region<input id="companyRegion" type="text"></label>
             <label>Ciudad / municipio<input id="companyCity" type="text"></label>
@@ -364,6 +365,13 @@
             <label class="wide">Entorno y condiciones locales<textarea id="companyLocalContext"></textarea></label>
             <label class="wide">Alcance del SGSTA<textarea id="companyScope"></textarea></label>
             <label class="wide">Partes interesadas principales<textarea id="companyStakeholders"></textarea></label>
+            <div class="wide company-context-ai">
+              <div>
+                <strong>Mejorar contexto para el agente</strong>
+                <span>Reescribe zona, entorno y partes interesadas con lenguaje claro. Revise antes de usar.</span>
+              </div>
+              <button id="improveCompanyContextAi" class="secondary-button" type="button">Mejorar contexto con IA</button>
+            </div>
           </form>
           <div id="companyImplementationProfile" class="company-profile-panel"></div>
         </div>

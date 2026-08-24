@@ -679,6 +679,7 @@ function compactSystemContext() {
     organizationProfile: {
       legalName: company.legalName || state.orgName || state.organizations?.[0]?.name || "",
       nit: company.nit || "",
+      rnt: company.rnt || "",
       country: company.country || "",
       region: company.region || "",
       city: company.city || "",
@@ -785,6 +786,107 @@ async function generateAiFormValues(form, currentValues = {}) {
   };
 }
 
+function defaultCompanyStakeholders() {
+  return [
+    "Clientes",
+    "Gobierno local",
+    "Gobierno nacional",
+    "Entidades de rescate y emergencias locales",
+    "Guias y otros empleados",
+    "Comunidad",
+    "Proveedores"
+  ];
+}
+
+function mergeStakeholderText(value = "") {
+  const existing = String(value || "")
+    .split(/[,;\n-]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const normalized = new Map();
+  [...defaultCompanyStakeholders(), ...existing].forEach((item) => {
+    const key = item.toLowerCase();
+    if (!normalized.has(key)) normalized.set(key, item);
+  });
+  return Array.from(normalized.values()).join(" - ");
+}
+
+function localCompanyContextImprovement(company = {}) {
+  const location = [company.city, company.region, company.country].filter(Boolean).join(", ");
+  const activityText = company.activityDescription || "las actividades de turismo de aventura registradas";
+  const operatingBase = String(company.operatingArea || "").trim();
+  const localBase = String(company.localContext || "").trim();
+  return {
+    operatingArea: operatingBase
+      ? `La zona de operacion comprende ${operatingBase}. Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad.`
+      : `Zona de operacion por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
+    localContext: localBase
+      ? `El entorno y las condiciones locales consideradas para el SGSTA incluyen: ${localBase}. Estos factores deben revisarse antes de ofertar u operar ${activityText}.`
+      : "Pendiente documentar condiciones locales que puedan afectar la seguridad: clima, acceso, comunicaciones, estado de vias, caudal, terreno, comunidad y disponibilidad de apoyo externo.",
+    stakeholders: mergeStakeholderText(company.stakeholders)
+  };
+}
+
+async function improveCompanyContext(company = {}) {
+  const config = aiConfig();
+  const fallback = localCompanyContextImprovement(company);
+  if (!config.enabled) return { values: fallback, notes: "IA no configurada; se aplico mejora basica.", ai: { used: false, reason: "disabled" } };
+
+  const response = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "Eres un consultor experto en NTC ISO 21101 para turismo de aventura.",
+            "Mejora la redaccion del contexto de empresa para que alimente borradores, riesgos y evidencias SGSTA.",
+            "No inventes datos verificables. Si falta informacion, conserva 'Por definir' o 'Pendiente de verificar'.",
+            "La lista de partes interesadas debe incluir como minimo: Clientes, Gobierno local, Gobierno nacional, Entidades de rescate y emergencias locales, Guias y otros empleados, Comunidad, Proveedores.",
+            "Devuelve unicamente JSON valido con esta forma: {\"values\":{\"operatingArea\":\"...\",\"localContext\":\"...\",\"stakeholders\":\"...\"},\"notes\":\"...\"}."
+          ].join(" ")
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            legalName: company.legalName || "",
+            nit: company.nit || "",
+            rnt: company.rnt || "",
+            country: company.country || "",
+            region: company.region || "",
+            city: company.city || "",
+            operatingArea: company.operatingArea || "",
+            activityDescription: company.activityDescription || "",
+            localContext: company.localContext || "",
+            scope: company.scope || "",
+            stakeholders: company.stakeholders || ""
+          })
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 900,
+      stream: false
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`DeepSeek respondio ${response.status}: ${detail.slice(0, 240)}`);
+  }
+  const data = await response.json();
+  const parsed = extractJsonObject(data.choices?.[0]?.message?.content || "");
+  const values = {
+    operatingArea: String(parsed.values?.operatingArea || fallback.operatingArea),
+    localContext: String(parsed.values?.localContext || fallback.localContext),
+    stakeholders: mergeStakeholderText(parsed.values?.stakeholders || fallback.stakeholders)
+  };
+  return { values, notes: parsed.notes || "", ai: { used: true, provider: config.provider, model: config.model } };
+}
+
 function suggestedValueForField(name, context) {
   const company = state.company || {};
   const org = company.legalName || state.orgName || state.organizations?.[0]?.name || "Organizacion por definir";
@@ -793,6 +895,7 @@ function suggestedValueForField(name, context) {
   if (lower.includes("organizacion") || lower.includes("empresa")) return org;
   if (lower.includes("usuario") || lower.includes("responsable") || lower.includes("representante")) return state.ownerName || "Responsable por definir";
   if (lower.includes("nit")) return company.nit || "NIT por definir";
+  if (lower.includes("rnt")) return company.rnt || "RNT por definir";
   if (lower.includes("correo")) return "correo@organizacion.com";
   if (lower.includes("telefono")) return company.phone || "Telefono por definir";
   if (lower.includes("direccion") || lower.includes("ubicacion") || lower.includes("lugar")) return company.city || "Ubicacion por definir";
@@ -1477,6 +1580,28 @@ async function handle(req, res) {
     }
     const result = await draftFormsWithAi(body);
     return send(res, 201, { ...result, state });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/agent/company/improve-context") {
+    const body = await parseBody(req);
+    try {
+      const result = await improveCompanyContext(body.company || state.company || {});
+      recordEvent({
+        actor: "agente",
+        type: "company_context_improved",
+        title: "Contexto de empresa mejorado",
+        detail: result.ai?.used ? "La IA mejoro zona, entorno y partes interesadas." : "Se aplico mejora basica sin IA.",
+        code: "4.1"
+      });
+      return send(res, 200, result);
+    } catch (error) {
+      const values = localCompanyContextImprovement(body.company || state.company || {});
+      return send(res, 200, {
+        values,
+        notes: "No se pudo usar la IA; se aplico mejora basica para continuar.",
+        ai: { used: false, error: error.message }
+      });
+    }
   }
 
   if (req.method === "POST" && url.pathname === "/api/agent/emergency/external-draft") {

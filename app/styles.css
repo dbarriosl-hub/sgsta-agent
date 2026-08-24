@@ -2557,6 +2557,29 @@ textarea {
   margin-bottom: 16px;
 }
 
+.company-context-ai {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.company-context-ai strong,
+.company-context-ai span {
+  display: block;
+}
+
+.company-context-ai span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
 .company-intake-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -5173,6 +5196,11 @@ textarea {
 
   .resume-trail {
     align-items: stretch;
+  }
+
+  .company-context-ai {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .resume-trail .row-actions {
