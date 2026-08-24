@@ -4451,6 +4451,64 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.person-training-checklist {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.person-training-head {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.person-training-head strong,
+.person-training-head span {
+  display: block;
+}
+
+.person-training-head span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+.training-check-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.training-check-item {
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: flex;
+  font-weight: 700;
+  gap: 8px;
+  line-height: 1.25;
+  padding: 8px;
+}
+
+.training-check-item input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  min-height: auto;
+  width: auto;
+}
+
+.training-check-item.checked {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
 .policy-edit-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.8fr) 120px 130px minmax(220px, 1.3fr) minmax(160px, 0.9fr) 90px 90px;

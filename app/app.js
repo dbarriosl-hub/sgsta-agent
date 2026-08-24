@@ -158,7 +158,7 @@ const implementationSteps = [
   { id: "actividades", view: "actividades", stage: "Planear", title: "Registrar actividades de turismo", code: "8.1", outcome: "Separar rafting, senderismo, cuatrimotos u otras actividades reales.", check: (s) => s.activities.length > 0, action: "Registrar actividades y responsables" },
   { id: "riesgos", view: "riesgos", stage: "Planear", title: "Construir mapa de riesgos", code: "6.1.2", outcome: "Saber que puede salir mal en cada actividad y que control aplica.", check: (s) => s.risks.length > 0, action: "Construir o completar mapa de riesgos" },
   { id: "seguros", view: "seguros", stage: "Planear", title: "Validar seguros por actividad", code: "6.1.3", outcome: "Evitar operar una actividad sin cobertura vigente.", check: (s) => s.policies.some((p) => p.status === "vigente"), action: "Validar polizas y cobertura" },
-  { id: "personal", view: "personal", stage: "Hacer", title: "Verificar personal y competencias", code: "5.3/7.2", outcome: "Confirmar que cada actividad tiene guia/persona competente.", check: (s) => s.people.length > 0 && s.people.every((p) => p.competence === "cumple"), action: "Evaluar competencias del personal" },
+  { id: "personal", view: "personal", stage: "Hacer", title: "Verificar personal y competencias", code: "5.3/7.2", outcome: "Confirmar que cada actividad tiene guia/persona competente.", check: (s) => s.people.length > 0 && s.people.every(personIsComplete), action: "Evaluar competencias del personal" },
   { id: "capacitacion", view: "capacitacion", stage: "Hacer", title: "Programar y cerrar capacitaciones", code: "7.2-7.3", outcome: "Cerrar brechas de entrenamiento antes de operar.", check: (s) => s.trainingNeeds.length > 0 && s.trainingNeeds.every((t) => t.status === "cerrada"), action: "Programar capacitaciones pendientes" },
   { id: "equipos", view: "equipos", stage: "Hacer", title: "Controlar equipos, inspecciones y mantenimiento", code: "7.1/8.1", outcome: "Tener equipos listos, revisados y con soporte.", check: (s) => s.equipment.length > 0 && s.equipment.every((e) => e.status === "operativo"), action: "Completar inspeccion de equipos" },
   { id: "documentos", view: "documentos", stage: "Hacer", title: "Aprobar documentos controlados", code: "7.5", outcome: "Convertir borradores en documentos usados por la empresa.", check: (s) => s.documents.length > 0 && s.documents.every((d) => d.status === "aprobado"), action: "Revisar y aprobar documentos" },
@@ -166,6 +166,21 @@ const implementationSteps = [
   { id: "auditoria", view: "auditorias", stage: "Verificar", title: "Preparar auditoria interna", code: "9.2", outcome: "Revisar si lo planeado se esta cumpliendo.", check: (s) => s.audits.length > 0, action: "Programar auditoria interna" },
   { id: "revision", view: "revision", stage: "Verificar", title: "Preparar revision por la direccion", code: "9.3", outcome: "Que la direccion tome decisiones con datos reales.", check: (s) => s.managementReviews.length > 0, action: "Preparar revision por la direccion" },
   { id: "mejora", view: "acciones", stage: "Actuar", title: "Gestionar acciones correctivas, preventivas y mejora", code: "10.1-10.2", outcome: "Cerrar problemas con evidencia y verificar que funciono.", check: (s) => s.actions.length > 0, action: "Crear y dar seguimiento a acciones" }
+];
+
+const sgstaTrainingTopics = [
+  { id: "induccion_sgsta", code: "7.3", label: "0. Induccion y toma de conciencia en el SGSTA" },
+  { id: "competencia_tecnica", code: "7.2", label: "1. Competencia tecnica especifica por actividad (guias/lideres)" },
+  { id: "primeros_auxilios", code: "7.2", label: "2. Primeros auxilios y RCP" },
+  { id: "emergencias", code: "8.2", label: "3. Preparacion y respuesta ante emergencias / evacuacion" },
+  { id: "gestion_riesgos", code: "6.1.2", label: "4. Identificacion, evaluacion y gestion de riesgos" },
+  { id: "incidentes", code: "8.3/10.2", label: "5. Gestion, reporte e investigacion de incidentes" },
+  { id: "seguridad_participantes", code: "7.4.3", label: "6. Comunicacion de informacion de seguridad a los participantes" },
+  { id: "consulta_personal", code: "7.4", label: "7. Comunicacion y consulta en seguridad con el personal" },
+  { id: "liderazgo", code: "5.1/5.3", label: "8. Liderazgo y responsabilidades de la alta direccion en el SGSTA" },
+  { id: "auditoria_interna", code: "9.2", label: "9. Auditoria interna del SGSTA" },
+  { id: "control_equipos", code: "7.1/8.1", label: "10. Control operacional de equipos y bienes criticos de seguridad" },
+  { id: "datos_personales", code: "7.4.3", label: "11. Manejo y proteccion de datos personales de los participantes" }
 ];
 
 const stateKey = "sgsta-agent-demo-v3";
@@ -5330,7 +5345,7 @@ function addGuideForActivity(activityName) {
     person.competence !== "cumple"
   );
   const count = state.people.length + 1;
-  if (!existing) state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar" });
+  if (!existing) state.people.unshift({ name: `Guia ${count}`, role: `Guia especializado en ${activityName}`, activity: activityName, competence: "pendiente", training: "Competencia especifica por verificar", trainingChecklist: {} });
   state.compliance["7.2"] = "en_proceso";
   createActivityQuickAction(`Verificar guia competente para ${activityName}`, "7.2", "preventiva", activityName);
   showActivityQuickResult(activityName, existing ? "Ya habia un guia pendiente. Te llevo al bloque de competencia para completarlo." : "Guia agregado. Completa nombre, competencia, capacitacion y certificado/evidencia.", "people");
@@ -7091,6 +7106,12 @@ function renderPeople() {
     field.addEventListener("input", () => updatePersonField(field, false));
     field.addEventListener("change", () => updatePersonField(field, true));
   });
+  container.querySelectorAll("[data-person-training]").forEach((field) => {
+    field.addEventListener("change", () => updatePersonTrainingTopic(field));
+  });
+  container.querySelectorAll("[data-person-training-needs]").forEach((button) => {
+    button.addEventListener("click", () => createPersonTrainingNeeds(Number(button.dataset.personTrainingNeeds)));
+  });
   container.querySelectorAll("[data-toggle-person]").forEach((button) => {
     button.addEventListener("click", () => {
       const person = state.people[Number(button.dataset.togglePerson)];
@@ -7113,6 +7134,8 @@ function renderPeople() {
 function personEditRow(person, index) {
   const missing = personMissingItems(person);
   const complete = !missing.length;
+  const trainingProgress = personTrainingProgress(person);
+  const trainingComplete = trainingProgress.done === trainingProgress.total;
   return `
     <div class="people-edit-row people-main-row">
       <label>Nombre<input data-person-field="${index}:name" type="text" value="${escapeHtml(person.name || "")}"></label>
@@ -7136,6 +7159,28 @@ function personEditRow(person, index) {
         <button class="secondary-button" data-remove="people:${index}" type="button">Quitar</button>
       </div>
       <small class="muted wide-row">${missing.length ? `Falta: ${missing.join(", ")}` : `Completo para ${escapeHtml(itemActivityName(person))}`}</small>
+      <div class="person-training-checklist wide-row">
+        <div class="person-training-head">
+          <div>
+            <strong>Capacitaciones SGSTA</strong>
+            <span>Marca solo lo que tenga soporte: certificado, registro, curso o evidencia externa.</span>
+          </div>
+          <div class="row-actions">
+            <span class="badge ${trainingComplete ? "cumple" : "en_proceso"}">${trainingProgress.done}/${trainingProgress.total}</span>
+            <button class="secondary-button" data-person-training-needs="${index}" type="button">Crear faltantes</button>
+          </div>
+        </div>
+        <div class="training-check-grid">
+          ${sgstaTrainingTopics.map((topic) => {
+            const checked = personTrainingChecklist(person)[topic.id] === true;
+            return `
+              <label class="training-check-item ${checked ? "checked" : ""}">
+                <input data-person-training="${index}:${topic.id}" type="checkbox" ${checked ? "checked" : ""}>
+                <span>${escapeHtml(topic.label)}</span>
+              </label>`;
+          }).join("")}
+        </div>
+      </div>
     </div>`;
 }
 
@@ -7153,6 +7198,112 @@ function updatePersonField(field, rerender = false) {
     renderActivityGaps();
     renderMetrics();
   }
+}
+
+function personTrainingChecklist(person) {
+  if (!person.trainingChecklist || Array.isArray(person.trainingChecklist)) person.trainingChecklist = {};
+  return person.trainingChecklist;
+}
+
+function personTrainingProgress(person) {
+  const checklist = personTrainingChecklist(person);
+  const done = sgstaTrainingTopics.filter((topic) => checklist[topic.id] === true).length;
+  return { done, total: sgstaTrainingTopics.length };
+}
+
+function missingPersonTrainingTopics(person) {
+  const checklist = personTrainingChecklist(person);
+  return sgstaTrainingTopics.filter((topic) => checklist[topic.id] !== true);
+}
+
+function updatePersonTrainingTopic(field) {
+  const [rawIndex, topicId] = field.dataset.personTraining.split(":");
+  const person = state.people[Number(rawIndex)];
+  if (!person) return;
+  const checklist = personTrainingChecklist(person);
+  checklist[topicId] = field.checked;
+  person.updatedAt = today();
+  const progress = personTrainingProgress(person);
+  if (progress.done === progress.total && person.competence === "pendiente") person.competence = "cumple";
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  saveState();
+  renderPeople();
+  renderActivityGaps();
+  renderMetrics();
+}
+
+function normalizedTrainingText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function topicIdFromTrainingText(value) {
+  const text = normalizedTrainingText(value);
+  if (text.includes("induccion") || text.includes("conciencia")) return "induccion_sgsta";
+  if (text.includes("competencia") || text.includes("tecnica") || text.includes("guia")) return "competencia_tecnica";
+  if (text.includes("primeros auxilios") || text.includes("rcp")) return "primeros_auxilios";
+  if (text.includes("emergencia") || text.includes("evacuacion")) return "emergencias";
+  if (text.includes("riesgo")) return "gestion_riesgos";
+  if (text.includes("incidente")) return "incidentes";
+  if (text.includes("participante") || text.includes("briefing")) return "seguridad_participantes";
+  if (text.includes("consulta") || text.includes("personal")) return "consulta_personal";
+  if (text.includes("direccion") || text.includes("liderazgo") || text.includes("responsabilidades")) return "liderazgo";
+  if (text.includes("auditoria")) return "auditoria_interna";
+  if (text.includes("equipo") || text.includes("control operacional")) return "control_equipos";
+  if (text.includes("dato") || text.includes("privacidad")) return "datos_personales";
+  return "";
+}
+
+function createPersonTrainingNeeds(index) {
+  const person = state.people[index];
+  if (!person) return;
+  const activity = itemActivityName(person);
+  const missingTopics = missingPersonTrainingTopics(person);
+  let created = 0;
+  missingTopics.forEach((topic) => {
+    const cleanLabel = topic.label.replace(/^\d+\.\s*/, "");
+    const needTitle = `${cleanLabel} - ${person.name || "persona por definir"}`;
+    const exists = state.trainingNeeds.some((item) =>
+      item.status !== "cerrada" &&
+      item.person === person.name &&
+      itemActivityName(item) === activity &&
+      topicIdFromTrainingText(`${item.topic} ${item.objective}`) === topic.id
+    );
+    if (exists) return;
+    state.trainingNeeds.unshift({
+      topic: needTitle,
+      activity,
+      person: person.name || "",
+      objective: `Registrar, ejecutar o enlazar evidencia de: ${cleanLabel}.`,
+      origin: "matriz de capacitaciones SGSTA",
+      priority: ["primeros_auxilios", "emergencias", "gestion_riesgos", "competencia_tecnica"].includes(topic.id) ? "alta" : "media",
+      status: "pendiente",
+      code: topic.code,
+      date: "",
+      evaluation: "",
+      certificate: "",
+      certificateDue: "",
+      evidence: "",
+      trainingTopicId: topic.id
+    });
+    created += 1;
+  });
+  state.compliance["7.2"] = "en_proceso";
+  state.compliance["7.3"] = "en_proceso";
+  recordAuditEvent({
+    title: "Necesidades de capacitacion por persona",
+    detail: `Se crearon ${created} necesidad(es) para ${person.name || "persona por definir"}.`,
+    code: "7.2",
+    type: "capacitacion",
+    actor: "humano"
+  });
+  addMessage("agent", created ? `Cree ${created} necesidad(es) de capacitacion para ${person.name}.` : "Esa persona no tiene nuevas capacitaciones faltantes o ya estaban abiertas.");
+  saveState();
+  showView("capacitacion");
+  renderAll();
 }
 
 function trainingNeedComplete(item) {
@@ -7184,6 +7335,8 @@ function syncTrainingToPerson(item) {
   person.training = item.topic || item.certificate || person.training;
   person.certificateDue = item.certificateDue || person.certificateDue || "Por definir";
   person.evidence = item.evidence || item.certificate || person.evidence;
+  const topicId = item.trainingTopicId || topicIdFromTrainingText(`${item.topic} ${item.objective} ${item.certificate}`);
+  if (topicId) personTrainingChecklist(person)[topicId] = true;
   person.updatedAt = today();
   return true;
 }
@@ -7194,6 +7347,8 @@ function personMissingItems(person) {
   if (!person.training || String(person.training).toLowerCase().includes("pendiente")) missing.push("capacitacion/certificado");
   if (!person.certificateDue || String(person.certificateDue).toLowerCase().includes("por ")) missing.push("vencimiento");
   if (!person.evidence || String(person.evidence).toLowerCase().includes("por ")) missing.push("evidencia");
+  const pendingTopics = missingPersonTrainingTopics(person).length;
+  if (pendingTopics) missing.push(`capacitaciones SGSTA ${sgstaTrainingTopics.length - pendingTopics}/${sgstaTrainingTopics.length}`);
   return missing;
 }
 
@@ -15271,7 +15426,7 @@ function addActivity() {
 function addPerson() {
   const count = state.people.length + 1;
   const activity = primaryActivityName();
-  state.people.unshift({ name: `Persona ${count}`, role: `Guia ${activity}`, activity, competence: "pendiente", training: "Competencia especifica por verificar" });
+  state.people.unshift({ name: `Persona ${count}`, role: `Guia ${activity}`, activity, competence: "pendiente", training: "Competencia especifica por verificar", trainingChecklist: {} });
   state.compliance["7.2"] = "en_proceso";
   createAction("Verificar competencia y evidencias del personal", "7.2", "preventiva", "competencia");
 }
