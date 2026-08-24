@@ -9918,7 +9918,7 @@ function nextFormWorkItem(catalog) {
     } else if (status === "borrador") {
       rank = 2;
       action = "review";
-      next = "Enviar a revision";
+      next = "Marcar borrador listo para revision";
     } else if (status === "sin llenar") {
       rank = 3;
       action = "draft";
@@ -9960,7 +9960,7 @@ function renderFormWorkGuide(container, catalog) {
       <div class="row-actions">
         <button class="secondary-button" data-form-guide-action="open" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Ver</button>
         ${item.action === "draft" ? `<button data-form-guide-action="draft" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Diligenciar</button>` : ""}
-        ${item.action === "review" ? `<button data-form-guide-action="review" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Enviar a revision</button>` : ""}
+        ${item.action === "review" ? `<button data-form-guide-action="review" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Marcar listo para revision</button>` : ""}
         ${item.action === "approve" ? `<button data-form-guide-action="approve" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button" ${canApprove ? "" : "disabled"}>Aprobar humano</button>` : ""}
         ${item.action === "evidence" ? `<button data-form-guide-action="evidence" data-form-guide-table="${item.form.table}" data-form-guide-activity="${escapeHtml(activity)}" type="button">Enviar a evidencias</button>` : ""}
         <button class="secondary-button" data-form-guide-action="requirement" data-form-guide-code="${item.requirement.code}" type="button">Ver requisito</button>
@@ -10223,7 +10223,7 @@ function renderFormGenerationResult() {
         <strong>${escapeHtml(result.nextStep)}</strong>
         <div class="row-actions">
           <button class="secondary-button" data-form-generation-filter type="button" ${filterLabel ? "" : "disabled"}>Ver generados</button>
-          <button data-form-generation-review type="button" ${pending ? "" : "disabled"}>Enviar a revision</button>
+          <button data-form-generation-review type="button" ${pending ? "" : "disabled"}>Marcar listo para revision</button>
           <button class="secondary-button" data-form-generation-human type="button">Revision humana</button>
         </div>
       </div>
@@ -10270,7 +10270,7 @@ function setFormGenerationResult({ responses = [], payload = {}, ai = {}, source
       code: item.code || "",
       status: normalizedFormStatus(item.status)
     })),
-    nextStep: "Enviar a revision humana y aprobar desde Direccion si el contenido esta correcto.",
+    nextStep: "Marcar listo para revision y aprobar desde Direccion si el contenido esta correcto.",
     createdAt: today()
   };
 }
@@ -10285,7 +10285,7 @@ async function sendLastGeneratedFormsToReview() {
     await setFormReviewStatus(item.table, item.activity || "");
     changed += 1;
   }
-  addMessage("agent", changed ? `Envie ${changed} formulario(s) generados a revision humana.` : "No habia formularios en borrador para enviar a revision.");
+  addMessage("agent", changed ? `Marque ${changed} formulario(s) generados como listos para revision humana.` : "No habia formularios en borrador para marcar como listos.");
   state.formGenerationResult = {
     ...result,
     responses: result.responses.map((item) => {
@@ -10456,7 +10456,7 @@ function renderFormPreview() {
         <button class="secondary-button" data-fill-activity-package-preview="${state.selectedFormActivity || ""}" type="button">Paquete actividad</button>
         <button class="secondary-button" data-fill-requirement="${requirement.code}" type="button">Crear borradores de ${requirement.code}</button>
         <button class="secondary-button" data-filter-requirement="${requirement.code}" type="button">Filtrar este requisito</button>
-        ${response ? `<button class="secondary-button" data-form-review="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button">${response.status === "revision" ? "Volver a borrador" : "Enviar a revision"}</button>` : ""}
+        ${response ? `<button class="secondary-button" data-form-review="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button">${response.status === "revision" ? "Volver a borrador" : "Marcar listo para revision"}</button>` : ""}
         ${response ? `<button class="secondary-button" data-form-approve="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button" ${canApprove ? "" : "disabled"}>Aprobar humano</button>` : ""}
         ${response ? `<button class="secondary-button" data-form-evidence="${form.table}" data-form-activity="${escapeHtml(response.activity || "")}" type="button">Enviar a evidencias</button>` : ""}
       </div>
@@ -11521,7 +11521,7 @@ function buildGeneratedReviewPanel(items) {
       </div>
       <div class="generated-review-actions">
         <button class="secondary-button" data-generated-review="open" type="button">Ver generados</button>
-        <button class="secondary-button" data-generated-review="send" type="button" ${drafts ? "" : "disabled"}>Enviar a revision</button>
+        <button class="secondary-button" data-generated-review="send" type="button" ${drafts ? "" : "disabled"}>Marcar listos</button>
         <button data-generated-review="approve" type="button" ${inReview && canCurrentUserApprove() ? "" : "disabled"}>Aprobar revisados</button>
       </div>
     </section>`;
@@ -11654,13 +11654,13 @@ async function sendDraftFormsToReview(items) {
     if (response) await setFormReviewStatus(response.table, response.activity || "");
   }
   recordAuditEvent({
-    title: "Formularios enviados a revision",
-    detail: `${draftForms.length} formulario(s) fueron enviados a revision humana desde la bandeja.`,
+    title: "Formularios listos para revision",
+    detail: `${draftForms.length} formulario(s) fueron marcados como listos para revision humana desde la bandeja.`,
     code: "7.5",
     type: "revision_formulario",
     actor: "humano"
   });
-  addMessage("agent", `Envie ${draftForms.length} formulario(s) a revision. Falta aprobacion humana para que cuenten como evidencia completa.`);
+  addMessage("agent", `Marque ${draftForms.length} formulario(s) como listos para revision. Falta aprobacion humana para que cuenten como evidencia completa.`);
   saveState();
   renderAll();
 }

@@ -2934,6 +2934,64 @@ textarea {
   margin-bottom: 14px;
 }
 
+.form-review-help {
+  align-items: start;
+  background: #fbfcfe;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(260px, 1fr);
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+
+.form-review-help h3,
+.form-review-help p {
+  margin: 0;
+}
+
+.form-review-help p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.form-review-help ol {
+  counter-reset: review-step;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.form-review-help li {
+  align-items: start;
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto 1fr;
+}
+
+.form-review-help li::before {
+  align-items: center;
+  background: #ccfbf1;
+  border-radius: 999px;
+  color: var(--ink);
+  content: counter(review-step);
+  counter-increment: review-step;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+.form-review-help strong {
+  color: var(--text);
+}
+
 .form-guide-card {
   align-items: start;
   background: #f0fdfa;
@@ -5050,6 +5108,7 @@ textarea {
   .forms-layout,
   .org-form,
   .form-grid,
+  .form-review-help,
   .form-guide-card,
   .ai-test-card,
   .form-generation-card,
