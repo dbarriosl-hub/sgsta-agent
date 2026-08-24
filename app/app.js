@@ -556,6 +556,12 @@ function today() {
   return new Date().toLocaleDateString("es-CO");
 }
 
+function dateInputToday() {
+  const date = new Date();
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
 function dateInputValue(value) {
   const raw = String(value || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
@@ -5629,7 +5635,7 @@ function activityRiskRows(activityName) {
             ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
           </select>
         </label>
-        <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(risk.lastReviewDate || risk.updatedAt || "")}"></label>
+        <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(dateInputValue(risk.lastReviewDate || risk.updatedAt))}"></label>
         <label>Comentario<textarea data-risk-field="${index}:reviewComment">${escapeHtml(risk.reviewComment || "")}</textarea></label>
         <span class="badge ${badge}">nivel ${level}</span>
         <button class="secondary-button" data-remove="risks:${index}" type="button">Quitar</button>
@@ -5644,7 +5650,7 @@ function updateActivityRiskField(field) {
   const previousLevel = riskLevel(risk);
   risk[key] = ["probability", "impact"].includes(key) ? Number(field.value) : field.value;
   risk.updatedAt = today();
-  if (key !== "lastReviewDate" && !risk.lastReviewDate) risk.lastReviewDate = today();
+  if (key !== "lastReviewDate" && !risk.lastReviewDate) risk.lastReviewDate = dateInputToday();
   risk.approvalStatus = risk.approvalStatus === "aprobado" ? "revision" : (risk.approvalStatus || "revision");
   risk.requiresApproval = true;
   state.compliance["6.1.2"] = "en_proceso";
@@ -5695,7 +5701,7 @@ function approveRisk(index) {
     risk.approvalStatus = "revision";
     risk.requiresApproval = true;
     risk.updatedAt = today();
-    risk.lastReviewDate = today();
+    risk.lastReviewDate = dateInputToday();
     addMessage("agent", `Reabri el riesgo "${risk.title}" para revision humana.`);
   } else {
     risk.approvalStatus = "aprobado";
@@ -5703,13 +5709,16 @@ function approveRisk(index) {
     risk.approvedBy = state.ownerName || "Responsable SGSTA";
     risk.approvedAt = today();
     risk.updatedAt = today();
-    risk.lastReviewDate = today();
+    risk.lastReviewDate = dateInputToday();
     state.compliance["6.1.2"] = state.risks.length && state.risks.every((item) => riskApprovalLabel(item) === "aprobado") ? "cumple" : "en_proceso";
     addMessage("agent", `Riesgo aprobado: "${risk.title}". Quedo trazabilidad de aprobacion humana.`);
   }
+  state.selectedActivityName = itemActivityName(risk) || state.selectedActivityName;
   saveState();
   renderRisks();
   renderMetrics();
+  renderActivityGaps();
+  renderActivities();
   renderChapterProgress();
 }
 
@@ -6533,13 +6542,13 @@ function activityIntakeText(activityName) {
   const activity = state.activities.find((item) => item.name === activityName) || {};
   const completed = items.filter((item) => item.done).length;
   return [
-    `Guia de entrevista de actividad - ${activityName}`,
+    `Checklist operativo de actividad - ${activityName}`,
     "",
     `Lugar/ruta: ${activity.place || "Por definir"}`,
     `Guia responsable: ${activity.leader || "Por definir"}`,
     `Estado: ${completed}/${items.length} bloques completos.`,
     "",
-    "Preguntas para levantar la actividad:",
+    "Preguntas de campo para completar la ficha operativa:",
     ...items.map((item) => `- ${item.done ? "[listo]" : "[preguntar]"} ${item.label}: ${item.question}`),
     "",
     "Uso del agente:",
@@ -6558,8 +6567,8 @@ function downloadActivityIntakeGuide(activityName) {
   link.remove();
   URL.revokeObjectURL(url);
   recordAuditEvent({
-    title: "Guia de actividad descargada",
-    detail: `Se descargo la guia de entrevista para ${activityName}.`,
+    title: "Checklist operativo descargado",
+    detail: `Se descargo el checklist operativo para ${activityName}.`,
     code: "8.1",
     type: "actividad",
     actor: "humano"
@@ -6572,7 +6581,7 @@ function createActivityIntakeActions(activityName) {
   const pending = activityIntakeItems(activityName).filter((item) => !item.done);
   let created = 0;
   pending.forEach((item) => {
-    const title = `Entrevista actividad: ${item.action}`;
+    const title = `Checklist operativo: ${item.action}`;
     if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
     state.actions.unshift({
       title,
@@ -6589,19 +6598,19 @@ function createActivityIntakeActions(activityName) {
       efficacyVerification: "",
       efficacyStatus: "pendiente",
       relatedActivity: activityName,
-      sourceDetail: "Entrevista de actividad",
+      sourceDetail: "Checklist operativo de actividad",
       createdAt: today()
     });
     created += 1;
   });
   recordAuditEvent({
-    title: "Acciones de entrevista de actividad creadas",
+    title: "Acciones de checklist operativo creadas",
     detail: `Se crearon ${created} accion(es) para completar ${activityName}.`,
     code: "8.1",
     type: "actividad",
     actor: "agente"
   });
-  addMessage("agent", created ? `Cree ${created} accion(es) para completar la entrevista de ${activityName}.` : `La entrevista de ${activityName} ya tenia acciones abiertas para sus pendientes.`);
+  addMessage("agent", created ? `Cree ${created} accion(es) para completar el checklist operativo de ${activityName}.` : `El checklist operativo de ${activityName} ya tenia acciones abiertas para sus pendientes.`);
   saveState();
   renderAll();
 }
@@ -6615,9 +6624,9 @@ function renderActivityIntakeGuide(activity) {
     <div class="activity-intake-card">
       <div class="activity-intake-head">
         <div>
-          <p class="eyebrow">Entrevista de actividad</p>
-          <h3>Levantar ${activity.name} con preguntas de campo</h3>
-          <p>La informacion se cruza con riesgos, guias, equipos, seguros, participantes, emergencia y formularios.</p>
+          <p class="eyebrow">Checklist operativo de actividad</p>
+          <h3>Completar ${activity.name} antes de ofertar</h3>
+          <p>Usa esta lista para confirmar ruta, condiciones, participantes, riesgos, guia, equipos, seguro y emergencia. Lo que falte se convierte en acciones.</p>
         </div>
         <div class="pilot-score">
           <strong>${pct}%</strong>
@@ -6637,8 +6646,8 @@ function renderActivityIntakeGuide(activity) {
           </span>`).join("")}
       </div>
       <div class="row-actions">
-        <button class="secondary-button" data-activity-intake-download="${activity.name}" type="button">Descargar entrevista</button>
-        <button data-activity-intake-actions="${activity.name}" type="button">Crear acciones</button>
+        <button class="secondary-button" data-activity-intake-download="${escapeHtml(activity.name)}" type="button">Descargar checklist</button>
+        <button data-activity-intake-actions="${escapeHtml(activity.name)}" type="button">Crear acciones</button>
       </div>
     </div>`;
 }
@@ -8752,7 +8761,7 @@ function riskEditRow(risk, index) {
           ${["pendiente", "implementado", "verificacion", "eficaz"].map((value) => `<option value="${value}" ${(risk.controlStatus || "pendiente") === value ? "selected" : ""}>${value}</option>`).join("")}
         </select>
       </label>
-      <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(risk.lastReviewDate || risk.updatedAt || "")}"></label>
+      <label>Ultima revision<input data-risk-field="${index}:lastReviewDate" type="date" value="${escapeHtml(dateInputValue(risk.lastReviewDate || risk.updatedAt))}"></label>
       <label>Comentario<textarea data-risk-field="${index}:reviewComment" placeholder="Observacion de la revision">${escapeHtml(risk.reviewComment || "")}</textarea></label>
       <span class="badge ${badge}" title="Nivel = probabilidad x impacto">${riskLabel(level)} (${level})</span>
       <span class="badge ${approvalBadge}" title="Decision humana">${approval}</span>
