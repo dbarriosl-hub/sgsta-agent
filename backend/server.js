@@ -811,17 +811,45 @@ function mergeStakeholderText(value = "") {
   return Array.from(normalized.values()).join(" - ");
 }
 
+function tidyCompanyContextText(value = "") {
+  return String(value || "")
+    .replace(/^La zona de operacion comprende\s*/i, "")
+    .replace(/^El entorno y las condiciones locales consideradas para el SGSTA incluyen:\s*/i, "")
+    .replace(/Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad\.?/gi, "")
+    .replace(/Estos factores deben revisarse antes de ofertar u operar[^.]*\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function removeRepeatedAreaFromContext(localContext = "", operatingArea = "") {
+  const area = tidyCompanyContextText(operatingArea);
+  let text = tidyCompanyContextText(localContext);
+  if (area) text = text.replace(area, "").trim();
+  const sentences = text
+    .split(/\.\s*/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  return sentences
+    .filter((sentence) => {
+      const key = sentence.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(". ");
+}
+
 function localCompanyContextImprovement(company = {}) {
   const location = [company.city, company.region, company.country].filter(Boolean).join(", ");
-  const activityText = company.activityDescription || "las actividades de turismo de aventura registradas";
-  const operatingBase = String(company.operatingArea || "").trim();
-  const localBase = String(company.localContext || "").trim();
+  const operatingBase = tidyCompanyContextText(company.operatingArea);
+  const localBase = removeRepeatedAreaFromContext(company.localContext, operatingBase);
   return {
     operatingArea: operatingBase
-      ? `La zona de operacion comprende ${operatingBase}. Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad.`
-      : `Zona de operacion por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
+      ? operatingBase
+      : `Por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
     localContext: localBase
-      ? `El entorno y las condiciones locales consideradas para el SGSTA incluyen: ${localBase}. Estos factores deben revisarse antes de ofertar u operar ${activityText}.`
+      ? localBase
       : "Pendiente documentar condiciones locales que puedan afectar la seguridad: clima, acceso, comunicaciones, estado de vias, caudal, terreno, comunidad y disponibilidad de apoyo externo.",
     stakeholders: mergeStakeholderText(company.stakeholders)
   };
@@ -846,6 +874,10 @@ async function improveCompanyContext(company = {}) {
           content: [
             "Eres un consultor experto en NTC ISO 21101 para turismo de aventura.",
             "Mejora la redaccion del contexto de empresa para que alimente borradores, riesgos y evidencias SGSTA.",
+            "No agregues advertencias, notas de revision ni frases genericas dentro de los campos.",
+            "No dupliques coordenadas, municipio, actividad ni tramo entre operatingArea y localContext.",
+            "operatingArea debe describir solo zona/ruta/lugar de operacion en una frase breve.",
+            "localContext debe describir solo condiciones del entorno que afectan la seguridad: clima, caudal, acceso, comunicaciones, terreno, comunidad u otros factores locales.",
             "No inventes datos verificables. Si falta informacion, conserva 'Por definir' o 'Pendiente de verificar'.",
             "La lista de partes interesadas debe incluir como minimo: Clientes, Gobierno local, Gobierno nacional, Entidades de rescate y emergencias locales, Guias y otros empleados, Comunidad, Proveedores.",
             "Devuelve unicamente JSON valido con esta forma: {\"values\":{\"operatingArea\":\"...\",\"localContext\":\"...\",\"stakeholders\":\"...\"},\"notes\":\"...\"}."
@@ -879,9 +911,10 @@ async function improveCompanyContext(company = {}) {
   }
   const data = await response.json();
   const parsed = extractJsonObject(data.choices?.[0]?.message?.content || "");
+  const operatingArea = tidyCompanyContextText(parsed.values?.operatingArea || fallback.operatingArea);
   const values = {
-    operatingArea: String(parsed.values?.operatingArea || fallback.operatingArea),
-    localContext: String(parsed.values?.localContext || fallback.localContext),
+    operatingArea,
+    localContext: removeRepeatedAreaFromContext(parsed.values?.localContext || fallback.localContext, operatingArea),
     stakeholders: mergeStakeholderText(parsed.values?.stakeholders || fallback.stakeholders)
   };
   return { values, notes: parsed.notes || "", ai: { used: true, provider: config.provider, model: config.model } };

@@ -3932,17 +3932,45 @@ function mergeStakeholderText(value = "") {
   return Array.from(normalized.values()).join(" - ");
 }
 
+function tidyCompanyContextText(value = "") {
+  return String(value || "")
+    .replace(/^La zona de operacion comprende\s*/i, "")
+    .replace(/^El entorno y las condiciones locales consideradas para el SGSTA incluyen:\s*/i, "")
+    .replace(/Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad\.?/gi, "")
+    .replace(/Estos factores deben revisarse antes de ofertar u operar[^.]*\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function removeRepeatedAreaFromContext(localContext = "", operatingArea = "") {
+  const area = tidyCompanyContextText(operatingArea);
+  let text = tidyCompanyContextText(localContext);
+  if (area) text = text.replace(area, "").trim();
+  const sentences = text
+    .split(/\.\s*/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  return sentences
+    .filter((sentence) => {
+      const key = sentence.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(". ");
+}
+
 function localCompanyContextImprovement(company = state.company) {
   const location = [company.city, company.region, company.country].filter(Boolean).join(", ");
-  const activityText = company.activityDescription || "las actividades de turismo de aventura registradas";
-  const operatingBase = String(company.operatingArea || "").trim();
-  const localBase = String(company.localContext || "").trim();
+  const operatingBase = tidyCompanyContextText(company.operatingArea);
+  const localBase = removeRepeatedAreaFromContext(company.localContext, operatingBase);
   return {
     operatingArea: operatingBase
-      ? `La zona de operacion comprende ${operatingBase}. Esta informacion debe verificarse con las rutas, puntos de inicio, puntos finales y puntos de evacuacion de cada actividad.`
-      : `Zona de operacion por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
+      ? operatingBase
+      : `Por definir${location ? ` en ${location}` : ""}. Registrar rutas, puntos de inicio, puntos finales y zonas criticas por actividad.`,
     localContext: localBase
-      ? `El entorno y las condiciones locales consideradas para el SGSTA incluyen: ${localBase}. Estos factores deben revisarse antes de ofertar u operar ${activityText}.`
+      ? localBase
       : `Pendiente documentar condiciones locales que puedan afectar la seguridad: clima, acceso, comunicaciones, estado de vias, caudal, terreno, comunidad y disponibilidad de apoyo externo.`,
     stakeholders: mergeStakeholderText(company.stakeholders)
   };
@@ -3953,8 +3981,9 @@ function applyCompanyContextImprovement(values = {}) {
     ...localCompanyContextImprovement(),
     ...values
   };
-  state.company.operatingArea = improved.operatingArea || state.company.operatingArea;
-  state.company.localContext = improved.localContext || state.company.localContext;
+  const operatingArea = tidyCompanyContextText(improved.operatingArea || state.company.operatingArea);
+  state.company.operatingArea = operatingArea;
+  state.company.localContext = removeRepeatedAreaFromContext(improved.localContext || state.company.localContext, operatingArea);
   state.company.stakeholders = improved.stakeholders || state.company.stakeholders;
   state.company.profileSummary = buildCompanyImplementationProfile();
   fillCompanyForm();
