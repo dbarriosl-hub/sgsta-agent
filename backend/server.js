@@ -874,25 +874,70 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 8000) {
   }
 }
 
+function uniqueTexts(values) {
+  const seen = new Set();
+  return values
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function coordinateFromText(...values) {
+  const text = values.filter(Boolean).join(" ");
+  const decimalPairs = [...text.matchAll(/(-?\d{1,2}\.\d+)\s*[,; ]+\s*(-?\d{1,3}\.\d+)/g)];
+  for (const match of decimalPairs) {
+    const first = Number(match[1]);
+    const second = Number(match[2]);
+    const validLatLon = Math.abs(first) <= 90 && Math.abs(second) <= 180;
+    const validLonLat = Math.abs(second) <= 90 && Math.abs(first) <= 180;
+    if (validLatLon) return { lat: first, lon: second, displayName: "Coordenadas declaradas por la organizacion", source: "Datos de la empresa" };
+    if (validLonLat) return { lat: second, lon: first, displayName: "Coordenadas declaradas por la organizacion", source: "Datos de la empresa" };
+  }
+  return null;
+}
+
+function geocodeQueries(company = {}, activity = {}) {
+  const country = company.country || "Colombia";
+  const region = company.region || "";
+  const city = company.city || "";
+  const area = company.operatingArea || "";
+  const place = activity.place || "";
+  const activityName = activity.name || "";
+  const waterOrRouteWords = uniqueTexts(`${activityName} ${place} ${area}`.split(/[,.;\-–|]+/))
+    .filter((part) => /(rio|río|quebrada|canon|cañon|caño|ruta|sendero|embarcadero|negro|fonce|guejar|güejar)/i.test(part))
+    .slice(0, 4);
+  return uniqueTexts([
+    [place, city, region, country].filter(Boolean).join(", "),
+    [area, city, region, country].filter(Boolean).join(", "),
+    [activityName, city, region, country].filter(Boolean).join(", "),
+    ...waterOrRouteWords.map((part) => [part, city, region, country].filter(Boolean).join(", ")),
+    [city, region, country].filter(Boolean).join(", "),
+    [area, region, country].filter(Boolean).join(", ")
+  ]);
+}
+
 async function geocodeEmergencyArea(company = {}, activity = {}) {
-  const query = [
-    activity.place,
-    company.operatingArea,
-    company.city,
-    company.region,
-    company.country || "Colombia"
-  ].filter(Boolean).join(", ");
-  if (!query) return null;
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-  const results = await fetchJsonWithTimeout(url);
-  const first = Array.isArray(results) ? results[0] : null;
-  if (!first) return null;
-  return {
-    lat: Number(first.lat),
-    lon: Number(first.lon),
-    displayName: first.display_name,
-    source: "OpenStreetMap Nominatim"
-  };
+  const coordinates = coordinateFromText(activity.place, company.operatingArea, company.localContext);
+  if (coordinates) return coordinates;
+  const queries = geocodeQueries(company, activity);
+  for (const query of queries) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const results = await fetchJsonWithTimeout(url);
+    const first = Array.isArray(results) ? results[0] : null;
+    if (!first) continue;
+    return {
+      lat: Number(first.lat),
+      lon: Number(first.lon),
+      displayName: first.display_name,
+      source: "OpenStreetMap Nominatim",
+      query
+    };
+  }
+  return null;
 }
 
 function osmElementName(element) {
@@ -1000,7 +1045,7 @@ async function buildExternalEmergencyDraft(input = {}) {
       if (!fire) lookup.warnings.push("No se encontro bomberos en OpenStreetMap cerca de la zona.");
       if (!hospital) lookup.warnings.push("No se encontro hospital/clinica en OpenStreetMap cerca de la zona.");
     } else {
-      lookup.warnings.push("No se pudo ubicar la zona para busqueda geografica.");
+      lookup.warnings.push(`No se pudo ubicar la zona para busqueda geografica tras probar: ${geocodeQueries(company, activity).slice(0, 4).join(" | ")}.`);
     }
   } catch (error) {
     lookup.warnings.push(error.message || "No fue posible consultar fuentes externas.");
