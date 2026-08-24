@@ -4463,10 +4463,12 @@ function activityOperatingPackage(activityName) {
 }
 
 function activityDepartureChecklist(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName) || {};
   const related = activityRelatedItems(activityName);
   const controls = activityControlStatus(activityName);
   const stats = activityFormStats(activityName);
   const hasEmergencyPlan = Boolean(formResponseForActivity("plan_emergencia", activityName));
+  const emergencyProfileReady = emergencyProfileIsComplete(activity);
   const hasHighRiskOpen = related.risks.some((risk) => riskLevel(risk) >= 12);
   return [
     {
@@ -4502,8 +4504,8 @@ function activityDepartureChecklist(activityName) {
     {
       key: "emergency",
       label: "Plan de emergencia",
-      ok: hasEmergencyPlan,
-      detail: hasEmergencyPlan ? "Plan de emergencia preparado para la actividad." : "Falta formulario/plan de emergencia de la actividad."
+      ok: emergencyProfileReady && hasEmergencyPlan,
+      detail: emergencyProfileReady && hasEmergencyPlan ? "Plan de emergencia preparado con perfil local de respuesta." : emergencyProfileReady ? "Perfil de emergencia listo; falta enviar/aprobar plan 8.2." : "Faltan contactos, centro medico, evacuacion, comunicaciones o equipos de emergencia."
     },
     {
       key: "forms",
@@ -4523,6 +4525,7 @@ function activityOperationalPackageText(activityName) {
   const checklist = activityDepartureChecklist(activityName);
   const packageData = activityOperatingPackage(activityName);
   const openActions = state.actions.filter((item) => item.status !== "cerrada" && item.relatedActivity === activityName);
+  const emergencyMissing = emergencyProfileMissingItems(activity);
   return [
     `FICHA OPERATIVA DE ACTIVIDAD - ${activity.name}`,
     "",
@@ -4560,10 +4563,15 @@ function activityOperationalPackageText(activityName) {
     `Seguros: ${related.policies.map((item) => `${item.number || item.insurer} (${item.status})`).join(", ") || "sin poliza asociada"}`,
     `Participantes/evidencias externas: ${related.participants.length || 0}`,
     "",
-    "6. Acciones abiertas",
+    "6. Perfil de emergencia",
+    emergencyProfileText(activity),
+    "",
+    `Pendientes de emergencia: ${emergencyMissing.length ? emergencyMissing.join(", ") : "sin pendientes principales visibles"}`,
+    "",
+    "7. Acciones abiertas",
     ...(openActions.length ? openActions.map((item) => `- ${item.priority || "media"} | ${item.code || "sin requisito"} | ${item.title}`) : ["- Sin acciones abiertas asociadas a esta actividad."]),
     "",
-    "7. Regla del agente",
+    "8. Regla del agente",
     "El agente puede preparar borradores, detectar brechas y crear acciones. La aprobacion final, la autorizacion para operar y el cierre de acciones criticas son humanos."
   ].join("\n");
 }
@@ -5824,6 +5832,7 @@ function updateActivityParticipantField(field) {
 function activityIntakeItems(activityName) {
   const activity = state.activities.find((item) => item.name === activityName) || {};
   const related = activityRelatedItems(activityName);
+  const emergencyReady = emergencyProfileIsComplete(activity);
   return [
     {
       id: "ruta",
@@ -5885,11 +5894,208 @@ function activityIntakeItems(activityName) {
       id: "emergencia",
       label: "Emergencia",
       question: "Que se hace si hay lesion, cambio de clima, perdida, falla de equipo o comunicacion?",
-      done: activityOperatingPackage(activityName).forms.some((item) => item.code === "8.2" && item.ready),
+      done: emergencyReady,
       action: `Preparar plan de emergencia de ${activityName}`,
       code: "8.2"
     }
   ];
+}
+
+function emergencyProfileFields() {
+  return [
+    {
+      id: "contacts",
+      title: "Contactos y organismos de emergencia",
+      fields: [
+        ["firefighters", "Bomberos"],
+        ["civilDefense", "Defensa Civil"],
+        ["redCross", "Cruz Roja"],
+        ["police", "Policia"],
+        ["specialRescue", "Rescate especializado"],
+        ["directRescueContact", "Contacto directo de rescate"],
+        ["supportAgreements", "Acuerdos de apoyo"],
+        ["emergencyNumber", "Numero real usado"],
+        ["internalCaller", "Responsable interno de llamadas"]
+      ]
+    },
+    {
+      id: "medical",
+      title: "Centros medicos y traslado",
+      fields: [
+        ["nearestMedicalCenter", "Centro medico mas cercano"],
+        ["referenceHospital", "Hospital de referencia"],
+        ["emergency24h", "Urgencias 24 horas"],
+        ["medicalPhone", "Telefono"],
+        ["timeFromEnd", "Tiempo desde punto final"],
+        ["timeFromEvacuationPoints", "Tiempo desde puntos intermedios"],
+        ["ambulance", "Ambulancia disponible / solicitud"],
+        ["companyVehicle", "Vehiculo de la empresa"],
+        ["driver", "Quien conduce"],
+        ["higherComplexityCenter", "Centro de mayor complejidad"]
+      ]
+    },
+    {
+      id: "route",
+      title: "Ruta y puntos de evacuacion",
+      fields: [
+        ["startPoint", "Inicio exacto / coordenadas"],
+        ["endPoint", "Final / coordenadas"],
+        ["intermediateExits", "Puntos intermedios de salida"],
+        ["vehicleAccess", "Acceso vehicular"],
+        ["ambulanceAccess", "Acceso ambulancia"],
+        ["evacuationPaths", "Caminos, puentes, fincas o senderos"],
+        ["evacuationTimes", "Tiempos aproximados"],
+        ["difficultEvacuationAreas", "Sectores de evacuacion dificil"],
+        ["criticalSectors", "Sectores criticos"],
+        ["activitySpecificHazards", "Puntos criticos propios de la actividad"]
+      ]
+    },
+    {
+      id: "communications",
+      title: "Comunicaciones",
+      fields: [
+        ["cellSignal", "Senal celular y operador"],
+        ["signalBlackspots", "Sectores sin senal"],
+        ["guidePhones", "Celulares de guias protegidos"],
+        ["radios", "Radios: cantidad y alcance"],
+        ["groundContact", "Contacto permanente en tierra"],
+        ["noSignalPlan", "Que hacer sin celular ni radio"],
+        ["knownCommunicationPoint", "Punto conocido para conseguir comunicacion"]
+      ]
+    },
+    {
+      id: "equipment",
+      title: "Equipos de emergencia y rescate",
+      fields: [
+        ["rescueEquipment", "Equipos de rescate reales"],
+        ["rescueRopes", "Cuerdas / bolsas de lanzamiento"],
+        ["extraFlotation", "Flotacion adicional"],
+        ["technicalHardware", "Mosquetones u otros equipos tecnicos"],
+        ["firstAidKit", "Botiquin y contenido"],
+        ["firstAidReview", "Quien revisa y frecuencia"],
+        ["thermalBlanket", "Manta termica"],
+        ["immobilizers", "Inmovilizadores"],
+        ["bleedingControl", "Control de hemorragias"],
+        ["whistlesLightsCuttingTool", "Silbatos, linternas y herramienta de corte"],
+        ["backupCommunication", "Comunicacion de respaldo"],
+        ["equipmentLocation", "Ubicacion de equipos durante la operacion"]
+      ]
+    }
+  ];
+}
+
+function ensureEmergencyProfile(activity) {
+  if (!activity) return {};
+  if (!activity.emergencyProfile) activity.emergencyProfile = {};
+  emergencyProfileFields().forEach((group) => {
+    if (!activity.emergencyProfile[group.id]) activity.emergencyProfile[group.id] = {};
+  });
+  return activity.emergencyProfile;
+}
+
+function emergencyProfileMissingItems(activity) {
+  const profile = ensureEmergencyProfile(activity);
+  const missing = [];
+  emergencyProfileFields().forEach((group) => {
+    group.fields.forEach(([key, label]) => {
+      if (!String(profile[group.id]?.[key] || "").trim()) missing.push(label);
+    });
+  });
+  return missing;
+}
+
+function emergencyProfileIsComplete(activity) {
+  if (!activity) return false;
+  return emergencyProfileMissingItems(activity).length === 0;
+}
+
+function emergencyProfileText(activity) {
+  const profile = ensureEmergencyProfile(activity);
+  return emergencyProfileFields().map((group) => [
+    group.title,
+    ...group.fields.map(([key, label]) => `- ${label}: ${profile[group.id]?.[key] || "por definir"}`)
+  ].join("\n")).join("\n\n");
+}
+
+function renderActivityEmergencyProfile(activity) {
+  const profile = ensureEmergencyProfile(activity);
+  const missing = emergencyProfileMissingItems(activity);
+  return `
+    <div class="activity-emergency-editor ${missing.length ? "pending" : "ready"}" data-activity-section="emergency">
+      <div class="panel-heading compact-heading">
+        <div>
+          <p class="eyebrow">Plan de emergencia 8.2</p>
+          <h2>Perfil de emergencia por actividad</h2>
+          <p>Estos datos alimentan el plan de emergencia. Si falta algo, el agente lo deja como pendiente antes de aprobar.</p>
+        </div>
+        <span class="badge ${missing.length ? "no_cumple" : "cumple"}">${missing.length ? `${missing.length} faltan` : "completo"}</span>
+      </div>
+      <div class="emergency-profile-grid">
+        ${emergencyProfileFields().map((group) => `
+          <article class="emergency-profile-card">
+            <h3>${group.title}</h3>
+            <div class="training-edit-grid">
+              ${group.fields.map(([key, label]) => `
+                <label>${label}
+                  <input data-emergency-field="${group.id}:${key}" type="text" value="${escapeHtml(profile[group.id]?.[key] || "")}" placeholder="Por definir">
+                </label>`).join("")}
+            </div>
+          </article>`).join("")}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-button" data-create-emergency-actions="${escapeHtml(activity.name)}" type="button">Crear acciones de faltantes</button>
+      </div>
+    </div>`;
+}
+
+function updateSelectedActivityEmergencyField(field, rerender = false) {
+  const activity = state.activities.find((item) => item.name === state.selectedActivityName);
+  if (!activity) return;
+  const [group, key] = field.dataset.emergencyField.split(":");
+  const profile = ensureEmergencyProfile(activity);
+  profile[group][key] = field.value;
+  activity.updatedAt = today();
+  state.compliance["8.2"] = "en_proceso";
+  saveState();
+  if (rerender) renderActivities();
+}
+
+function createEmergencyProfileActions(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName);
+  if (!activity) return;
+  const missing = emergencyProfileMissingItems(activity);
+  let created = 0;
+  emergencyProfileFields().forEach((group) => {
+    const groupMissing = group.fields
+      .filter(([key]) => !String(ensureEmergencyProfile(activity)[group.id]?.[key] || "").trim())
+      .map(([, label]) => label);
+    if (!groupMissing.length) return;
+    const title = `Completar emergencia ${group.title.toLowerCase()} - ${activityName}`;
+    if (state.actions.some((action) => action.title === title && action.status !== "cerrada")) return;
+    state.actions.unshift({
+      title,
+      code: "8.2",
+      status: "abierta",
+      type: "preventiva",
+      origin: "emergencia",
+      priority: ["contacts", "medical", "route", "communications"].includes(group.id) ? "alta" : "media",
+      responsible: state.ownerName || "Responsable SGSTA",
+      dueDate: "",
+      cause: `Faltan datos para el plan de emergencia de ${activityName}: ${groupMissing.join(", ")}.`,
+      immediateCorrection: "",
+      followUp: "",
+      efficacyVerification: "",
+      efficacyStatus: "pendiente",
+      relatedActivity: activityName,
+      sourceDetail: "Perfil de emergencia por actividad",
+      createdAt: today()
+    });
+    created += 1;
+  });
+  state.compliance["8.2"] = "en_proceso";
+  addMessage("agent", created ? `Cree ${created} accion(es) para completar el perfil de emergencia de ${activityName}.` : missing.length ? "Las acciones de emergencia ya estaban abiertas." : "El perfil de emergencia no tiene faltantes visibles.");
+  saveState();
+  renderAll();
 }
 
 function activityIntakeText(activityName) {
@@ -6302,6 +6508,7 @@ function renderActivities() {
         </div>
         ${activityParticipantRows(selectedActivity.name)}
       </div>
+      ${renderActivityEmergencyProfile(selectedActivity)}
       <div class="simple-table">
         <div class="simple-row"><strong>Condiciones</strong><span>${selectedActivity.conditions || "Por definir"}</span></div>
         <div class="simple-row"><strong>Participacion</strong><span>${selectedActivity.participantRequirements || "Por definir"}</span></div>
@@ -6340,6 +6547,11 @@ function renderActivities() {
   container.querySelector("[data-add-participant-activity]")?.addEventListener("click", (event) => addParticipantConditionForActivity(event.currentTarget.dataset.addParticipantActivity));
   container.querySelector("[data-add-policy-activity]")?.addEventListener("click", (event) => addPolicyForActivity(event.currentTarget.dataset.addPolicyActivity));
   container.querySelector("[data-suggest-activity-conditions]")?.addEventListener("click", (event) => suggestActivityConditionsWithAgent(event.currentTarget.dataset.suggestActivityConditions));
+  container.querySelectorAll("[data-emergency-field]").forEach((field) => {
+    field.addEventListener("input", () => updateSelectedActivityEmergencyField(field, false));
+    field.addEventListener("change", () => updateSelectedActivityEmergencyField(field, true));
+  });
+  container.querySelector("[data-create-emergency-actions]")?.addEventListener("click", (event) => createEmergencyProfileActions(event.currentTarget.dataset.createEmergencyActions));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
   container.querySelector("[data-prepare-activity-package]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivityPackage));
   container.querySelector("[data-open-activity-forms]")?.addEventListener("click", (event) => {
@@ -14544,7 +14756,8 @@ function addActivity() {
     leader: state.ownerName,
     status: "activa",
     conditions: "Condiciones operacionales por definir.",
-    participantRequirements: "Condiciones de participacion por definir."
+    participantRequirements: "Condiciones de participacion por definir.",
+    emergencyProfile: {}
   });
   state.compliance["8.1"] = state.compliance["8.1"] || "en_proceso";
   saveState();
@@ -14681,6 +14894,8 @@ function documentDraftTemplates() {
   const participantLines = state.activities.map((item) => `- ${item.name}: ${item.participantRequirements || "condiciones de participacion por definir"}.`).join("\n") || "- Condiciones de participantes por definir.";
   const participantEvidenceLines = state.participantEvidence.map((item) => `- ${item.activity || "General"} / ${item.phase || "fase por definir"}: ${item.kind || "soporte por definir"} - Estado: ${item.status || "pendiente"} - Enlace/evidencia: ${item.link || item.evidence || "por registrar"}.`).join("\n") || "- Evidencias externas de participantes por definir.";
   const emergencyScenarios = state.risks.filter((risk) => riskLevel(risk) >= 9).map((risk) => `- ${risk.activity || "General"}: ${risk.title}. Control base: ${risk.control || "por definir"}.`).join("\n") || "- Lesion, perdida de comunicacion, cambio climatico, falla de equipo o incidente durante la actividad.";
+  const emergencyProfile = emergencyProfileText(mainActivity);
+  const emergencyPending = emergencyProfileMissingItems(mainActivity);
   return [
     {
       documentCode: "SGSTA-DOC-001",
@@ -14704,7 +14919,7 @@ function documentDraftTemplates() {
       documentCode: "SGSTA-PLA-001",
       title: "Plan de emergencia",
       code: "8.2",
-      content: `PLAN DE EMERGENCIA\n\nOrganizacion: ${org}\n${locationContext}\nActividad base: ${activity}\n\nEscenarios de emergencia derivados del perfil:\n${emergencyScenarios}\n\nRecursos y equipos disponibles:\n${equipmentLines}\n\nPersonal y capacitacion requerida:\n${trainingLines}\n\nSeguros/coberturas por validar:\n${policyLines}\n\nRequisitos minimos:\n- Definir responsable de respuesta y comunicaciones.\n- Confirmar rutas, puntos de encuentro y medios de contacto.\n- Verificar botiquin/equipos de emergencia antes de operar.\n- Registrar simulacros, incidentes, aprendizajes y acciones de mejora.\n\nEl plan debe probarse mediante simulacros, registrar resultados y generar acciones de mejora cuando se detecten fallas.`
+      content: `PLAN DE EMERGENCIA\n\nOrganizacion: ${org}\n${locationContext}\nActividad base: ${activity}\n\n1. Perfil local de emergencia por actividad\n${emergencyProfile}\n\n2. Escenarios de emergencia derivados del perfil y riesgos:\n${emergencyScenarios}\n\n3. Recursos y equipos disponibles:\n${equipmentLines}\n\n4. Personal y capacitacion requerida:\n${trainingLines}\n\n5. Seguros/coberturas por validar:\n${policyLines}\n\n6. Criterios minimos de respuesta\n- Proteger primero la vida e integridad de participantes, guias y personal de apoyo.\n- Activar el responsable interno de llamadas y usar el numero real definido para emergencia.\n- Ubicar al grupo en punto seguro y mantener conteo de participantes.\n- Usar los puntos de evacuacion definidos segun condicion del lesionado, acceso y comunicacion disponible.\n- Solicitar apoyo externo cuando el evento supere la capacidad de respuesta de la empresa.\n- Registrar incidente, atencion inicial, entidad contactada, tiempos, decisiones y acciones posteriores.\n\n7. Pendientes antes de aprobar el plan\n${emergencyPending.length ? emergencyPending.map((item) => `- Definir: ${item}`).join("\n") : "- Sin pendientes principales visibles en el perfil de emergencia."}\n\n8. Simulacros y mejora\nEl plan debe probarse mediante simulacros, registrar resultados, evaluar tiempos de respuesta, comunicacion, acceso a puntos de evacuacion y generar acciones de mejora cuando se detecten fallas.\n\nEste documento es un borrador generado por el agente y requiere aprobacion humana antes de usarse como documento controlado.`
     },
     {
       documentCode: "SGSTA-ACT-001",
