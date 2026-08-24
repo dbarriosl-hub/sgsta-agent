@@ -7641,7 +7641,7 @@ function renderEquipment() {
           </div>
           <div class="row-actions">
             <button class="secondary-button" data-equipment-action="${index}" type="button">Crear accion</button>
-            <button class="secondary-button" data-toggle-equipment="${index}" type="button">${item.status === "operativo" ? "Revision" : "Operativo"}</button>
+            <button class="secondary-button" data-save-equipment="${index}" type="button">Guardar</button>
             <button class="secondary-button" data-duplicate-equipment="${index}" type="button">Duplicar</button>
             <button class="secondary-button" data-remove-equipment="${index}" type="button">Quitar</button>
           </div>
@@ -7697,17 +7697,16 @@ function renderEquipment() {
       detectEquipmentGaps();
     });
   });
-  container.querySelectorAll("[data-toggle-equipment]").forEach((button) => {
+  container.querySelectorAll("[data-save-equipment]").forEach((button) => {
     button.addEventListener("click", () => {
-      const index = Number(button.dataset.toggleEquipment);
+      const index = Number(button.dataset.saveEquipment);
       syncEquipmentFieldsFromView(index);
       const item = state.equipment[index];
       if (!item) return;
-      item.status = item.status === "operativo" ? "revision" : "operativo";
       item.updatedAt = today();
       state.compliance["7.1"] = "en_proceso";
       state.compliance["8.1"] = "en_proceso";
-      addMessage("agent", `Equipo ${item.name || index + 1} marcado como ${item.status}. ${equipmentGapReason(item)}`);
+      addMessage("agent", `Equipo ${item.name || index + 1} guardado. ${equipmentGapReason(item)}`);
       saveState();
       renderEquipment();
       renderMetrics();
