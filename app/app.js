@@ -566,7 +566,6 @@ function renderAll() {
   renderDemoReadiness();
   renderSubscriptionSnapshot();
   renderOperationReadinessSummary();
-  renderTodayWork();
   renderRequirements();
   renderClosurePackages();
   renderImplementation();
@@ -611,27 +610,30 @@ function renderDashboard() {
   renderDemoReadiness();
   renderSubscriptionSnapshot();
   renderOperationReadinessSummary();
-  renderTodayWork();
   renderDashboardImplementationQueue();
   renderChapterProgress();
 }
 
 function renderMetrics() {
   const totalScore = requirements.reduce((sum, item) => sum + requirementCompletionScore(item.code), 0);
-  const evaluated = requirements.filter((item) => requirementCompletionScore(item.code) > 0).length;
   const compliance = Math.round((totalScore / requirements.length) * 100);
-  const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12).length;
-  const peoplePending = state.people.filter((person) => person.competence !== "cumple").length;
-  const trainingOpen = state.trainingNeeds.filter((item) => item.status !== "cerrada").length;
-  const policiesDue = state.policies.filter((item) => item.status !== "vigente").length;
+  const activityReady = state.activities.filter((activity) => activityDepartureChecklist(activity.name).every((item) => item.ok)).length;
+  const highRisks = state.risks.filter((risk) => riskLevel(risk) >= 12);
+  const highRisksControlled = highRisks.filter((risk) => ["cerrado", "tratado", "controlado"].includes(String(risk.controlStatus || risk.status || "").toLowerCase())).length;
+  const approvedDocs = state.documents.filter((doc) => doc.status === "aprobado").length;
+  const registeredEvidence = state.evidence.filter((item) => ["registrada", "aprobada"].includes(String(item.status || "").toLowerCase())).length;
+  const peopleReady = state.people.filter((person) => person.competence === "cumple").length;
+  const equipmentReady = state.equipment.filter(equipmentIsComplete).length;
+  const trainingClosed = state.trainingNeeds.filter(trainingNeedComplete).length;
+  const activitiesWithPolicy = state.activities.filter((activity) => state.policies.some((policy) => itemActivityName(policy) === activity.name && policyIsComplete(policy))).length;
   document.querySelector("#metricCompliance").textContent = `${compliance}%`;
-  document.querySelector("#metricEvaluated").textContent = `${evaluated}/${requirements.length}`;
-  document.querySelector("#metricActions").textContent = state.actions.filter((item) => item.status !== "cerrada").length;
-  document.querySelector("#metricEvidence").textContent = state.evidence.length;
-  document.querySelector("#metricHighRisks").textContent = highRisks;
-  document.querySelector("#metricPeoplePending").textContent = peoplePending;
-  document.querySelector("#metricTraining").textContent = trainingOpen;
-  document.querySelector("#metricPoliciesDue").textContent = policiesDue;
+  document.querySelector("#metricEvaluated").textContent = `${activityReady}/${state.activities.length}`;
+  document.querySelector("#metricActions").textContent = highRisks.length ? `${highRisksControlled}/${highRisks.length}` : "0/0";
+  document.querySelector("#metricEvidence").textContent = approvedDocs + registeredEvidence;
+  document.querySelector("#metricHighRisks").textContent = `${peopleReady}/${state.people.length}`;
+  document.querySelector("#metricPeoplePending").textContent = `${equipmentReady}/${state.equipment.length}`;
+  document.querySelector("#metricTraining").textContent = `${trainingClosed}/${state.trainingNeeds.length}`;
+  document.querySelector("#metricPoliciesDue").textContent = `${activitiesWithPolicy}/${state.activities.length}`;
 }
 
 function demoReadinessStatus() {
@@ -6017,6 +6019,131 @@ function emergencyProfileText(activity) {
   ].join("\n")).join("\n\n");
 }
 
+function emergencyActivityType(activity) {
+  const source = `${activity?.name || ""} ${activity?.place || ""} ${state.company?.activityDescription || ""}`.toLowerCase();
+  if (source.includes("rafting") || source.includes("balsa") || source.includes("rio") || source.includes("caudal")) return "rafting";
+  if (source.includes("sender") || source.includes("caminata") || source.includes("trek")) return "senderismo";
+  if (source.includes("cuatrimoto") || source.includes("atv")) return "cuatrimotos";
+  return "general";
+}
+
+function emergencyDraftByAgent(activity) {
+  const city = state.company.city || "municipio/zona de operacion";
+  const region = state.company.region || "departamento";
+  const country = state.company.country || "Colombia";
+  const area = state.company.operatingArea || activity.place || "ruta/lugar de operacion";
+  const place = activity.place || area;
+  const leader = activity.leader || state.ownerName || "responsable SGSTA";
+  const type = emergencyActivityType(activity);
+  const related = activityRelatedItems(activity.name);
+  const equipmentNames = related.equipment.map((item) => item.name).filter(Boolean).join(", ");
+  const typeCritical = {
+    rafting: "rapidos, rocas, remolinos, cambios de caudal, caidas al agua, atrapamientos y puntos de rescate desde orilla",
+    senderismo: "pendientes, terreno resbaloso, perdida de ruta, caidas, tormenta, insolacion y sectores sin comunicacion",
+    cuatrimotos: "curvas, pendientes, trafico local, perdida de control, falla mecanica, polvo, lluvia y cruces de via",
+    general: "cambios de clima, lesiones, perdida de comunicacion, falla de equipo, retrasos y evacuacion dificil"
+  }[type];
+  const rescueEquipment = equipmentNames || {
+    rafting: "chalecos, cascos, remos, balsa, botiquin, cuerda o bolsa de lanzamiento y medio de comunicacion; verificar cantidades reales",
+    senderismo: "botiquin, comunicacion, silbatos, linterna, hidratacion, manta termica y elementos de orientacion; verificar cantidades reales",
+    cuatrimotos: "cascos, botiquin, comunicacion, kit basico de herramientas, elementos reflectivos y vehiculo de apoyo; verificar cantidades reales",
+    general: "botiquin, comunicacion y equipos de rescate aplicables a la actividad; verificar cantidades reales"
+  }[type];
+  return {
+    contacts: {
+      firefighters: `Bomberos de ${city} o municipio mas cercano - telefono por verificar`,
+      civilDefense: `Defensa Civil ${region} - disponibilidad y telefono por verificar`,
+      redCross: `Cruz Roja ${region} - confirmar si presta apoyo en la zona`,
+      police: `${country === "Colombia" ? "Linea 123 / Policia Nacional" : "Policia local"} - estacion o cuadrante por verificar`,
+      specialRescue: type === "rafting" ? "Rescate acuatico local / Bomberos / Defensa Civil - confirmar capacidad real" : "Grupo de rescate aplicable a la actividad - confirmar disponibilidad real",
+      directRescueContact: "Contacto directo con entidad de rescate por confirmar y registrar",
+      supportAgreements: "Acuerdo formal o informal de apoyo por documentar con entidad local, guias vecinos u operadores cercanos",
+      emergencyNumber: country === "Colombia" ? "123; verificar numero municipal/regional que realmente responden en la zona" : "Numero nacional/local de emergencia por verificar",
+      internalCaller: leader
+    },
+    medical: {
+      nearestMedicalCenter: `Centro de salud mas cercano a ${place} - nombre y ruta por verificar`,
+      referenceHospital: `Hospital de referencia de ${city || region} - confirmar nivel de atencion`,
+      emergency24h: "Confirmar si tiene urgencias 24 horas",
+      medicalPhone: "Telefono por verificar antes de aprobar",
+      timeFromEnd: "Medir tiempo real desde punto final de la actividad",
+      timeFromEvacuationPoints: "Medir tiempos desde puntos intermedios de evacuacion",
+      ambulance: "Confirmar ambulancia disponible y mecanismo de solicitud",
+      companyVehicle: "Definir vehiculo de la empresa si el traslado es medicamente apropiado",
+      driver: "Definir conductor autorizado",
+      higherComplexityCenter: "Centro de mayor complejidad al que remiten casos graves - verificar"
+    },
+    route: {
+      startPoint: `${place} - inicio exacto y coordenadas por confirmar`,
+      endPoint: `${area} - final exacto y coordenadas por confirmar`,
+      intermediateExits: "Identificar puntos intermedios reales de salida durante reconocimiento de ruta",
+      vehicleAccess: "Marcar puntos con acceso vehicular real",
+      ambulanceAccess: "Confirmar en que puntos puede ingresar ambulancia",
+      evacuationPaths: "Registrar caminos, puentes, fincas, carreteras o senderos utiles para evacuacion",
+      evacuationTimes: "Registrar tiempos aproximados de evacuacion medidos en campo",
+      difficultEvacuationAreas: "Identificar sectores donde evacuar sea dificil por terreno, agua, distancia o clima",
+      criticalSectors: "Definir sectores criticos de la ruta antes de operar",
+      activitySpecificHazards: typeCritical
+    },
+    communications: {
+      cellSignal: "Verificar senal celular por operador durante todo el recorrido",
+      signalBlackspots: "Registrar sectores sin senal o con senal inestable",
+      guidePhones: "Confirmar que los guias llevan celular protegido contra agua/golpes",
+      radios: "Definir si se usan radios, cantidad, canal y alcance probado",
+      groundContact: "Definir contacto en tierra mientras el grupo esta en actividad",
+      noSignalPlan: "Si no hay senal ni radio, usar punto conocido de comunicacion o enviar apoyo segun protocolo",
+      knownCommunicationPoint: "Punto conocido para conseguir comunicacion por verificar en campo"
+    },
+    equipment: {
+      rescueEquipment,
+      rescueRopes: type === "rafting" ? "Cuerdas o bolsas de lanzamiento por cantidad y estado; verificar" : "Cuerdas o elementos de rescate aplicables; verificar",
+      extraFlotation: type === "rafting" ? "Elementos de flotacion adicionales por verificar" : "No aplica o definir segun actividad",
+      technicalHardware: "Mosquetones u otros equipos tecnicos aplicables; verificar necesidad real",
+      firstAidKit: "Botiquin disponible; completar contenido real y fecha de revision",
+      firstAidReview: "Responsable y frecuencia de revision del botiquin por definir",
+      thermalBlanket: "Manta termica: confirmar disponibilidad",
+      immobilizers: "Inmovilizadores: confirmar disponibilidad o apoyo externo",
+      bleedingControl: "Elementos para control de hemorragias: confirmar disponibilidad",
+      whistlesLightsCuttingTool: "Silbatos, linternas y herramienta de corte apropiada: confirmar disponibilidad",
+      backupCommunication: "Comunicacion de respaldo por definir",
+      equipmentLocation: "Definir si los equipos van con cada guia, en cada balsa, en vehiculo o en base"
+    }
+  };
+}
+
+function fillEmergencyProfileWithAgent(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName);
+  if (!activity) return;
+  const profile = ensureEmergencyProfile(activity);
+  const draft = emergencyDraftByAgent(activity);
+  let filled = 0;
+  emergencyProfileFields().forEach((group) => {
+    group.fields.forEach(([key]) => {
+      if (String(profile[group.id]?.[key] || "").trim()) return;
+      profile[group.id][key] = draft[group.id]?.[key] || "Por verificar";
+      filled += 1;
+    });
+  });
+  activity.emergencyProfileDraftNotice = "Borrador IA: la informacion fue prellenada con contexto de empresa, actividad y zona. Verifica telefonos, entidades, tiempos, coordenadas y disponibilidad real antes de aprobar.";
+  activity.updatedAt = today();
+  state.compliance["8.2"] = "en_proceso";
+  state.activityHelperNotice = {
+    activity: activity.name,
+    section: "emergency",
+    message: filled ? `Complete ${filled} campo(s) del perfil de emergencia como borrador. Deben verificarse antes de aprobar.` : "El perfil de emergencia ya tenia datos; revisa si requieren actualizacion."
+  };
+  recordAuditEvent({
+    title: "Borrador IA de emergencia preparado",
+    detail: `Se prellenaron ${filled} campo(s) para ${activity.name}. Requiere verificacion humana.`,
+    code: "8.2",
+    type: "emergencia",
+    actor: "agente"
+  });
+  addMessage("agent", state.activityHelperNotice.message);
+  saveState();
+  renderAll();
+}
+
 function renderActivityEmergencyProfile(activity) {
   const profile = ensureEmergencyProfile(activity);
   const missing = emergencyProfileMissingItems(activity);
@@ -6027,9 +6154,11 @@ function renderActivityEmergencyProfile(activity) {
           <p class="eyebrow">Plan de emergencia 8.2</p>
           <h2>Perfil de emergencia por actividad</h2>
           <p>Estos datos alimentan el plan de emergencia. Si falta algo, el agente lo deja como pendiente antes de aprobar.</p>
+          <p class="emergency-ai-note">El borrador IA ayuda a empezar, pero debes revisar telefonos, entidades, coordenadas, tiempos y disponibilidad real antes de aprobar.</p>
         </div>
         <span class="badge ${missing.length ? "no_cumple" : "cumple"}">${missing.length ? `${missing.length} faltan` : "completo"}</span>
       </div>
+      ${activity.emergencyProfileDraftNotice ? `<div class="activity-helper-notice"><strong>Advertencia:</strong><span>${escapeHtml(activity.emergencyProfileDraftNotice)}</span></div>` : ""}
       <div class="emergency-profile-grid">
         ${emergencyProfileFields().map((group) => `
           <article class="emergency-profile-card">
@@ -6043,6 +6172,7 @@ function renderActivityEmergencyProfile(activity) {
           </article>`).join("")}
       </div>
       <div class="row-actions">
+        <button data-draft-emergency-ai="${escapeHtml(activity.name)}" type="button">Borrador IA</button>
         <button class="secondary-button" data-create-emergency-actions="${escapeHtml(activity.name)}" type="button">Crear acciones de faltantes</button>
       </div>
     </div>`;
@@ -6551,6 +6681,7 @@ function renderActivities() {
     field.addEventListener("input", () => updateSelectedActivityEmergencyField(field, false));
     field.addEventListener("change", () => updateSelectedActivityEmergencyField(field, true));
   });
+  container.querySelector("[data-draft-emergency-ai]")?.addEventListener("click", (event) => fillEmergencyProfileWithAgent(event.currentTarget.dataset.draftEmergencyAi));
   container.querySelector("[data-create-emergency-actions]")?.addEventListener("click", (event) => createEmergencyProfileActions(event.currentTarget.dataset.createEmergencyActions));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
   container.querySelector("[data-prepare-activity-package]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivityPackage));
