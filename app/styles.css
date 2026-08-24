@@ -1387,7 +1387,6 @@ textarea {
 
 .master-document-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
@@ -1418,6 +1417,61 @@ textarea {
   gap: 5px;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.dashboard-document-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-document-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dashboard-document-summary span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: var(--muted);
+  padding: 8px 10px;
+}
+
+.dashboard-document-summary strong {
+  color: var(--text);
+}
+
+.dashboard-document-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-document-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 130px minmax(180px, 1fr) minmax(150px, 0.8fr) auto;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.dashboard-document-row:hover {
+  border-color: #99f6e4;
+}
+
+.dashboard-document-row span,
+.dashboard-document-row small {
+  color: var(--muted);
+}
+
+.dashboard-document-row em {
+  font-style: normal;
+  justify-self: end;
 }
 
 .activity-emergency-editor {
@@ -5075,6 +5129,7 @@ textarea {
   .implementation-queue-row,
   .step-row,
   .simple-row,
+  .dashboard-document-row,
   .coverage-item,
   .chapter-row,
   .chapter-detail summary,
@@ -5096,6 +5151,10 @@ textarea {
 
   .requirement-line-actions {
     justify-content: space-between;
+  }
+
+  .dashboard-document-row em {
+    justify-self: start;
   }
 
   .implementation-queue-row {

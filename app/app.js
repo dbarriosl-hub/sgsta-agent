@@ -566,6 +566,7 @@ function renderAll() {
   renderDemoReadiness();
   renderSubscriptionSnapshot();
   renderOperationReadinessSummary();
+  renderDashboardDocumentMasterList();
   renderRequirements();
   renderClosurePackages();
   renderImplementation();
@@ -612,6 +613,7 @@ function renderDashboard() {
   renderOperationReadinessSummary();
   renderDashboardImplementationQueue();
   renderChapterProgress();
+  renderDashboardDocumentMasterList();
 }
 
 function renderMetrics() {
@@ -1515,10 +1517,10 @@ function resumeStepStatus() {
   if (firstReview) {
     return {
       phase: "Revision humana",
-      title: inReview.length ? "Aprobar formularios en revision" : "Enviar borradores a revision",
-      detail: `${reviewDrafts.length} formulario(s) necesitan revision/aprobacion para contar como evidencia. Siguiente: ${firstReview.form || firstReview.table}.`,
+      title: "Revisar y aprobar borradores",
+      detail: `El agente ya preparo ${reviewDrafts.length} borrador(es). Deben revisarse por una persona para que cuenten como evidencia. Siguiente: ${firstReview.form || firstReview.table}.`,
       pct: progress.pct,
-      primary: { label: "Abrir formularios", view: "formularios", table: firstReview.table, activity: firstReview.activity || "" },
+      primary: { label: "Abrir borradores", view: "formularios", table: firstReview.table, activity: firstReview.activity || "" },
       secondary: { label: "Revision humana", view: "revision_humana" }
     };
   }
@@ -8394,6 +8396,19 @@ function registryStatusClass(status = "") {
   return "en_proceso";
 }
 
+function registrySimpleStatus(row) {
+  const normalized = String(row.status || "").toLowerCase();
+  const implemented = ["aprobado", "aprobada", "vigente", "recibida", "recibido", "cerrada", "operativo", "cumple"].includes(normalized);
+  if (implemented) return { label: "Implementado", className: "cumple" };
+  if (row.source === "documento") {
+    return String(row.link || "").toLowerCase().includes("borrador") || normalized === "borrador"
+      ? { label: "Borrador", className: "en_proceso" }
+      : { label: "Sin iniciar", className: "no_cumple" };
+  }
+  if (row.link) return { label: "Borrador", className: "en_proceso" };
+  return { label: "Sin iniciar", className: "no_cumple" };
+}
+
 function externalRecordCode(prefix, index) {
   return `${prefix}-${String(index + 1).padStart(3, "0")}`;
 }
@@ -8481,6 +8496,44 @@ function documentRegistryRows() {
   return rows;
 }
 
+function renderDashboardDocumentMasterList() {
+  const container = document.querySelector("#dashboardDocumentMasterList");
+  if (!container) return;
+  const rows = documentRegistryRows();
+  const priorityRows = [...rows].sort((a, b) => {
+    const order = { "Sin iniciar": 0, Borrador: 1, Implementado: 2 };
+    return order[registrySimpleStatus(a).label] - order[registrySimpleStatus(b).label] || String(a.requirement).localeCompare(String(b.requirement));
+  }).slice(0, 10);
+  const counts = rows.reduce((acc, row) => {
+    const status = registrySimpleStatus(row).label;
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  container.innerHTML = `
+    <div class="dashboard-document-summary">
+      <span><strong>${counts.Implementado || 0}</strong> implementados</span>
+      <span><strong>${counts.Borrador || 0}</strong> borradores</span>
+      <span><strong>${counts["Sin iniciar"] || 0}</strong> sin iniciar</span>
+    </div>
+    <div class="dashboard-document-rows">
+      ${priorityRows.length ? priorityRows.map((row) => {
+        const status = registrySimpleStatus(row);
+        return `
+          <button class="dashboard-document-row" data-open-documents-list type="button">
+            <span>${escapeHtml(row.code)}</span>
+            <strong>${escapeHtml(row.name)}</strong>
+            <small>Req. ${escapeHtml(row.requirement)} · ${escapeHtml(row.activity)}</small>
+            <em class="badge ${status.className}">${status.label}</em>
+          </button>`;
+      }).join("") : `<p class="muted">Todavia no hay documentos o registros en el listado maestro.</p>`}
+    </div>`;
+  container.querySelectorAll("[data-open-documents-list]").forEach((button) => {
+    button.addEventListener("click", () => showView("documentos"));
+  });
+  const detailButton = document.querySelector("#openDocumentMasterFromPanel");
+  if (detailButton) detailButton.onclick = () => showView("documentos");
+}
+
 function renderDocumentMasterList() {
   const list = document.querySelector("#documentMasterList");
   const summary = document.querySelector("#documentMasterSummary");
@@ -8498,7 +8551,7 @@ function renderDocumentMasterList() {
     <article class="master-document-row">
       <div>
         <span class="badge requisito">${escapeHtml(row.requirement)}</span>
-        <span class="badge ${registryStatusClass(row.status)}">${escapeHtml(row.status || "pendiente")}</span>
+        <span class="badge ${registrySimpleStatus(row).className}">${escapeHtml(registrySimpleStatus(row).label)}</span>
       </div>
       <strong>${escapeHtml(row.code)} - ${escapeHtml(row.name)}</strong>
       <p>${escapeHtml(row.type)} · ${escapeHtml(row.activity)} · ${escapeHtml(row.medium)}</p>
