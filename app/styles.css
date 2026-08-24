@@ -1465,6 +1465,40 @@ textarea {
   margin-top: 6px;
 }
 
+.emergency-source-list {
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.emergency-source-list strong {
+  color: #1e3a8a;
+}
+
+.emergency-source-list div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emergency-source-list a {
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-size: 0.86rem;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.emergency-source-list p {
+  color: #92400e;
+  margin: 0;
+}
+
 .forms-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);

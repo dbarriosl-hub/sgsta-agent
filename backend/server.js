@@ -832,6 +832,187 @@ function activityContext(activityName = "") {
   };
 }
 
+function searchUrl(query) {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function compactEmergencySources(input = {}) {
+  const company = input.company || {};
+  const activity = input.activity || {};
+  const city = company.city || "";
+  const region = company.region || "";
+  const country = company.country || "Colombia";
+  const area = company.operatingArea || activity.place || "";
+  const place = [area, city, region, country].filter(Boolean).join(" ");
+  return [
+    { label: "Bomberos", url: searchUrl(`Bomberos ${city || area} ${region} telefono emergencia`) },
+    { label: "Defensa Civil", url: searchUrl(`Defensa Civil ${city || area} ${region} telefono`) },
+    { label: "Cruz Roja", url: searchUrl(`Cruz Roja ${city || area} ${region} telefono`) },
+    { label: "Policia", url: searchUrl(`Policia ${city || area} ${region} telefono emergencia`) },
+    { label: "Centro medico", url: searchUrl(`centro de salud hospital urgencias ${place}`) },
+    { label: "Ambulancia", url: searchUrl(`ambulancia urgencias ${city || area} ${region}`) },
+    { label: "Rescate actividad", url: searchUrl(`rescate ${activity.name || "turismo aventura"} ${place}`) }
+  ];
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "SGSTA-Agent-MVP/0.1 contacto-verificacion-humana",
+        ...(options.headers || {})
+      }
+    });
+    if (!response.ok) throw new Error(`Fuente externa respondio ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function geocodeEmergencyArea(company = {}, activity = {}) {
+  const query = [
+    activity.place,
+    company.operatingArea,
+    company.city,
+    company.region,
+    company.country || "Colombia"
+  ].filter(Boolean).join(", ");
+  if (!query) return null;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+  const results = await fetchJsonWithTimeout(url);
+  const first = Array.isArray(results) ? results[0] : null;
+  if (!first) return null;
+  return {
+    lat: Number(first.lat),
+    lon: Number(first.lon),
+    displayName: first.display_name,
+    source: "OpenStreetMap Nominatim"
+  };
+}
+
+function osmElementName(element) {
+  const tags = element.tags || {};
+  return tags.name || tags["official_name"] || tags.operator || "Entidad encontrada sin nombre";
+}
+
+function osmElementPhone(element) {
+  const tags = element.tags || {};
+  return tags.phone || tags["contact:phone"] || tags.mobile || tags["contact:mobile"] || "";
+}
+
+function osmElementUrl(element) {
+  const tags = element.tags || {};
+  return tags.website || tags["contact:website"] || "";
+}
+
+async function overpassEmergencyPlaces(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+  const query = `
+    [out:json][timeout:10];
+    (
+      node(around:25000,${lat},${lon})["amenity"~"hospital|clinic|doctors|fire_station|police"];
+      way(around:25000,${lat},${lon})["amenity"~"hospital|clinic|doctors|fire_station|police"];
+      relation(around:25000,${lat},${lon})["amenity"~"hospital|clinic|doctors|fire_station|police"];
+      node(around:25000,${lat},${lon})["emergency"];
+      way(around:25000,${lat},${lon})["emergency"];
+    );
+    out tags center 25;
+  `;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+  const data = await fetchJsonWithTimeout(url, {}, 12000);
+  return Array.isArray(data.elements) ? data.elements : [];
+}
+
+function firstOsmByAmenity(elements, amenities) {
+  return elements.find((element) => amenities.includes(element.tags?.amenity));
+}
+
+function formatOsmPlace(element, fallback) {
+  if (!element) return fallback;
+  const phone = osmElementPhone(element);
+  const website = osmElementUrl(element);
+  return [osmElementName(element), phone ? `tel. ${phone}` : "telefono por verificar", website ? `web: ${website}` : ""].filter(Boolean).join(" - ");
+}
+
+async function buildExternalEmergencyDraft(input = {}) {
+  const company = input.company || {};
+  const activity = input.activity || {};
+  const city = company.city || "municipio/zona";
+  const region = company.region || "";
+  const country = company.country || "Colombia";
+  const sources = compactEmergencySources(input);
+  const profile = {
+    contacts: {
+      firefighters: `Bomberos de ${city} - buscar y verificar telefono oficial`,
+      civilDefense: `Defensa Civil ${region || city} - buscar y verificar telefono oficial`,
+      redCross: `Cruz Roja ${region || city} - buscar y verificar disponibilidad`,
+      police: country === "Colombia" ? "Linea 123 / Policia Nacional - confirmar estacion o cuadrante local" : "Policia local - verificar telefono",
+      specialRescue: `Grupo de rescate aplicable a ${activity.name || "la actividad"} - buscar y verificar`,
+      directRescueContact: "Pendiente de confirmar con entidad local",
+      supportAgreements: "Pendiente de documentar con entidad local, guias vecinos u operadores cercanos",
+      emergencyNumber: country === "Colombia" ? "123 - confirmar numero local realmente usado" : "Numero local de emergencia por verificar",
+      internalCaller: activity.leader || input.ownerName || "Responsable SGSTA"
+    },
+    medical: {
+      nearestMedicalCenter: `Centro medico mas cercano a ${activity.place || company.operatingArea || city} - buscar y verificar`,
+      referenceHospital: `Hospital de referencia de ${city} - buscar y verificar`,
+      emergency24h: "Por verificar con el centro medico",
+      medicalPhone: "Telefono por verificar",
+      timeFromEnd: "Medir o verificar en mapa desde punto final",
+      timeFromEvacuationPoints: "Medir en mapa/campo desde puntos intermedios",
+      ambulance: "Verificar ambulancia disponible y mecanismo de solicitud",
+      companyVehicle: "Definir vehiculo de la empresa si aplica",
+      driver: "Definir conductor autorizado",
+      higherComplexityCenter: "Centro de mayor complejidad por verificar"
+    },
+    route: {},
+    communications: {},
+    equipment: {}
+  };
+  const lookup = { ok: false, provider: "OpenStreetMap", warnings: [] };
+  try {
+    const geo = await geocodeEmergencyArea(company, activity);
+    if (geo) {
+      lookup.ok = true;
+      lookup.geocodedArea = geo.displayName;
+      sources.unshift({ label: "Geocodificacion", url: `https://www.openstreetmap.org/?mlat=${geo.lat}&mlon=${geo.lon}#map=13/${geo.lat}/${geo.lon}` });
+      const places = await overpassEmergencyPlaces(geo.lat, geo.lon);
+      const fire = firstOsmByAmenity(places, ["fire_station"]);
+      const police = firstOsmByAmenity(places, ["police"]);
+      const hospital = firstOsmByAmenity(places, ["hospital", "clinic", "doctors"]);
+      if (fire) profile.contacts.firefighters = `${formatOsmPlace(fire, profile.contacts.firefighters)} - verificar vigencia`;
+      if (police) profile.contacts.police = `${formatOsmPlace(police, profile.contacts.police)} - verificar vigencia`;
+      if (hospital) {
+        profile.medical.nearestMedicalCenter = `${formatOsmPlace(hospital, profile.medical.nearestMedicalCenter)} - verificar urgencias`;
+        profile.medical.referenceHospital = `${formatOsmPlace(hospital, profile.medical.referenceHospital)} - verificar nivel de atencion`;
+      }
+      places.slice(0, 8).forEach((place, index) => {
+        sources.push({
+          label: `${place.tags?.amenity || "lugar"} ${index + 1}: ${osmElementName(place)}`,
+          url: osmElementUrl(place) || `https://www.openstreetmap.org/${place.type}/${place.id}`
+        });
+      });
+      if (!fire) lookup.warnings.push("No se encontro bomberos en OpenStreetMap cerca de la zona.");
+      if (!hospital) lookup.warnings.push("No se encontro hospital/clinica en OpenStreetMap cerca de la zona.");
+    } else {
+      lookup.warnings.push("No se pudo ubicar la zona para busqueda geografica.");
+    }
+  } catch (error) {
+    lookup.warnings.push(error.message || "No fue posible consultar fuentes externas.");
+  }
+  return {
+    profile,
+    sources,
+    lookup,
+    note: "Borrador externo: datos sugeridos desde fuentes abiertas y enlaces de busqueda. La organizacion debe verificar telefono, ubicacion, disponibilidad, tiempos de respuesta y acuerdos antes de aprobar."
+  };
+}
+
 function generateFormDraftValues(form, activityName = "") {
   const contextByActivity = activityContext(activityName);
   const context = {
@@ -1246,6 +1427,19 @@ async function handle(req, res) {
     }
     const result = await draftFormsWithAi(body);
     return send(res, 201, { ...result, state });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/agent/emergency/external-draft") {
+    const body = await parseBody(req);
+    const result = await buildExternalEmergencyDraft(body);
+    recordEvent({
+      actor: "agente",
+      type: "emergency_external_draft",
+      title: "Borrador externo de emergencia preparado",
+      detail: `${body.activity?.name || body.activityName || "Actividad"} - requiere verificacion humana.`,
+      code: "8.2"
+    });
+    return send(res, 200, result);
   }
 
   if (req.method === "POST" && url.pathname === "/api/agent/requirements/close-gap") {

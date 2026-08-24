@@ -6144,6 +6144,81 @@ function fillEmergencyProfileWithAgent(activityName) {
   renderAll();
 }
 
+function mergeEmergencyDraft(activity, draft = {}, overwrite = false) {
+  const profile = ensureEmergencyProfile(activity);
+  let filled = 0;
+  emergencyProfileFields().forEach((group) => {
+    group.fields.forEach(([key]) => {
+      const value = draft[group.id]?.[key];
+      if (!String(value || "").trim()) return;
+      if (!overwrite && String(profile[group.id]?.[key] || "").trim()) return;
+      profile[group.id][key] = value;
+      filled += 1;
+    });
+  });
+  return filled;
+}
+
+async function searchEmergencyProfileExternally(activityName) {
+  const activity = state.activities.find((item) => item.name === activityName);
+  if (!activity) return;
+  state.activityHelperNotice = {
+    activity: activity.name,
+    section: "emergency",
+    message: "Buscando datos externos para emergencia. Esto puede tardar unos segundos."
+  };
+  renderActivities();
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/agent/emergency/external-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: state.company,
+        activity,
+        ownerName: state.ownerName
+      })
+    });
+    if (!response.ok) throw new Error(`No se pudo consultar fuentes externas (${response.status}).`);
+    const result = await response.json();
+    const filled = mergeEmergencyDraft(activity, result.profile || {}, false);
+    activity.emergencyExternalSources = result.sources || [];
+    activity.emergencyExternalLookup = result.lookup || {};
+    activity.emergencyProfileDraftNotice = result.note || "Borrador externo preparado. Verifica toda la informacion antes de aprobar.";
+    activity.updatedAt = today();
+    state.compliance["8.2"] = "en_proceso";
+    state.activityHelperNotice = {
+      activity: activity.name,
+      section: "emergency",
+      message: filled
+        ? `Agregue ${filled} dato(s) sugeridos desde busqueda externa. Revisa fuentes y confirma antes de aprobar.`
+        : "La busqueda externa dejo fuentes de verificacion, pero no reemplazo campos ya diligenciados."
+    };
+    recordAuditEvent({
+      title: "Busqueda externa de emergencia ejecutada",
+      detail: `${activity.name}: ${filled} campo(s) sugeridos; ${activity.emergencyExternalSources.length} fuente(s)/busqueda(s) para revisar.`,
+      code: "8.2",
+      type: "emergencia",
+      actor: "agente"
+    });
+    addMessage("agent", state.activityHelperNotice.message);
+  } catch (error) {
+    activity.emergencyExternalSources = [
+      { label: "Buscar Bomberos", url: `https://www.google.com/search?q=${encodeURIComponent(`Bomberos ${state.company.city || activity.place || activity.name} telefono emergencia`)}` },
+      { label: "Buscar centro medico", url: `https://www.google.com/search?q=${encodeURIComponent(`centro de salud hospital urgencias ${activity.place || state.company.operatingArea || state.company.city}`)}` },
+      { label: "Buscar Defensa Civil / Cruz Roja", url: `https://www.google.com/search?q=${encodeURIComponent(`Defensa Civil Cruz Roja ${state.company.city || state.company.region || activity.place} telefono`)}` }
+    ];
+    activity.emergencyProfileDraftNotice = "No se pudo consultar automaticamente. Se dejaron enlaces de busqueda para verificacion manual.";
+    state.activityHelperNotice = {
+      activity: activity.name,
+      section: "emergency",
+      message: "No pude consultar fuentes externas automaticamente; deje enlaces para verificacion manual."
+    };
+    addMessage("agent", state.activityHelperNotice.message);
+  }
+  saveState();
+  renderAll();
+}
+
 function renderActivityEmergencyProfile(activity) {
   const profile = ensureEmergencyProfile(activity);
   const missing = emergencyProfileMissingItems(activity);
@@ -6159,6 +6234,15 @@ function renderActivityEmergencyProfile(activity) {
         <span class="badge ${missing.length ? "no_cumple" : "cumple"}">${missing.length ? `${missing.length} faltan` : "completo"}</span>
       </div>
       ${activity.emergencyProfileDraftNotice ? `<div class="activity-helper-notice"><strong>Advertencia:</strong><span>${escapeHtml(activity.emergencyProfileDraftNotice)}</span></div>` : ""}
+      ${activity.emergencyExternalSources?.length ? `
+        <div class="emergency-source-list">
+          <strong>Fuentes y busquedas para verificar</strong>
+          <div>
+            ${activity.emergencyExternalSources.slice(0, 10).map((source) => `
+              <a href="${escapeHtml(source.url || "#")}" target="_blank" rel="noreferrer">${escapeHtml(source.label || "Fuente")}</a>`).join("")}
+          </div>
+          ${activity.emergencyExternalLookup?.warnings?.length ? `<p>${escapeHtml(activity.emergencyExternalLookup.warnings.join(" "))}</p>` : ""}
+        </div>` : ""}
       <div class="emergency-profile-grid">
         ${emergencyProfileFields().map((group) => `
           <article class="emergency-profile-card">
@@ -6173,6 +6257,7 @@ function renderActivityEmergencyProfile(activity) {
       </div>
       <div class="row-actions">
         <button data-draft-emergency-ai="${escapeHtml(activity.name)}" type="button">Borrador IA</button>
+        <button class="secondary-button" data-search-emergency-external="${escapeHtml(activity.name)}" type="button">Buscar datos externos</button>
         <button class="secondary-button" data-create-emergency-actions="${escapeHtml(activity.name)}" type="button">Crear acciones de faltantes</button>
       </div>
     </div>`;
@@ -6682,6 +6767,7 @@ function renderActivities() {
     field.addEventListener("change", () => updateSelectedActivityEmergencyField(field, true));
   });
   container.querySelector("[data-draft-emergency-ai]")?.addEventListener("click", (event) => fillEmergencyProfileWithAgent(event.currentTarget.dataset.draftEmergencyAi));
+  container.querySelector("[data-search-emergency-external]")?.addEventListener("click", (event) => searchEmergencyProfileExternally(event.currentTarget.dataset.searchEmergencyExternal));
   container.querySelector("[data-create-emergency-actions]")?.addEventListener("click", (event) => createEmergencyProfileActions(event.currentTarget.dataset.createEmergencyActions));
   container.querySelector("[data-prepare-activity]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivity));
   container.querySelector("[data-prepare-activity-package]")?.addEventListener("click", (event) => prepareActivityPackage(event.currentTarget.dataset.prepareActivityPackage));
